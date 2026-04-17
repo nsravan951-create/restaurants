@@ -1,0 +1,9 @@
+{
+  "cleanUrls": true,
+  "rewrites": [
+    {
+      "source": "/restaurant/:id/table/:tableId",
+      "destination": "/pages/customer.html"
+    }
+  ]
+}

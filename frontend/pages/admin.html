@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Super Admin</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@600;700&family=Sora:wght@400;500;600&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="../assets/css/styles.css" />
+  </head>
+  <body>
+    <main class="dashboard-layout">
+      <header class="panel">
+        <h1>Super Admin Panel</h1>
+      </header>
+
+      <section class="panel">
+        <h2>Summary</h2>
+        <div id="summaryCards" class="card-row"></div>
+      </section>
+
+      <section class="panel">
+        <h2>Restaurants</h2>
+        <div id="restaurantsTable"></div>
+      </section>
+
+      <section class="panel">
+        <h2>Manage Promotions / Ads</h2>
+        <form id="adForm" class="grid-3">
+          <input name="title" placeholder="Ad title" required />
+          <input name="imageUrl" placeholder="Image URL" required />
+          <input name="targetLink" placeholder="Target link" required />
+          <input name="restaurantId" placeholder="Restaurant ID (optional)" />
+          <button class="btn btn-primary" type="submit">Create Ad</button>
+        </form>
+        <div id="adsList"></div>
+      </section>
+
+      <p id="adminMessage" class="message"></p>
+    </main>
+
+    <footer class="brand-footer">Powered by Online Solutionzzz</footer>
+    <script src="../assets/js/config.js"></script>
+    <script src="../assets/js/common.js"></script>
+    <script src="../assets/js/admin.js"></script>
+  </body>
+</html>

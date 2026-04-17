@@ -1,0 +1,234 @@
+const express = require('express');
+const { z } = require('zod');
+const pool = require('../config/db');
+const asyncHandler = require('../utils/asyncHandler');
+const { requireAuth } = require('../middleware/auth');
+const { ensureRestaurantAccess } = require('../utils/access');
+const { buildQrPayload } = require('../utils/qr');
+const { expireInactiveSessions } = require('../utils/tableSession');
+
+const router = express.Router();
+
+const tableSchema = z.object({
+  tableNumber: z.string().min(1),
+});
+
+const autoTableSchema = z.object({
+  totalTables: z.number().int().positive().max(500),
+});
+
+router.get('/owner/me', requireAuth(['owner']), asyncHandler(async (req, res) => {
+  const [rows] = await pool.query('SELECT id, name, slug, phone, address, is_active FROM restaurants WHERE owner_user_id = ? LIMIT 1', [req.user.userId]);
+  if (!rows.length) return res.status(404).json({ message: 'Restaurant not found' });
+  return res.json({ restaurant: rows[0] });
+}));
+
+router.get('/:restaurantId/tables', requireAuth(['owner', 'super_admin', 'staff', 'kitchen']), asyncHandler(async (req, res) => {
+  const { restaurantId } = req.params;
+  await ensureRestaurantAccess(req.user, restaurantId);
+  await expireInactiveSessions();
+
+  const [rows] = await pool.query(
+    `SELECT t.id, t.table_number, t.availability_status, t.qr_token, q.qr_url, q.qr_data_url, t.created_at
+     FROM restaurant_tables t
+     LEFT JOIN qr_codes q ON q.table_id = t.id
+     WHERE t.restaurant_id = ?
+     ORDER BY t.table_number ASC`,
+    [restaurantId]
+  );
+
+  return res.json({ tables: rows });
+}));
+
+router.post('/:restaurantId/tables', requireAuth(['owner', 'super_admin']), asyncHandler(async (req, res) => {
+  const { restaurantId } = req.params;
+  const data = tableSchema.parse(req.body);
+  await ensureRestaurantAccess(req.user, restaurantId);
+
+  const token = `${restaurantId}-${data.tableNumber}-${Date.now()}`;
+
+  const [result] = await pool.query(
+    'INSERT INTO restaurant_tables (restaurant_id, table_number, qr_token) VALUES (?, ?, ?)',
+    [restaurantId, data.tableNumber, token]
+  );
+
+  const { qrUrl, qrDataUrl } = await buildQrPayload({
+    restaurantId: Number(restaurantId),
+    tableId: result.insertId,
+  });
+
+  await pool.query(
+    `INSERT INTO qr_codes (restaurant_id, table_id, qr_url, qr_data_url)
+     VALUES (?, ?, ?, ?)`,
+    [restaurantId, result.insertId, qrUrl, qrDataUrl]
+  );
+
+  return res.status(201).json({
+    message: 'Table created',
+    table: {
+      id: result.insertId,
+      restaurant_id: Number(restaurantId),
+      table_number: data.tableNumber,
+      availability_status: 'available',
+      qr_token: token,
+      qr_url: qrUrl,
+      qr_data_url: qrDataUrl,
+    },
+  });
+}));
+
+router.post('/:restaurantId/auto-generate-tables', requireAuth(['owner', 'super_admin']), asyncHandler(async (req, res) => {
+  const { restaurantId } = req.params;
+  await ensureRestaurantAccess(req.user, restaurantId);
+
+  const data = autoTableSchema.parse({
+    ...req.body,
+    totalTables: Number(req.body.totalTables),
+  });
+
+  const conn = await pool.getConnection();
+  let createdCount = 0;
+
+  try {
+    await conn.beginTransaction();
+
+    const [existingRows] = await conn.query(
+      'SELECT table_number FROM restaurant_tables WHERE restaurant_id = ?',
+      [restaurantId]
+    );
+    const existingSet = new Set(existingRows.map((row) => row.table_number));
+
+    for (let i = 1; i <= data.totalTables; i += 1) {
+      const tableNumber = `Table ${i}`;
+      if (existingSet.has(tableNumber)) continue;
+
+      const token = `${restaurantId}-${tableNumber.replace(/\s+/g, '-')}-${Date.now()}-${i}`;
+      const [tableResult] = await conn.query(
+        'INSERT INTO restaurant_tables (restaurant_id, table_number, qr_token) VALUES (?, ?, ?)',
+        [restaurantId, tableNumber, token]
+      );
+
+      const { qrUrl, qrDataUrl } = await buildQrPayload({
+        restaurantId: Number(restaurantId),
+        tableId: tableResult.insertId,
+      });
+
+      await conn.query(
+        `INSERT INTO qr_codes (restaurant_id, table_id, qr_url, qr_data_url)
+         VALUES (?, ?, ?, ?)`,
+        [restaurantId, tableResult.insertId, qrUrl, qrDataUrl]
+      );
+
+      createdCount += 1;
+    }
+
+    await conn.commit();
+    return res.json({ message: 'Tables generated successfully', createdCount });
+  } catch (error) {
+    await conn.rollback();
+    throw error;
+  } finally {
+    conn.release();
+  }
+}));
+
+router.delete('/:restaurantId/tables/:tableId', requireAuth(['owner', 'super_admin']), asyncHandler(async (req, res) => {
+  const { restaurantId, tableId } = req.params;
+  await ensureRestaurantAccess(req.user, restaurantId);
+
+  await pool.query('DELETE FROM restaurant_tables WHERE id = ? AND restaurant_id = ?', [tableId, restaurantId]);
+  return res.json({ message: 'Table deleted' });
+}));
+
+router.get('/:restaurantId/tables/:tableId/qr', requireAuth(['owner', 'super_admin']), asyncHandler(async (req, res) => {
+  const { restaurantId, tableId } = req.params;
+  await ensureRestaurantAccess(req.user, restaurantId);
+
+  const [rows] = await pool.query('SELECT id FROM restaurant_tables WHERE id = ? AND restaurant_id = ?', [tableId, restaurantId]);
+  if (!rows.length) return res.status(404).json({ message: 'Table not found' });
+
+  let [qrRows] = await pool.query(
+    'SELECT qr_url, qr_data_url FROM qr_codes WHERE restaurant_id = ? AND table_id = ? LIMIT 1',
+    [restaurantId, tableId]
+  );
+
+  if (!qrRows.length) {
+    const { qrUrl, qrDataUrl } = await buildQrPayload({
+      restaurantId: Number(restaurantId),
+      tableId: Number(tableId),
+    });
+    await pool.query(
+      `INSERT INTO qr_codes (restaurant_id, table_id, qr_url, qr_data_url)
+       VALUES (?, ?, ?, ?)`,
+      [restaurantId, tableId, qrUrl, qrDataUrl]
+    );
+    qrRows = [{ qr_url: qrUrl, qr_data_url: qrDataUrl }];
+  }
+
+  return res.json({
+    url: qrRows[0].qr_url,
+    qrDataUrl: qrRows[0].qr_data_url,
+    downloadName: `restaurant-${restaurantId}-table-${tableId}.png`,
+  });
+}));
+
+router.get('/:restaurantId/table/:tableId', asyncHandler(async (req, res) => {
+  const { restaurantId, tableId } = req.params;
+  await expireInactiveSessions();
+
+  const [restaurantRows] = await pool.query(
+    'SELECT id, name, slug FROM restaurants WHERE id = ? AND is_active = 1 LIMIT 1',
+    [restaurantId]
+  );
+
+  if (!restaurantRows.length) {
+    return res.status(404).json({ message: 'Restaurant not found' });
+  }
+
+  const [tableRows] = await pool.query(
+    'SELECT id, table_number, availability_status FROM restaurant_tables WHERE id = ? AND restaurant_id = ? LIMIT 1',
+    [tableId, restaurantId]
+  );
+
+  if (!tableRows.length) {
+    return res.status(404).json({ message: 'Table not found' });
+  }
+
+  const [menuRows] = await pool.query(
+    'SELECT id, name, description, price, image_url, category FROM menu_items WHERE restaurant_id = ? AND is_available = 1 ORDER BY category, name',
+    [restaurantId]
+  );
+
+  const [adsRows] = await pool.query(
+    `SELECT id, title, image_url, target_link
+     FROM ads
+     WHERE is_active = 1
+       AND (restaurant_id IS NULL OR restaurant_id = ?)
+       AND (starts_at IS NULL OR starts_at <= NOW())
+       AND (ends_at IS NULL OR ends_at >= NOW())
+     ORDER BY id DESC`,
+    [restaurantId]
+  );
+
+  const [activeSessionRows] = await pool.query(
+    `SELECT id, expires_at
+     FROM table_sessions
+     WHERE restaurant_id = ? AND table_id = ? AND status = 'active'
+     ORDER BY id DESC
+     LIMIT 1`,
+    [restaurantId, tableId]
+  );
+
+  return res.json({
+    restaurant: restaurantRows[0],
+    table: tableRows[0],
+    lock: {
+      isLocked: activeSessionRows.length > 0,
+      expiresAt: activeSessionRows[0]?.expires_at || null,
+    },
+    menu: menuRows,
+    ads: adsRows,
+  });
+}));
+
+module.exports = router;

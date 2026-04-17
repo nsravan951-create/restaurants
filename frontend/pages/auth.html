@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Owner Auth</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@600;700&family=Sora:wght@400;500;600&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="../assets/css/styles.css" />
+  </head>
+  <body>
+    <main class="auth-page">
+      <section class="panel auth-panel">
+        <h1>Restaurant Owner Access</h1>
+        <p>Create your restaurant account or login.</p>
+
+        <div class="grid-2">
+          <form id="registerForm" class="stack">
+            <h2>Register</h2>
+            <input name="name" placeholder="Owner Name" required />
+            <input name="email" type="email" placeholder="Email" required />
+            <input name="password" type="password" placeholder="Password" required />
+            <input name="restaurantName" placeholder="Restaurant Name" required />
+            <input name="totalTables" type="number" min="1" max="500" placeholder="Total Tables" required />
+            <input name="phone" placeholder="Phone" />
+            <input name="address" placeholder="Address" />
+            <button class="btn btn-primary" type="submit">Create Account</button>
+          </form>
+
+          <form id="loginForm" class="stack">
+            <h2>Login</h2>
+            <input name="email" type="email" placeholder="Email" required />
+            <input name="password" type="password" placeholder="Password" required />
+            <button class="btn btn-dark" type="submit">Login</button>
+
+            <small>
+              Super admin should login here too, then open Admin panel.
+            </small>
+          </form>
+        </div>
+
+        <div id="authMessage" class="message"></div>
+      </section>
+    </main>
+
+    <footer class="brand-footer">Powered by Online Solutionzzz</footer>
+    <script src="../assets/js/config.js"></script>
+    <script src="../assets/js/common.js"></script>
+    <script src="../assets/js/auth.js"></script>
+  </body>
+</html>
