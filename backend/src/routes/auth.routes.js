@@ -87,6 +87,7 @@ router.post('/register-owner', asyncHandler(async (req, res) => {
       const { qrUrl, qrDataUrl } = await buildQrPayload({
         restaurantId,
         tableId,
+        tableNumber,
       });
 
       await conn.query(

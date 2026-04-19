@@ -269,12 +269,12 @@ document.getElementById('autoTableForm').addEventListener('submit', async (event
 
   try {
     const totalTables = Number(formData.get('totalTables'));
-    const data = await apiRequest(`/restaurants/${restaurantId}/auto-generate-tables`, {
+    const data = await apiRequest(`/restaurants/${restaurantId}/generate-qrs`, {
       method: 'POST',
-      body: JSON.stringify({ totalTables }),
+      body: JSON.stringify({ tableCount: totalTables }),
     }, true);
 
-    setMessage('ownerMessage', `Auto generation complete. Created ${data.createdCount} new tables.`);
+    setMessage('ownerMessage', `Generated ${data.generatedCount} QR codes.`);
     await loadTables();
   } catch (error) {
     setMessage('ownerMessage', error.message, true);

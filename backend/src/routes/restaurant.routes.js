@@ -89,6 +89,7 @@ router.post('/:restaurantId/tables', requireAuth(['owner', 'super_admin']), asyn
   const { qrUrl, qrDataUrl } = await buildQrPayload({
     restaurantId: Number(restaurantId),
     tableId,
+    tableNumber: data.tableNumber,
   });
 
   await pool.query(
@@ -146,6 +147,7 @@ router.post('/:restaurantId/auto-generate-tables', requireAuth(['owner', 'super_
       const { qrUrl, qrDataUrl } = await buildQrPayload({
         restaurantId: Number(restaurantId),
         tableId,
+        tableNumber,
       });
 
       await conn.query(
@@ -202,6 +204,7 @@ router.post('/:restaurantId/generate-qrs', requireAuth(['owner', 'super_admin'])
       const { qrUrl, qrDataUrl } = await buildQrPayload({
         restaurantId: Number(restaurantId),
         tableId,
+        tableNumber,
       });
 
       await conn.query(
@@ -213,12 +216,22 @@ router.post('/:restaurantId/generate-qrs', requireAuth(['owner', 'super_admin'])
       generated.push({ tableId, tableNumber, qrCodeUrl: qrUrl });
     }
 
+    const { rows: exactRows } = await conn.query(
+      `SELECT rt.id, rt.table_number, COALESCE(q.qr_url, '') AS qr_url, COALESCE(q.qr_data_url, '') AS qr_data_url
+       FROM restaurant_tables rt
+       LEFT JOIN qr_codes q ON q.table_id = rt.id
+       WHERE rt.restaurant_id = $1
+         AND rt.table_number = ANY($2::text[])
+       ORDER BY rt.id ASC`,
+      [restaurantId, Array.from({ length: tableCount }, (_, index) => `Table ${index + 1}`)]
+    );
+
     await conn.query('COMMIT');
     return res.json({
       message: 'QR generation completed',
       restaurantId: Number(restaurantId),
-      generatedCount: generated.length,
-      tables: generated,
+      generatedCount: exactRows.length,
+      tables: exactRows,
     });
   } catch (error) {
     await conn.query('ROLLBACK');
@@ -253,6 +266,7 @@ router.get('/:restaurantId/tables/:tableId/qr', requireAuth(['owner', 'super_adm
     const { qrUrl, qrDataUrl } = await buildQrPayload({
       restaurantId: Number(restaurantId),
       tableId: Number(tableId),
+      tableNumber: rows[0].table_number,
     });
     await pool.query(
       `INSERT INTO qr_codes (restaurant_id, table_id, qr_url, qr_data_url)
