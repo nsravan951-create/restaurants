@@ -3,11 +3,82 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Table Redirect</title>
+    <title>Table Order</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@600;700&family=Sora:wght@400;500;600&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="./assets/css/styles.css" />
+    <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
     <script>
-      const params = window.location.search || '';
-      window.location.replace(`./pages/table.html${params}`);
+      const params = new URLSearchParams(window.location.search);
+      const restaurantId = params.get('restaurantId');
+      const tableNumber = params.get('table');
+
+      console.log('Restaurant:', restaurantId);
+      console.log('Table:', tableNumber);
+
+      if (!restaurantId || !tableNumber) {
+        document.documentElement.innerHTML = `
+          <html lang="en">
+            <head>
+              <meta charset="UTF-8" />
+              <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+              <title>Invalid QR Code</title>
+              <link rel="stylesheet" href="./assets/css/styles.css" />
+            </head>
+            <body>
+              <main class="customer-layout">
+                <section class="panel">
+                  <h2>Invalid QR Code</h2>
+                </section>
+              </main>
+            </body>
+          </html>
+        `;
+        window.stop();
+      }
     </script>
   </head>
-  <body></body>
+  <body>
+    <main class="customer-layout">
+      <header class="panel">
+        <h1 id="restaurantTitle">Loading menu...</h1>
+        <p id="tableInfo"></p>
+        <p id="sessionTimer" class="message"></p>
+        <div id="tableLockNotice" class="message"></div>
+        <button id="joinSessionBtn" class="btn btn-light hidden" type="button">Join Existing Order Session</button>
+      </header>
+
+      <section class="panel">
+        <div id="menuContainer" class="menu-grid"></div>
+      </section>
+
+      <aside class="panel sticky-cart">
+        <h2>Your Cart</h2>
+        <div id="cartItems"></div>
+        <p class="total">Total: INR <span id="cartTotal">0</span></p>
+        <input id="customerName" placeholder="Your name (optional)" />
+        <textarea id="orderNotes" placeholder="Notes (optional)"></textarea>
+
+        <div class="payment-actions">
+          <button id="codBtn" class="btn btn-dark">Place COD Order</button>
+          <button id="onlineBtn" class="btn btn-primary">Pay Online (Razorpay)</button>
+        </div>
+        <div id="orderMessage" class="message"></div>
+      </aside>
+
+      <div id="adPopup" class="ad-popup hidden">
+        <button id="closeAd" class="close-btn">X</button>
+        <a id="adLink" target="_blank" rel="noreferrer">
+          <img id="adImage" alt="Promotion" />
+          <h3 id="adTitle"></h3>
+        </a>
+      </div>
+    </main>
+
+    <footer class="brand-footer">Powered by Online Solutionzzz</footer>
+    <script src="./assets/js/config.js"></script>
+    <script src="./assets/js/common.js"></script>
+    <script src="./assets/js/customer.js"></script>
+  </body>
 </html>

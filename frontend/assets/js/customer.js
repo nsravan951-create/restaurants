@@ -381,11 +381,18 @@ async function initCustomerPage() {
   }
 }
 
-joinSessionBtn.addEventListener('click', async () => {
-  await startOrJoinSession(true);
-});
+if (joinSessionBtn) {
+  joinSessionBtn.addEventListener('click', async () => {
+    await startOrJoinSession(true);
+  });
+}
 
-codBtn.addEventListener('click', handleCod);
-onlineBtn.addEventListener('click', handleOnline);
+if (codBtn) {
+  codBtn.addEventListener('click', handleCod);
+}
+
+if (onlineBtn) {
+  onlineBtn.addEventListener('click', handleOnline);
+}
 
 initCustomerPage();
