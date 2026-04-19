@@ -48,6 +48,21 @@ module.exports = async function handler(req, res) {
     const supabase = createSupabaseServerClient();
     const tableCandidates = toTableCandidates(tableRaw);
 
+    const { data: restaurantData, error: restaurantError } = await supabase
+      .from('restaurants')
+      .select('id, name, slug, phone, address, is_active')
+      .eq('id', restaurantId)
+      .limit(1)
+      .maybeSingle();
+
+    if (restaurantError) {
+      throw restaurantError;
+    }
+
+    if (!restaurantData) {
+      return res.status(404).json({ error: 'Restaurant not found' });
+    }
+
     const { data: tableData, error: tableError } = await supabase
       .from('restaurant_tables')
       .select('id, restaurant_id, table_number, availability_status')
@@ -80,6 +95,7 @@ module.exports = async function handler(req, res) {
       return res.status(200).json({
         ok: true,
         restaurantId,
+        restaurant: restaurantData,
         table: tableData,
         orders: ordersData || [],
       });
@@ -95,10 +111,15 @@ module.exports = async function handler(req, res) {
         <head>
           <meta charset="utf-8" />
           <meta name="viewport" content="width=device-width, initial-scale=1" />
-          <title>Table ${tableData.table_number}</title>
+          <title>${restaurantData.name} - ${tableData.table_number}</title>
         </head>
         <body>
-          <h1>Restaurant ${restaurantId} - ${tableData.table_number}</h1>
+          <h1>${restaurantData.name} - ${tableData.table_number}</h1>
+          <p>Restaurant ID: ${restaurantData.id}</p>
+          <p>Slug: ${restaurantData.slug || 'N/A'}</p>
+          <p>Phone: ${restaurantData.phone || 'N/A'}</p>
+          <p>Address: ${restaurantData.address || 'N/A'}</p>
+          <p>Active: ${restaurantData.is_active ? 'Yes' : 'No'}</p>
           <p>Availability: ${tableData.availability_status}</p>
           <h2>Recent Orders</h2>
           <ul>${orderRows || '<li>No orders found</li>'}</ul>
