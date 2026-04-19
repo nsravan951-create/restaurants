@@ -1,15 +1,26 @@
-module.exports = function handler(req, res) {
-  const restaurantId = req.query.restaurantId || '';
-  const table = req.query.table || '';
-  const wantsJson =
-    req.query.format === 'json' ||
-    (req.headers.accept && req.headers.accept.includes('application/json'));
+const { createSupabaseServerClient } = require('./_lib/supabase');
 
-  if (!restaurantId || !table) {
+function shouldReturnJson(req) {
+  return req.query.format === 'json' || (req.headers.accept && req.headers.accept.includes('application/json'));
+}
+
+function toTableCandidates(rawTable) {
+  const value = String(rawTable).trim();
+  const candidates = [value];
+  if (/^\d+$/.test(value)) {
+    candidates.push(`Table ${value}`);
+  }
+  return [...new Set(candidates)];
+}
+
+module.exports = async function handler(req, res) {
+  const restaurantIdRaw = req.query.restaurantId;
+  const tableRaw = req.query.table;
+  const wantsJson = shouldReturnJson(req);
+
+  if (!restaurantIdRaw || !tableRaw) {
     if (wantsJson) {
-      return res.status(400).json({
-        error: 'restaurantId and table query parameters are required',
-      });
+      return res.status(400).json({ error: 'restaurantId and table query parameters are required' });
     }
 
     return res.status(400).send(`
@@ -19,51 +30,84 @@ module.exports = function handler(req, res) {
           <meta charset="utf-8" />
           <meta name="viewport" content="width=device-width, initial-scale=1" />
           <title>Invalid QR Code</title>
-          <style>
-            body { font-family: Arial, sans-serif; margin: 2rem; }
-            .card { max-width: 520px; padding: 1rem 1.25rem; border: 1px solid #ddd; border-radius: 10px; }
-          </style>
         </head>
         <body>
-          <div class="card">
-            <h2>Invalid QR Code</h2>
-            <p>Required query params: restaurantId and table.</p>
-          </div>
+          <h2>Invalid QR Code</h2>
+          <p>Required query params: restaurantId and table.</p>
         </body>
       </html>
     `);
   }
 
-  if (wantsJson) {
-    return res.status(200).json({
-      ok: true,
-      restaurantId,
-      table,
-      message: 'Table route resolved successfully',
-    });
+  const restaurantId = Number(restaurantIdRaw);
+  if (!Number.isInteger(restaurantId) || restaurantId <= 0) {
+    return res.status(400).json({ error: 'restaurantId must be a positive integer' });
   }
 
-  return res.status(200).send(`
-    <!doctype html>
-    <html>
-      <head>
-        <meta charset="utf-8" />
-        <meta name="viewport" content="width=device-width, initial-scale=1" />
-        <title>Table Session</title>
-        <style>
-          body { font-family: Arial, sans-serif; margin: 2rem; }
-          .card { max-width: 680px; padding: 1rem 1.25rem; border: 1px solid #ddd; border-radius: 10px; }
-          code { background: #f7f7f7; padding: 2px 4px; border-radius: 4px; }
-        </style>
-      </head>
-      <body>
-        <div class="card">
-          <h1>Table Page Loaded</h1>
-          <p>Restaurant ID: <strong>${String(restaurantId)}</strong></p>
-          <p>Table: <strong>${String(table)}</strong></p>
-          <p>Use <code>?format=json</code> to get JSON response.</p>
-        </div>
-      </body>
-    </html>
-  `);
+  try {
+    const supabase = createSupabaseServerClient();
+    const tableCandidates = toTableCandidates(tableRaw);
+
+    const { data: tableData, error: tableError } = await supabase
+      .from('restaurant_tables')
+      .select('id, restaurant_id, table_number, availability_status')
+      .eq('restaurant_id', restaurantId)
+      .in('table_number', tableCandidates)
+      .limit(1)
+      .maybeSingle();
+
+    if (tableError) {
+      throw tableError;
+    }
+
+    if (!tableData) {
+      return res.status(404).json({ error: 'Table not found for this restaurant' });
+    }
+
+    const { data: ordersData, error: ordersError } = await supabase
+      .from('orders')
+      .select('id, status, total_amount, payment_status, created_at')
+      .eq('restaurant_id', restaurantId)
+      .eq('table_id', tableData.id)
+      .order('created_at', { ascending: false })
+      .limit(20);
+
+    if (ordersError) {
+      throw ordersError;
+    }
+
+    if (wantsJson) {
+      return res.status(200).json({
+        ok: true,
+        restaurantId,
+        table: tableData,
+        orders: ordersData || [],
+      });
+    }
+
+    const orderRows = (ordersData || [])
+      .map((order) => `<li>#${order.id} - ${order.status} - INR ${order.total_amount} - ${order.payment_status}</li>`)
+      .join('');
+
+    return res.status(200).send(`
+      <!doctype html>
+      <html>
+        <head>
+          <meta charset="utf-8" />
+          <meta name="viewport" content="width=device-width, initial-scale=1" />
+          <title>Table ${tableData.table_number}</title>
+        </head>
+        <body>
+          <h1>Restaurant ${restaurantId} - ${tableData.table_number}</h1>
+          <p>Availability: ${tableData.availability_status}</p>
+          <h2>Recent Orders</h2>
+          <ul>${orderRows || '<li>No orders found</li>'}</ul>
+          <p>Add <code>&format=json</code> for JSON output.</p>
+        </body>
+      </html>
+    `);
+  } catch (error) {
+    const message = error && error.message ? error.message : 'Unhandled server error';
+    return res.status(500).json({ error: message });
+  }
 };
