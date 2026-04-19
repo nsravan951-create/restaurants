@@ -41,47 +41,47 @@ router.post('/', asyncHandler(async (req, res) => {
     })),
   });
 
-  const conn = await pool.getConnection();
+  const conn = await pool.connect();
 
   try {
-    await conn.beginTransaction();
+    await conn.query('BEGIN');
 
-    const [tableRows] = await conn.query(
-      'SELECT id, table_number FROM restaurant_tables WHERE id = ? AND restaurant_id = ? LIMIT 1',
+    const { rows: tableRows } = await conn.query(
+      'SELECT id, table_number FROM restaurant_tables WHERE id = $1 AND restaurant_id = $2 LIMIT 1',
       [data.tableId, data.restaurantId]
     );
 
     if (!tableRows.length) {
-      await conn.rollback();
+      await conn.query('ROLLBACK');
       return res.status(404).json({ message: 'Table not found for restaurant' });
     }
 
-    const [sessionRows] = await conn.query(
+    const { rows: sessionRows } = await conn.query(
       `SELECT id, status, session_token
        FROM table_sessions
-       WHERE id = ? AND table_id = ? AND restaurant_id = ?
+       WHERE id = $1 AND table_id = $2 AND restaurant_id = $3
        LIMIT 1
        FOR UPDATE`,
       [data.tableSessionId, data.tableId, data.restaurantId]
     );
 
     if (!sessionRows.length) {
-      await conn.rollback();
+      await conn.query('ROLLBACK');
       return res.status(404).json({ message: 'Table session not found' });
     }
 
     if (sessionRows[0].status !== 'active' || sessionRows[0].session_token !== data.sessionToken) {
-      await conn.rollback();
+      await conn.query('ROLLBACK');
       return res.status(409).json({ message: 'This table is currently in ordering session with a different lock' });
     }
 
-    const [existingOrderRows] = await conn.query(
-      'SELECT id FROM orders WHERE table_session_id = ? LIMIT 1 FOR UPDATE',
+    const { rows: existingOrderRows } = await conn.query(
+      'SELECT id FROM orders WHERE table_session_id = $1 LIMIT 1 FOR UPDATE',
       [data.tableSessionId]
     );
 
     if (existingOrderRows.length) {
-      await conn.rollback();
+      await conn.query('ROLLBACK');
       return res.status(409).json({
         message: 'An order is already placed for this active table session',
         orderId: existingOrderRows[0].id,
@@ -89,10 +89,10 @@ router.post('/', asyncHandler(async (req, res) => {
     }
 
     const menuItemIds = [...new Set(data.items.map((item) => item.menuItemId))];
-    const [menuRows] = await conn.query(
+    const { rows: menuRows } = await conn.query(
       `SELECT id, name, price
        FROM menu_items
-       WHERE restaurant_id = ? AND id IN (${menuItemIds.map(() => '?').join(',')}) AND is_available = 1`,
+       WHERE restaurant_id = $1 AND id IN (${menuItemIds.map((_, index) => `$${index + 2}`).join(',')}) AND is_available = TRUE`,
       [data.restaurantId, ...menuItemIds]
     );
 
@@ -119,42 +119,43 @@ router.post('/', asyncHandler(async (req, res) => {
       };
     });
 
-    const [orderResult] = await conn.query(
+    const orderResult = await conn.query(
       `INSERT INTO orders (restaurant_id, table_id, table_session_id, table_number, customer_name, total_amount, status, payment_method, payment_status, notes)
-       VALUES (?, ?, ?, ?, ?, ?, 'pending', ?, 'pending', ?)`,
+       VALUES ($1, $2, $3, $4, $5, $6, 'pending', $7, 'pending', $8) RETURNING id` ,
       [data.restaurantId, data.tableId, data.tableSessionId, tableRows[0].table_number, data.customerName, total, data.paymentMethod, data.notes]
     );
+    const orderId = orderResult.rows[0].id;
 
     for (const item of orderItems) {
       await conn.query(
         `INSERT INTO order_items (order_id, menu_item_id, item_name, item_price, quantity, unit_price, line_total)
-         VALUES (?, ?, ?, ?, ?, ?, ?)`,
-        [orderResult.insertId, item.menuItemId, item.itemName, item.itemPrice, item.quantity, item.unitPrice, item.lineTotal]
+         VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+        [orderId, item.menuItemId, item.itemName, item.itemPrice, item.quantity, item.unitPrice, item.lineTotal]
       );
     }
 
     const nextExpiry = getSessionExpiryDate();
     await conn.query(
-      'UPDATE table_sessions SET last_activity_at = NOW(), expires_at = ? WHERE id = ?',
+      'UPDATE table_sessions SET last_activity_at = NOW(), expires_at = $1 WHERE id = $2',
       [nextExpiry, data.tableSessionId]
     );
 
-    await conn.commit();
+    await conn.query('COMMIT');
 
     emitOrderUpdate(data.restaurantId, {
       type: 'created',
-      orderId: orderResult.insertId,
+      orderId,
       tableId: data.tableId,
       status: 'pending',
     });
 
     return res.status(201).json({
       message: 'Order placed successfully',
-      orderId: orderResult.insertId,
+      orderId,
       totalAmount: total,
     });
   } catch (error) {
-    await conn.rollback();
+    await conn.query('ROLLBACK');
     throw error;
   } finally {
     conn.release();
@@ -171,21 +172,21 @@ router.get('/restaurant/:restaurantId', requireAuth(['owner', 'super_admin', 'ki
 
   let query = `
           SELECT o.id, o.table_id, o.table_number, o.table_session_id, o.customer_name, o.total_amount, o.status, o.payment_method, o.payment_status, o.created_at,
-            JSON_ARRAYAGG(JSON_OBJECT('id', oi.id, 'menu_item_id', oi.menu_item_id, 'item_name', oi.item_name, 'item_price', oi.item_price, 'quantity', oi.quantity, 'unit_price', oi.unit_price, 'line_total', oi.line_total)) AS items
+            COALESCE(json_agg(json_build_object('id', oi.id, 'menu_item_id', oi.menu_item_id, 'item_name', oi.item_name, 'item_price', oi.item_price, 'quantity', oi.quantity, 'unit_price', oi.unit_price, 'line_total', oi.line_total) ORDER BY oi.id), '[]'::json) AS items
     FROM orders o
     JOIN order_items oi ON oi.order_id = o.id
-    WHERE o.restaurant_id = ?
+    WHERE o.restaurant_id = $1
   `;
 
   const params = [restaurantId];
   if (status) {
-    query += ' AND o.status = ?';
+    query += ' AND o.status = $2';
     params.push(status);
   }
 
   query += ' GROUP BY o.id ORDER BY o.created_at DESC';
 
-  const [rows] = await pool.query(query, params);
+  const { rows } = await pool.query(query, params);
   return res.json({ orders: rows });
 }));
 
@@ -199,7 +200,7 @@ router.patch('/:orderId/status', requireAuth(['owner', 'super_admin', 'kitchen',
     return res.status(400).json({ message: 'Invalid order status' });
   }
 
-  const [rows] = await pool.query('SELECT id, restaurant_id FROM orders WHERE id = ?', [orderId]);
+  const { rows } = await pool.query('SELECT id, restaurant_id FROM orders WHERE id = $1', [orderId]);
   if (!rows.length) return res.status(404).json({ message: 'Order not found' });
 
   await ensureRestaurantAccess(req.user, rows[0].restaurant_id);
@@ -208,7 +209,7 @@ router.patch('/:orderId/status', requireAuth(['owner', 'super_admin', 'kitchen',
     return res.status(403).json({ message: 'Kitchen cannot mark delivered' });
   }
 
-  await pool.query('UPDATE orders SET status = ? WHERE id = ?', [status, orderId]);
+  await pool.query('UPDATE orders SET status = $1 WHERE id = $2', [status, orderId]);
 
   if (status === 'delivered') {
     await endSessionByOrderId(orderId, 'order_delivered');
@@ -227,8 +228,8 @@ router.get('/:orderId/invoice', requireAuth(['owner', 'super_admin', 'kitchen', 
   const { orderId } = req.params;
   const format = (req.query.format || 'html').toLowerCase();
 
-  const [orderRows] = await pool.query(
-    'SELECT id, restaurant_id, table_number, customer_name, total_amount, status, payment_method, payment_status, created_at FROM orders WHERE id = ? LIMIT 1',
+  const { rows: orderRows } = await pool.query(
+    'SELECT id, restaurant_id, table_number, customer_name, total_amount, status, payment_method, payment_status, created_at FROM orders WHERE id = $1 LIMIT 1',
     [orderId]
   );
 
@@ -238,15 +239,15 @@ router.get('/:orderId/invoice', requireAuth(['owner', 'super_admin', 'kitchen', 
 
   await ensureRestaurantAccess(req.user, orderRows[0].restaurant_id);
 
-  const [restaurantRows] = await pool.query(
-    'SELECT id, name FROM restaurants WHERE id = ? LIMIT 1',
+  const { rows: restaurantRows } = await pool.query(
+    'SELECT id, name FROM restaurants WHERE id = $1 LIMIT 1',
     [orderRows[0].restaurant_id]
   );
 
-  const [itemRows] = await pool.query(
+  const { rows: itemRows } = await pool.query(
     `SELECT item_name, item_price, quantity, line_total
      FROM order_items
-     WHERE order_id = ?
+     WHERE order_id = $1
      ORDER BY id ASC`,
     [orderId]
   );
@@ -263,8 +264,8 @@ router.get('/:orderId/invoice', requireAuth(['owner', 'super_admin', 'kitchen', 
 router.get('/:orderId/invoice-data', requireAuth(['owner', 'super_admin', 'kitchen', 'staff']), asyncHandler(async (req, res) => {
   const { orderId } = req.params;
 
-  const [orderRows] = await pool.query(
-    'SELECT id, restaurant_id, table_number, customer_name, total_amount, status, payment_method, payment_status, created_at FROM orders WHERE id = ? LIMIT 1',
+  const { rows: orderRows } = await pool.query(
+    'SELECT id, restaurant_id, table_number, customer_name, total_amount, status, payment_method, payment_status, created_at FROM orders WHERE id = $1 LIMIT 1',
     [orderId]
   );
 
@@ -274,15 +275,15 @@ router.get('/:orderId/invoice-data', requireAuth(['owner', 'super_admin', 'kitch
 
   await ensureRestaurantAccess(req.user, orderRows[0].restaurant_id);
 
-  const [restaurantRows] = await pool.query(
-    'SELECT id, name FROM restaurants WHERE id = ? LIMIT 1',
+  const { rows: restaurantRows } = await pool.query(
+    'SELECT id, name FROM restaurants WHERE id = $1 LIMIT 1',
     [orderRows[0].restaurant_id]
   );
 
-  const [itemRows] = await pool.query(
+  const { rows: itemRows } = await pool.query(
     `SELECT item_name, item_price, quantity, line_total
      FROM order_items
-     WHERE order_id = ?
+     WHERE order_id = $1
      ORDER BY id ASC`,
     [orderId]
   );

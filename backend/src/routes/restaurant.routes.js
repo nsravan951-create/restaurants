@@ -18,7 +18,7 @@ const autoTableSchema = z.object({
 });
 
 router.get('/owner/me', requireAuth(['owner']), asyncHandler(async (req, res) => {
-  const [rows] = await pool.query('SELECT id, name, slug, phone, address, is_active FROM restaurants WHERE owner_user_id = ? LIMIT 1', [req.user.userId]);
+  const { rows } = await pool.query('SELECT id, name, slug, phone, address, is_active FROM restaurants WHERE owner_user_id = $1 LIMIT 1', [req.user.userId]);
   if (!rows.length) return res.status(404).json({ message: 'Restaurant not found' });
   return res.json({ restaurant: rows[0] });
 }));
@@ -28,11 +28,11 @@ router.get('/:restaurantId/tables', requireAuth(['owner', 'super_admin', 'staff'
   await ensureRestaurantAccess(req.user, restaurantId);
   await expireInactiveSessions();
 
-  const [rows] = await pool.query(
+  const { rows } = await pool.query(
     `SELECT t.id, t.table_number, t.availability_status, t.qr_token, q.qr_url, q.qr_data_url, t.created_at
      FROM restaurant_tables t
      LEFT JOIN qr_codes q ON q.table_id = t.id
-     WHERE t.restaurant_id = ?
+     WHERE t.restaurant_id = $1
      ORDER BY t.table_number ASC`,
     [restaurantId]
   );
@@ -47,26 +47,27 @@ router.post('/:restaurantId/tables', requireAuth(['owner', 'super_admin']), asyn
 
   const token = `${restaurantId}-${data.tableNumber}-${Date.now()}`;
 
-  const [result] = await pool.query(
-    'INSERT INTO restaurant_tables (restaurant_id, table_number, qr_token) VALUES (?, ?, ?)',
+  const result = await pool.query(
+    'INSERT INTO restaurant_tables (restaurant_id, table_number, qr_token) VALUES ($1, $2, $3) RETURNING id',
     [restaurantId, data.tableNumber, token]
   );
+  const tableId = result.rows[0].id;
 
   const { qrUrl, qrDataUrl } = await buildQrPayload({
     restaurantId: Number(restaurantId),
-    tableId: result.insertId,
+    tableId,
   });
 
   await pool.query(
     `INSERT INTO qr_codes (restaurant_id, table_id, qr_url, qr_data_url)
-     VALUES (?, ?, ?, ?)`,
-    [restaurantId, result.insertId, qrUrl, qrDataUrl]
+     VALUES ($1, $2, $3, $4)`,
+    [restaurantId, tableId, qrUrl, qrDataUrl]
   );
 
   return res.status(201).json({
     message: 'Table created',
     table: {
-      id: result.insertId,
+      id: tableId,
       restaurant_id: Number(restaurantId),
       table_number: data.tableNumber,
       availability_status: 'available',
@@ -86,14 +87,14 @@ router.post('/:restaurantId/auto-generate-tables', requireAuth(['owner', 'super_
     totalTables: Number(req.body.totalTables),
   });
 
-  const conn = await pool.getConnection();
+  const conn = await pool.connect();
   let createdCount = 0;
 
   try {
-    await conn.beginTransaction();
+    await conn.query('BEGIN');
 
-    const [existingRows] = await conn.query(
-      'SELECT table_number FROM restaurant_tables WHERE restaurant_id = ?',
+    const { rows: existingRows } = await conn.query(
+      'SELECT table_number FROM restaurant_tables WHERE restaurant_id = $1',
       [restaurantId]
     );
     const existingSet = new Set(existingRows.map((row) => row.table_number));
@@ -103,29 +104,30 @@ router.post('/:restaurantId/auto-generate-tables', requireAuth(['owner', 'super_
       if (existingSet.has(tableNumber)) continue;
 
       const token = `${restaurantId}-${tableNumber.replace(/\s+/g, '-')}-${Date.now()}-${i}`;
-      const [tableResult] = await conn.query(
-        'INSERT INTO restaurant_tables (restaurant_id, table_number, qr_token) VALUES (?, ?, ?)',
+      const tableResult = await conn.query(
+        'INSERT INTO restaurant_tables (restaurant_id, table_number, qr_token) VALUES ($1, $2, $3) RETURNING id',
         [restaurantId, tableNumber, token]
       );
+      const tableId = tableResult.rows[0].id;
 
       const { qrUrl, qrDataUrl } = await buildQrPayload({
         restaurantId: Number(restaurantId),
-        tableId: tableResult.insertId,
+        tableId,
       });
 
       await conn.query(
         `INSERT INTO qr_codes (restaurant_id, table_id, qr_url, qr_data_url)
-         VALUES (?, ?, ?, ?)`,
-        [restaurantId, tableResult.insertId, qrUrl, qrDataUrl]
+         VALUES ($1, $2, $3, $4)`,
+        [restaurantId, tableId, qrUrl, qrDataUrl]
       );
 
       createdCount += 1;
     }
 
-    await conn.commit();
+    await conn.query('COMMIT');
     return res.json({ message: 'Tables generated successfully', createdCount });
   } catch (error) {
-    await conn.rollback();
+    await conn.query('ROLLBACK');
     throw error;
   } finally {
     conn.release();
@@ -136,7 +138,7 @@ router.delete('/:restaurantId/tables/:tableId', requireAuth(['owner', 'super_adm
   const { restaurantId, tableId } = req.params;
   await ensureRestaurantAccess(req.user, restaurantId);
 
-  await pool.query('DELETE FROM restaurant_tables WHERE id = ? AND restaurant_id = ?', [tableId, restaurantId]);
+  await pool.query('DELETE FROM restaurant_tables WHERE id = $1 AND restaurant_id = $2', [tableId, restaurantId]);
   return res.json({ message: 'Table deleted' });
 }));
 
@@ -144,13 +146,14 @@ router.get('/:restaurantId/tables/:tableId/qr', requireAuth(['owner', 'super_adm
   const { restaurantId, tableId } = req.params;
   await ensureRestaurantAccess(req.user, restaurantId);
 
-  const [rows] = await pool.query('SELECT id FROM restaurant_tables WHERE id = ? AND restaurant_id = ?', [tableId, restaurantId]);
+  const { rows } = await pool.query('SELECT id FROM restaurant_tables WHERE id = $1 AND restaurant_id = $2', [tableId, restaurantId]);
   if (!rows.length) return res.status(404).json({ message: 'Table not found' });
 
-  let [qrRows] = await pool.query(
-    'SELECT qr_url, qr_data_url FROM qr_codes WHERE restaurant_id = ? AND table_id = ? LIMIT 1',
+  const qrResult = await pool.query(
+    'SELECT qr_url, qr_data_url FROM qr_codes WHERE restaurant_id = $1 AND table_id = $2 LIMIT 1',
     [restaurantId, tableId]
   );
+  let qrRows = qrResult.rows;
 
   if (!qrRows.length) {
     const { qrUrl, qrDataUrl } = await buildQrPayload({
@@ -159,7 +162,7 @@ router.get('/:restaurantId/tables/:tableId/qr', requireAuth(['owner', 'super_adm
     });
     await pool.query(
       `INSERT INTO qr_codes (restaurant_id, table_id, qr_url, qr_data_url)
-       VALUES (?, ?, ?, ?)`,
+       VALUES ($1, $2, $3, $4)`,
       [restaurantId, tableId, qrUrl, qrDataUrl]
     );
     qrRows = [{ qr_url: qrUrl, qr_data_url: qrDataUrl }];
@@ -176,8 +179,8 @@ router.get('/:restaurantId/table/:tableId', asyncHandler(async (req, res) => {
   const { restaurantId, tableId } = req.params;
   await expireInactiveSessions();
 
-  const [restaurantRows] = await pool.query(
-    'SELECT id, name, slug FROM restaurants WHERE id = ? AND is_active = 1 LIMIT 1',
+  const { rows: restaurantRows } = await pool.query(
+    'SELECT id, name, slug FROM restaurants WHERE id = $1 AND is_active = TRUE LIMIT 1',
     [restaurantId]
   );
 
@@ -185,8 +188,8 @@ router.get('/:restaurantId/table/:tableId', asyncHandler(async (req, res) => {
     return res.status(404).json({ message: 'Restaurant not found' });
   }
 
-  const [tableRows] = await pool.query(
-    'SELECT id, table_number, availability_status FROM restaurant_tables WHERE id = ? AND restaurant_id = ? LIMIT 1',
+  const { rows: tableRows } = await pool.query(
+    'SELECT id, table_number, availability_status FROM restaurant_tables WHERE id = $1 AND restaurant_id = $2 LIMIT 1',
     [tableId, restaurantId]
   );
 
@@ -194,26 +197,26 @@ router.get('/:restaurantId/table/:tableId', asyncHandler(async (req, res) => {
     return res.status(404).json({ message: 'Table not found' });
   }
 
-  const [menuRows] = await pool.query(
-    'SELECT id, name, description, price, image_url, category FROM menu_items WHERE restaurant_id = ? AND is_available = 1 ORDER BY category, name',
+  const { rows: menuRows } = await pool.query(
+    'SELECT id, name, description, price, image_url, category FROM menu_items WHERE restaurant_id = $1 AND is_available = TRUE ORDER BY category, name',
     [restaurantId]
   );
 
-  const [adsRows] = await pool.query(
+  const { rows: adsRows } = await pool.query(
     `SELECT id, title, image_url, target_link
      FROM ads
-     WHERE is_active = 1
-       AND (restaurant_id IS NULL OR restaurant_id = ?)
+     WHERE is_active = TRUE
+       AND (restaurant_id IS NULL OR restaurant_id = $1)
        AND (starts_at IS NULL OR starts_at <= NOW())
        AND (ends_at IS NULL OR ends_at >= NOW())
      ORDER BY id DESC`,
     [restaurantId]
   );
 
-  const [activeSessionRows] = await pool.query(
+  const { rows: activeSessionRows } = await pool.query(
     `SELECT id, expires_at
      FROM table_sessions
-     WHERE restaurant_id = ? AND table_id = ? AND status = 'active'
+     WHERE restaurant_id = $1 AND table_id = $2 AND status = 'active'
      ORDER BY id DESC
      LIMIT 1`,
     [restaurantId, tableId]

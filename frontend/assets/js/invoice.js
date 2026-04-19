@@ -1,3 +1,5 @@
+const API_URL = window.API_URL;
+
 function parseOrderId() {
   const params = new URLSearchParams(window.location.search);
   return params.get('orderId');
@@ -62,10 +64,13 @@ function renderInvoice(invoice) {
     event.preventDefault();
     try {
       const auth = getAuth();
-      const response = await fetch(`${window.APP_CONFIG.API_BASE_URL}/orders/${invoice.order.id}/invoice?format=pdf`, {
+      const response = await fetch(`${API_URL}/orders/${invoice.order.id}/invoice?format=pdf`, {
         headers: {
           Authorization: auth?.token ? `Bearer ${auth.token}` : '',
         },
+      }).catch((error) => {
+        console.error(error);
+        throw error;
       });
 
       if (!response.ok) {

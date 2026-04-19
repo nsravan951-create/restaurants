@@ -25,7 +25,7 @@ router.post('/create-order', asyncHandler(async (req, res) => {
   const { orderId } = req.body;
   if (!orderId) return res.status(400).json({ message: 'orderId is required' });
 
-  const [orderRows] = await pool.query('SELECT id, total_amount FROM orders WHERE id = ?', [orderId]);
+  const { rows: orderRows } = await pool.query('SELECT id, total_amount FROM orders WHERE id = $1', [orderId]);
   if (!orderRows.length) return res.status(404).json({ message: 'Order not found' });
 
   const razorpay = getRazorpay();
@@ -38,7 +38,7 @@ router.post('/create-order', asyncHandler(async (req, res) => {
     notes: { internalOrderId: String(orderId) },
   });
 
-  await pool.query('UPDATE orders SET razorpay_order_id = ?, payment_method = ? WHERE id = ?', [razorpayOrder.id, 'online', orderId]);
+  await pool.query('UPDATE orders SET razorpay_order_id = $1, payment_method = $2 WHERE id = $3', [razorpayOrder.id, 'online', orderId]);
 
   return res.json({
     message: 'Razorpay order created',
@@ -61,12 +61,12 @@ router.post('/verify', asyncHandler(async (req, res) => {
     .digest('hex');
 
   if (expected !== razorpay_signature) {
-    await pool.query('UPDATE orders SET payment_status = ? WHERE id = ?', ['failed', orderId]);
+    await pool.query('UPDATE orders SET payment_status = $1 WHERE id = $2', ['failed', orderId]);
     return res.status(400).json({ message: 'Payment verification failed' });
   }
 
   await pool.query(
-    'UPDATE orders SET payment_status = ?, razorpay_payment_id = ? WHERE id = ?',
+    'UPDATE orders SET payment_status = $1, razorpay_payment_id = $2 WHERE id = $3',
     ['paid', razorpay_payment_id, orderId]
   );
 

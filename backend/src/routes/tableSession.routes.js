@@ -29,24 +29,24 @@ router.post('/start', asyncHandler(async (req, res) => {
 
   await expireInactiveSessions();
 
-  const conn = await pool.getConnection();
+  const conn = await pool.connect();
   try {
-    await conn.beginTransaction();
+    await conn.query('BEGIN');
 
-    const [tableRows] = await conn.query(
-      'SELECT id, table_number FROM restaurant_tables WHERE id = ? AND restaurant_id = ? LIMIT 1 FOR UPDATE',
+    const { rows: tableRows } = await conn.query(
+      'SELECT id, table_number FROM restaurant_tables WHERE id = $1 AND restaurant_id = $2 LIMIT 1 FOR UPDATE',
       [data.tableId, data.restaurantId]
     );
 
     if (!tableRows.length) {
-      await conn.rollback();
+      await conn.query('ROLLBACK');
       return res.status(404).json({ message: 'Table not found' });
     }
 
-    const [activeRows] = await conn.query(
+    const { rows: activeRows } = await conn.query(
       `SELECT id, session_token, created_by_client_id, status, expires_at
        FROM table_sessions
-       WHERE table_id = ? AND restaurant_id = ? AND status = 'active'
+       WHERE table_id = $1 AND restaurant_id = $2 AND status = 'active'
        ORDER BY id DESC LIMIT 1
        FOR UPDATE`,
       [data.tableId, data.restaurantId]
@@ -58,11 +58,11 @@ router.post('/start', asyncHandler(async (req, res) => {
       if (data.sessionToken && data.sessionToken === existing.session_token) {
         const nextExpiry = getSessionExpiryDate();
         await conn.query(
-          'UPDATE table_sessions SET last_activity_at = NOW(), expires_at = ? WHERE id = ?',
+          'UPDATE table_sessions SET last_activity_at = NOW(), expires_at = $1 WHERE id = $2',
           [nextExpiry, existing.id]
         );
 
-        await conn.commit();
+        await conn.query('COMMIT');
         return res.json({
           locked: false,
           joined: true,
@@ -79,11 +79,11 @@ router.post('/start', asyncHandler(async (req, res) => {
       if (data.joinExisting) {
         const nextExpiry = getSessionExpiryDate();
         await conn.query(
-          'UPDATE table_sessions SET last_activity_at = NOW(), expires_at = ? WHERE id = ?',
+          'UPDATE table_sessions SET last_activity_at = NOW(), expires_at = $1 WHERE id = $2',
           [nextExpiry, existing.id]
         );
 
-        await conn.commit();
+        await conn.query('COMMIT');
         return res.json({
           locked: false,
           joined: true,
@@ -97,7 +97,7 @@ router.post('/start', asyncHandler(async (req, res) => {
         });
       }
 
-      await conn.rollback();
+      await conn.query('ROLLBACK');
       return res.status(409).json({
         locked: true,
         message: 'This table is currently in ordering session. Please wait or join existing order.',
@@ -112,32 +112,32 @@ router.post('/start', asyncHandler(async (req, res) => {
     const sessionToken = generateSessionToken();
     const expiresAt = getSessionExpiryDate();
 
-    const [result] = await conn.query(
+    const result = await conn.query(
       `INSERT INTO table_sessions (restaurant_id, table_id, session_token, created_by_client_id, status, last_activity_at, expires_at)
-       VALUES (?, ?, ?, ?, 'active', NOW(), ?)`,
+       VALUES ($1, $2, $3, $4, 'active', NOW(), $5) RETURNING id`,
       [data.restaurantId, data.tableId, sessionToken, data.clientId, expiresAt]
     );
 
     await conn.query(
-      "UPDATE restaurant_tables SET availability_status = 'active' WHERE id = ?",
+      "UPDATE restaurant_tables SET availability_status = 'active' WHERE id = $1",
       [data.tableId]
     );
 
-    await conn.commit();
+    await conn.query('COMMIT');
 
     return res.status(201).json({
       locked: false,
       joined: false,
       message: 'Table session started',
       session: {
-        id: result.insertId,
+        id: result.rows[0].id,
         sessionToken,
         expiresAt,
         timeoutMinutes: SESSION_TIMEOUT_MINUTES,
       },
     });
   } catch (error) {
-    await conn.rollback();
+    await conn.query('ROLLBACK');
     throw error;
   } finally {
     conn.release();
@@ -154,10 +154,10 @@ router.post('/:sessionId/ping', asyncHandler(async (req, res) => {
 
   await expireInactiveSessions();
 
-  const [rows] = await pool.query(
+  const { rows } = await pool.query(
     `SELECT id, status
      FROM table_sessions
-     WHERE id = ? AND session_token = ?
+     WHERE id = $1 AND session_token = $2
      LIMIT 1`,
     [sessionId, sessionToken]
   );
@@ -172,7 +172,7 @@ router.post('/:sessionId/ping', asyncHandler(async (req, res) => {
 
   const expiresAt = getSessionExpiryDate();
   await pool.query(
-    'UPDATE table_sessions SET last_activity_at = NOW(), expires_at = ? WHERE id = ?',
+    'UPDATE table_sessions SET last_activity_at = NOW(), expires_at = $1 WHERE id = $2',
     [expiresAt, sessionId]
   );
 
@@ -187,46 +187,46 @@ router.post('/:sessionId/end', asyncHandler(async (req, res) => {
     return res.status(400).json({ message: 'sessionToken is required' });
   }
 
-  const conn = await pool.getConnection();
+  const conn = await pool.connect();
 
   try {
-    await conn.beginTransaction();
+    await conn.query('BEGIN');
 
-    const [rows] = await conn.query(
+    const { rows } = await conn.query(
       `SELECT id, table_id, status
        FROM table_sessions
-       WHERE id = ? AND session_token = ?
+       WHERE id = $1 AND session_token = $2
        LIMIT 1
        FOR UPDATE`,
       [sessionId, sessionToken]
     );
 
     if (!rows.length) {
-      await conn.rollback();
+      await conn.query('ROLLBACK');
       return res.status(404).json({ message: 'Session not found' });
     }
 
     if (rows[0].status !== 'active') {
-      await conn.commit();
+      await conn.query('COMMIT');
       return res.json({ message: 'Session already ended' });
     }
 
     await conn.query(
       `UPDATE table_sessions
-       SET status = 'completed', ended_at = NOW(), ended_reason = ?
-       WHERE id = ?`,
+       SET status = 'completed', ended_at = NOW(), ended_reason = $1
+       WHERE id = $2`,
       [reason || 'manual_end', sessionId]
     );
 
     await conn.query(
-      "UPDATE restaurant_tables SET availability_status = 'available' WHERE id = ?",
+      "UPDATE restaurant_tables SET availability_status = 'available' WHERE id = $1",
       [rows[0].table_id]
     );
 
-    await conn.commit();
+    await conn.query('COMMIT');
     return res.json({ message: 'Session ended' });
   } catch (error) {
-    await conn.rollback();
+    await conn.query('ROLLBACK');
     throw error;
   } finally {
     conn.release();

@@ -1,4 +1,5 @@
 const STORAGE_KEY = 'qr_ordering_auth';
+const API_URL = window.API_URL;
 
 function setAuth(authData) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(authData));
@@ -31,9 +32,12 @@ async function apiRequest(path, options = {}, requiresAuth = false) {
     }
   }
 
-  const response = await fetch(`${window.APP_CONFIG.API_BASE_URL}${path}`, {
+  const response = await fetch(`${API_URL}${path}`, {
     ...options,
     headers,
+  }).catch((error) => {
+    console.error(error);
+    throw error;
   });
 
   const data = await response.json().catch(() => ({}));

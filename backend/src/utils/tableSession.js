@@ -8,11 +8,11 @@ function generateSessionToken() {
 }
 
 async function expireInactiveSessions() {
-  const conn = await pool.getConnection();
+  const conn = await pool.connect();
   try {
-    await conn.beginTransaction();
+    await conn.query('BEGIN');
 
-    const [expiredRows] = await conn.query(
+    const { rows: expiredRows } = await conn.query(
       `SELECT id, table_id
        FROM table_sessions
        WHERE status = 'active' AND expires_at <= NOW()
@@ -26,22 +26,22 @@ async function expireInactiveSessions() {
       await conn.query(
         `UPDATE table_sessions
          SET status = 'expired', ended_at = NOW(), ended_reason = 'timeout'
-         WHERE id IN (${sessionIds.map(() => '?').join(',')})`,
+         WHERE id IN (${sessionIds.map((_, index) => `$${index + 1}`).join(',')})`,
         sessionIds
       );
 
       await conn.query(
         `UPDATE restaurant_tables
          SET availability_status = 'available'
-         WHERE id IN (${tableIds.map(() => '?').join(',')})`,
+         WHERE id IN (${tableIds.map((_, index) => `$${index + 1}`).join(',')})`,
         tableIds
       );
     }
 
-    await conn.commit();
+    await conn.query('COMMIT');
     return expiredRows.length;
   } catch (error) {
-    await conn.rollback();
+    await conn.query('ROLLBACK');
     throw error;
   } finally {
     conn.release();
@@ -53,18 +53,18 @@ function getSessionExpiryDate() {
 }
 
 async function endSessionByOrderId(orderId, reason) {
-  const conn = await pool.getConnection();
+  const conn = await pool.connect();
 
   try {
-    await conn.beginTransaction();
+    await conn.query('BEGIN');
 
-    const [orderRows] = await conn.query(
-      'SELECT id, table_id, table_session_id FROM orders WHERE id = ? LIMIT 1 FOR UPDATE',
+    const { rows: orderRows } = await conn.query(
+      'SELECT id, table_id, table_session_id FROM orders WHERE id = $1 LIMIT 1 FOR UPDATE',
       [orderId]
     );
 
     if (!orderRows.length) {
-      await conn.rollback();
+      await conn.query('ROLLBACK');
       return false;
     }
 
@@ -72,22 +72,22 @@ async function endSessionByOrderId(orderId, reason) {
 
     await conn.query(
       `UPDATE table_sessions
-       SET status = 'completed', ended_at = NOW(), ended_reason = ?
-       WHERE id = ? AND status = 'active'`,
+       SET status = 'completed', ended_at = NOW(), ended_reason = $1
+       WHERE id = $2 AND status = 'active'`,
       [reason, sessionId]
     );
 
     await conn.query(
       `UPDATE restaurant_tables
        SET availability_status = 'available'
-       WHERE id = ?`,
+       WHERE id = $1`,
       [orderRows[0].table_id]
     );
 
-    await conn.commit();
+    await conn.query('COMMIT');
     return true;
   } catch (error) {
-    await conn.rollback();
+    await conn.query('ROLLBACK');
     throw error;
   } finally {
     conn.release();
