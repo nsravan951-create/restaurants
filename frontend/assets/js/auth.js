@@ -1,6 +1,5 @@
 const registerForm = document.getElementById('registerForm');
 const loginForm = document.getElementById('loginForm');
-const API_URL = window.API_URL;
 
 if (registerForm) {
   registerForm.addEventListener('submit', (event) => {
@@ -8,7 +7,7 @@ if (registerForm) {
     const formData = new FormData(registerForm);
     const payload = Object.fromEntries(formData.entries());
 
-    fetch(`${API_URL}/auth/register-owner`, {
+    fetch(`${window.API_URL}/auth/register-owner`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
