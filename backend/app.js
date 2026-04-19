@@ -14,16 +14,33 @@ const errorHandler = require('./src/middleware/errorHandler');
 
 const app = express();
 
-app.use(cors({
-  origin: [
-    'http://localhost:3000',
-    'http://localhost:5173',
-    'https://restaurants-os3fs97xx-nsravan951-creates-projects.vercel.app',
-    'https://restaurants-mauve-two.vercel.app',
-  ],
-  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
+const allowedOrigins = [
+  'http://localhost:3000',
+  'http://localhost:5173',
+  'https://restaurants-git-main-nsravan951-creates-projects.vercel.app',
+  'https://restaurants-7l46sycxk-nsravan951-creates-projects.vercel.app',
+  'https://restaurants-os3fs97xx-nsravan951-creates-projects.vercel.app',
+  'https://restaurants-mauve-two.vercel.app',
+];
+
+const corsOptions = {
+  origin(origin, callback) {
+    if (process.env.NODE_ENV !== 'production') {
+      console.log('Request from:', origin);
+    }
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+      return;
+    }
+    callback(new Error(`CORS not allowed: ${origin}`));
+  },
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
   credentials: true,
-}));
+};
+
+app.use(cors(corsOptions));
+app.options('*', cors(corsOptions));
 app.use(express.json());
 app.use((req, res, next) => {
   if (process.env.NODE_ENV !== 'test') {
