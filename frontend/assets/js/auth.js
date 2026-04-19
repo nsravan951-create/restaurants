@@ -1,22 +1,41 @@
 const registerForm = document.getElementById('registerForm');
 const loginForm = document.getElementById('loginForm');
+const API_URL = window.API_URL;
 
 if (registerForm) {
-  registerForm.addEventListener('submit', async (event) => {
+  registerForm.addEventListener('submit', (event) => {
     event.preventDefault();
     const formData = new FormData(registerForm);
+    const payload = Object.fromEntries(formData.entries());
 
-    try {
-      const payload = Object.fromEntries(formData.entries());
-      await apiRequest('/auth/register-owner', {
-        method: 'POST',
-        body: JSON.stringify(payload),
+    fetch(`${API_URL}/auth/register-owner`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload),
+    })
+      .then(async (res) => {
+        const data = await res.json().catch(() => ({}));
+
+        if (!res.ok) {
+          if (res.status === 409) {
+            throw new Error('User already exists');
+          }
+          throw new Error(data.error || data.message || 'Request failed');
+        }
+
+        return data;
+      })
+      .then(() => {
+        console.log('Success: registered owner');
+        setMessage('authMessage', 'Owner account created. Please login.');
+        registerForm.reset();
+      })
+      .catch((err) => {
+        console.error('Error:', err.message);
+        setMessage('authMessage', err.message, true);
       });
-      setMessage('authMessage', 'Owner account created. Please login.');
-      registerForm.reset();
-    } catch (error) {
-      setMessage('authMessage', error.message, true);
-    }
   });
 }
 

@@ -34,6 +34,13 @@ function signToken(user) {
 }
 
 router.post('/register-owner', asyncHandler(async (req, res) => {
+  console.log('BODY:', req.body);
+
+  const { name, email, password } = req.body || {};
+  if (!name || !email || !password) {
+    return res.status(400).json({ error: 'Missing required fields' });
+  }
+
   const data = ownerRegisterSchema.parse({
     ...req.body,
     totalTables: Number(req.body.totalTables),
@@ -41,12 +48,13 @@ router.post('/register-owner', asyncHandler(async (req, res) => {
   const conn = await pool.connect();
 
   try {
-    await conn.query('BEGIN');
-
     const { rows: existing } = await conn.query('SELECT id FROM users WHERE email = $1', [data.email]);
+    console.log('REGISTER existing user count:', existing.length);
     if (existing.length) {
-      return res.status(409).json({ message: 'Email already exists' });
+      return res.status(409).json({ error: 'User already exists' });
     }
+
+    await conn.query('BEGIN');
 
     const hash = await bcrypt.hash(data.password, 10);
     const userResult = await conn.query(
@@ -54,6 +62,7 @@ router.post('/register-owner', asyncHandler(async (req, res) => {
       [data.name, data.email, hash, 'owner']
     );
     const userId = userResult.rows[0].id;
+    console.log('REGISTER created user id:', userId);
 
     const slugBase = data.restaurantName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
     const slug = `${slugBase}-${Date.now()}`;
@@ -63,6 +72,7 @@ router.post('/register-owner', asyncHandler(async (req, res) => {
       [userId, data.restaurantName, slug, data.phone, data.address]
     );
     const restaurantId = restaurantResult.rows[0].id;
+    console.log('REGISTER created restaurant id:', restaurantId);
 
     for (let i = 1; i <= data.totalTables; i += 1) {
       const tableNumber = `Table ${i}`;
@@ -98,8 +108,13 @@ router.post('/register-owner', asyncHandler(async (req, res) => {
       restaurant: { id: restaurantId, name: data.restaurantName, slug, totalTables: data.totalTables },
     });
   } catch (error) {
-    await conn.query('ROLLBACK');
-    throw error;
+    console.error('REGISTER ERROR:', error);
+    try {
+      await conn.query('ROLLBACK');
+    } catch (rollbackError) {
+      console.error('REGISTER ROLLBACK ERROR:', rollbackError);
+    }
+    return res.status(500).json({ error: error.message });
   } finally {
     conn.release();
   }

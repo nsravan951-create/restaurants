@@ -42,7 +42,7 @@ async function apiRequest(path, options = {}, requiresAuth = false) {
 
   const data = await response.json().catch(() => ({}));
   if (!response.ok) {
-    const error = new Error(data.message || 'Request failed');
+    const error = new Error(data.error || data.message || 'Request failed');
     error.data = data;
     error.status = response.status;
     throw error;
