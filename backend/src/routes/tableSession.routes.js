@@ -20,6 +20,37 @@ const startSessionSchema = z.object({
   sessionToken: z.string().optional().default(''),
 });
 
+router.post('/start', asyncHandler(async (req, res, next) => {
+  if (req.body && req.body.tableNumber !== undefined && req.body.tableId === undefined) {
+    const restaurantId = Number(req.body.restaurantId);
+    const tableNumber = String(req.body.tableNumber).trim();
+
+    if (!restaurantId || !tableNumber) {
+      return res.status(400).json({ error: 'restaurantId and tableNumber are required' });
+    }
+
+    const normalized = /^\d+$/.test(tableNumber) ? [`Table ${tableNumber}`, tableNumber] : [tableNumber];
+    const placeholders = normalized.map((_, index) => `$${index + 2}`).join(', ');
+    const { rows: tableRows } = await pool.query(
+      `SELECT id, table_number
+       FROM restaurant_tables
+       WHERE restaurant_id = $1 AND table_number IN (${placeholders})
+       ORDER BY id ASC
+       LIMIT 1`,
+      [restaurantId, ...normalized]
+    );
+
+    if (!tableRows.length) {
+      return res.status(404).json({ error: 'Table not found' });
+    }
+
+    req.body.tableId = tableRows[0].id;
+    req.body.clientId = req.body.clientId || `legacy_${Date.now()}`;
+  }
+
+  return next();
+}));
+
 router.post('/start', asyncHandler(async (req, res) => {
   const data = startSessionSchema.parse({
     ...req.body,
@@ -225,6 +256,53 @@ router.post('/:sessionId/end', asyncHandler(async (req, res) => {
 
     await conn.query('COMMIT');
     return res.json({ message: 'Session ended' });
+  } catch (error) {
+    await conn.query('ROLLBACK');
+    throw error;
+  } finally {
+    conn.release();
+  }
+}));
+
+router.post('/end', asyncHandler(async (req, res) => {
+  const sessionId = Number(req.body.sessionId);
+  if (!sessionId) {
+    return res.status(400).json({ error: 'sessionId is required' });
+  }
+
+  const conn = await pool.connect();
+  try {
+    await conn.query('BEGIN');
+
+    const { rows } = await conn.query(
+      `SELECT id, table_id, status
+       FROM table_sessions
+       WHERE id = $1
+       LIMIT 1
+       FOR UPDATE`,
+      [sessionId]
+    );
+
+    if (!rows.length) {
+      await conn.query('ROLLBACK');
+      return res.status(404).json({ error: 'Session not found' });
+    }
+
+    if (rows[0].status !== 'active') {
+      await conn.query('COMMIT');
+      return res.json({ message: 'Session already ended', sessionId });
+    }
+
+    await conn.query(
+      `UPDATE table_sessions
+       SET status = 'completed', ended_at = NOW(), ended_reason = $1
+       WHERE id = $2`,
+      [req.body.reason || 'payment_completed', sessionId]
+    );
+    await conn.query("UPDATE restaurant_tables SET availability_status = 'available' WHERE id = $1", [rows[0].table_id]);
+
+    await conn.query('COMMIT');
+    return res.json({ message: 'Session ended', sessionId });
   } catch (error) {
     await conn.query('ROLLBACK');
     throw error;

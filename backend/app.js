@@ -6,6 +6,7 @@ const authRoutes = require('./src/routes/auth.routes');
 const restaurantRoutes = require('./src/routes/restaurant.routes');
 const menuRoutes = require('./src/routes/menu.routes');
 const orderRoutes = require('./src/routes/order.routes');
+const ownerRoutes = require('./src/routes/owner.routes');
 const paymentRoutes = require('./src/routes/payment.routes');
 const adRoutes = require('./src/routes/ad.routes');
 const adminRoutes = require('./src/routes/admin.routes');
@@ -67,8 +68,10 @@ app.get('/test-db', async (req, res) => {
 app.use('/api/auth', authRoutes);
 app.use('/auth', authRoutes);
 app.use('/api/restaurants', restaurantRoutes);
+app.use('/restaurants', restaurantRoutes);
 app.use('/api/menu', menuRoutes);
 app.use('/api/orders', orderRoutes);
+app.use('/orders', orderRoutes);
 app.use('/menu', menuRoutes);
 app.use('/order', orderRoutes);
 app.use('/api/payments', paymentRoutes);
@@ -76,7 +79,9 @@ app.use('/api/ads', adRoutes);
 app.use('/ads', adRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/table-sessions', tableSessionRoutes);
+app.use('/sessions', tableSessionRoutes);
 app.use('/tables', restaurantRoutes);
+app.use('/owner', ownerRoutes);
 
 
 app.use(errorHandler);

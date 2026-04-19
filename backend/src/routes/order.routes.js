@@ -29,6 +29,67 @@ const createOrderSchema = z.object({
 router.post('/', asyncHandler(async (req, res) => {
   await expireInactiveSessions();
 
+  if (req.body && req.body.sessionId && !req.body.tableSessionId) {
+    const sessionId = Number(req.body.sessionId);
+    const { rows: sessionRows } = await pool.query(
+      `SELECT id, restaurant_id, table_id, session_token, status
+       FROM table_sessions
+       WHERE id = $1
+       LIMIT 1`,
+      [sessionId]
+    );
+
+    if (!sessionRows.length) {
+      return res.status(404).json({ message: 'Session not found' });
+    }
+    if (sessionRows[0].status !== 'active') {
+      return res.status(409).json({ message: 'Session is no longer active' });
+    }
+
+    const rawItems = Array.isArray(req.body.items) ? req.body.items : [];
+    const itemNames = [...new Set(rawItems.map((item) => String(item.name || '').trim().toLowerCase()).filter(Boolean))];
+    if (!itemNames.length) {
+      return res.status(400).json({ message: 'items are required' });
+    }
+
+    const placeholders = itemNames.map((_, index) => `$${index + 2}`).join(', ');
+    const { rows: menuRows } = await pool.query(
+      `SELECT id, name, price
+       FROM menu_items
+       WHERE restaurant_id = $1 AND LOWER(name) IN (${placeholders})`,
+      [sessionRows[0].restaurant_id, ...itemNames]
+    );
+    const menuByName = new Map(menuRows.map((row) => [String(row.name).trim().toLowerCase(), row]));
+
+    const normalizedItems = rawItems.map((item) => {
+      const menu = menuByName.get(String(item.name || '').trim().toLowerCase());
+      if (!menu) {
+        return null;
+      }
+      const quantity = Number(item.qty || item.quantity || 1);
+      return {
+        menuItemId: menu.id,
+        itemPrice: Number(item.price || menu.price),
+        quantity,
+      };
+    }).filter(Boolean);
+
+    if (!normalizedItems.length) {
+      return res.status(400).json({ message: 'No valid menu items found' });
+    }
+
+    req.body = {
+      restaurantId: sessionRows[0].restaurant_id,
+      tableId: sessionRows[0].table_id,
+      tableSessionId: sessionRows[0].id,
+      sessionToken: sessionRows[0].session_token,
+      customerName: req.body.customerName || '',
+      paymentMethod: req.body.paymentMethod || 'cod',
+      notes: req.body.notes || '',
+      items: normalizedItems,
+    };
+  }
+
   const data = createOrderSchema.parse({
     ...req.body,
     restaurantId: Number(req.body.restaurantId),
@@ -87,6 +148,7 @@ router.post('/', asyncHandler(async (req, res) => {
         orderId: existingOrderRows[0].id,
       });
     }
+
 
     const menuItemIds = [...new Set(data.items.map((item) => item.menuItemId))];
     const { rows: menuRows } = await conn.query(
@@ -160,6 +222,27 @@ router.post('/', asyncHandler(async (req, res) => {
   } finally {
     conn.release();
   }
+}));
+
+router.get('/active', asyncHandler(async (req, res) => {
+  const restaurantId = req.query.restaurantId ? Number(req.query.restaurantId) : null;
+
+  let query = `
+    SELECT o.id, o.restaurant_id, o.table_id, o.table_number, o.status, o.total_amount, o.created_at,
+      COALESCE(json_agg(json_build_object('id', oi.id, 'item_name', oi.item_name, 'item_price', oi.item_price, 'quantity', oi.quantity, 'line_total', oi.line_total) ORDER BY oi.id), '[]'::json) AS items
+    FROM orders o
+    JOIN order_items oi ON oi.order_id = o.id
+    WHERE o.status IN ('pending', 'preparing', 'ready')
+  `;
+  const params = [];
+  if (restaurantId) {
+    query += ' AND o.restaurant_id = $1';
+    params.push(restaurantId);
+  }
+  query += ' GROUP BY o.id ORDER BY o.created_at DESC';
+
+  const { rows } = await pool.query(query, params);
+  return res.json({ orders: rows });
 }));
 
 router.get('/restaurant/:restaurantId', requireAuth(['owner', 'super_admin', 'kitchen', 'staff']), asyncHandler(async (req, res) => {

@@ -153,6 +153,7 @@ function parseRoute() {
     return {
       restaurantId: Number(parts[restaurantIdx + 1]),
       tableId: Number(parts[tableIdx + 1]),
+      tableNumber: null,
     };
   }
 
@@ -160,6 +161,7 @@ function parseRoute() {
   return {
     restaurantId: Number(params.get('restaurantId')),
     tableId: Number(params.get('tableId')),
+    tableNumber: params.get('table') || params.get('tableNumber') || null,
   };
 }
 
@@ -349,7 +351,17 @@ function setupAdPopup(ads) {
 async function initCustomerPage() {
   try {
     routeState = parseRoute();
-    if (!routeState.restaurantId || !routeState.tableId) {
+    if (!routeState.restaurantId) {
+      setMessage('orderMessage', 'Invalid table QR URL', true);
+      return;
+    }
+
+    if (!routeState.tableId && routeState.tableNumber) {
+      const resolved = await apiRequest(`/restaurants/${routeState.restaurantId}/tables/resolve?table=${encodeURIComponent(routeState.tableNumber)}`);
+      routeState.tableId = Number(resolved.table.id);
+    }
+
+    if (!routeState.tableId) {
       setMessage('orderMessage', 'Invalid table QR URL', true);
       return;
     }

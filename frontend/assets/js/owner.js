@@ -1,5 +1,14 @@
 let restaurantId = null;
 
+function ensureRestaurantId() {
+  if (!restaurantId) {
+    console.error('Restaurant ID missing');
+    setMessage('ownerMessage', 'Restaurant ID missing', true);
+    return false;
+  }
+  return true;
+}
+
 function mustOwnerAuth() {
   const auth = getAuth();
   if (!auth || !auth.token || auth.user.role !== 'owner') {
@@ -25,6 +34,7 @@ async function loadRestaurant() {
 }
 
 async function loadMenu() {
+  if (!ensureRestaurantId()) return;
   const data = await apiRequest(`/menu/${restaurantId}`, {}, true);
   const menuList = document.getElementById('menuList');
 
@@ -66,6 +76,7 @@ async function loadMenu() {
 }
 
 async function loadTables() {
+  if (!ensureRestaurantId()) return;
   const data = await apiRequest(`/restaurants/${restaurantId}/tables`, {}, true);
   const tableList = document.getElementById('tableList');
 
@@ -118,6 +129,7 @@ async function loadTables() {
 }
 
 async function loadOrders() {
+  if (!ensureRestaurantId()) return;
   const data = await apiRequest(`/orders/restaurant/${restaurantId}`, {}, true);
   const kitchenOrders = data.orders.filter((order) => order.status === 'pending' || order.status === 'preparing');
   const readyOrders = data.orders.filter((order) => order.status === 'ready');
@@ -157,6 +169,7 @@ async function loadOrders() {
 }
 
 function initSocket() {
+  if (!ensureRestaurantId()) return;
   const socket = io(window.APP_CONFIG.SOCKET_URL);
   socket.emit('restaurant:join', restaurantId);
   socket.on('order:update', () => {
@@ -180,6 +193,7 @@ async function initOwner() {
 
 document.getElementById('menuForm').addEventListener('submit', async (event) => {
   event.preventDefault();
+  if (!ensureRestaurantId()) return;
   const formData = new FormData(event.target);
 
   try {
@@ -232,6 +246,7 @@ document.getElementById('menuEditForm').addEventListener('submit', async (event)
 
 document.getElementById('tableForm').addEventListener('submit', async (event) => {
   event.preventDefault();
+  if (!ensureRestaurantId()) return;
   const formData = new FormData(event.target);
 
   try {
@@ -249,6 +264,7 @@ document.getElementById('tableForm').addEventListener('submit', async (event) =>
 
 document.getElementById('autoTableForm').addEventListener('submit', async (event) => {
   event.preventDefault();
+  if (!ensureRestaurantId()) return;
   const formData = new FormData(event.target);
 
   try {

@@ -17,6 +17,13 @@ const autoTableSchema = z.object({
   totalTables: z.number().int().positive().max(500),
 });
 
+router.param('restaurantId', (req, res, next, restaurantId) => {
+  if (!/^\d+$/.test(String(restaurantId))) {
+    return res.status(400).json({ error: 'Invalid restaurant ID' });
+  }
+  return next();
+});
+
 router.get('/owner/me', requireAuth(['owner']), asyncHandler(async (req, res) => {
   const { rows } = await pool.query('SELECT id, name, slug, phone, address, is_active FROM restaurants WHERE owner_user_id = $1 LIMIT 1', [req.user.userId]);
   if (!rows.length) return res.status(404).json({ message: 'Restaurant not found' });
@@ -38,6 +45,32 @@ router.get('/:restaurantId/tables', requireAuth(['owner', 'super_admin', 'staff'
   );
 
   return res.json({ tables: rows });
+}));
+
+router.get('/:restaurantId/tables/resolve', asyncHandler(async (req, res) => {
+  const { restaurantId } = req.params;
+  const tableParam = String(req.query.table || req.query.tableNumber || '').trim();
+
+  if (!tableParam) {
+    return res.status(400).json({ error: 'table or tableNumber query is required' });
+  }
+
+  const normalized = /^\d+$/.test(tableParam) ? [`Table ${tableParam}`, tableParam] : [tableParam];
+  const placeholders = normalized.map((_, index) => `$${index + 2}`).join(', ');
+  const { rows } = await pool.query(
+    `SELECT id, table_number
+     FROM restaurant_tables
+     WHERE restaurant_id = $1 AND table_number IN (${placeholders})
+     ORDER BY id ASC
+     LIMIT 1`,
+    [restaurantId, ...normalized]
+  );
+
+  if (!rows.length) {
+    return res.status(404).json({ error: 'Table not found' });
+  }
+
+  return res.json({ table: rows[0] });
 }));
 
 router.post('/:restaurantId/tables', requireAuth(['owner', 'super_admin']), asyncHandler(async (req, res) => {
@@ -126,6 +159,67 @@ router.post('/:restaurantId/auto-generate-tables', requireAuth(['owner', 'super_
 
     await conn.query('COMMIT');
     return res.json({ message: 'Tables generated successfully', createdCount });
+  } catch (error) {
+    await conn.query('ROLLBACK');
+    throw error;
+  } finally {
+    conn.release();
+  }
+}));
+
+router.post('/:restaurantId/generate-qrs', requireAuth(['owner', 'super_admin']), asyncHandler(async (req, res) => {
+  const { restaurantId } = req.params;
+  await ensureRestaurantAccess(req.user, restaurantId);
+
+  const tableCount = Number(req.body.tableCount);
+  if (!Number.isInteger(tableCount) || tableCount <= 0 || tableCount > 500) {
+    return res.status(400).json({ error: 'tableCount must be an integer between 1 and 500' });
+  }
+
+  const conn = await pool.connect();
+  const generated = [];
+
+  try {
+    await conn.query('BEGIN');
+
+    const { rows: existingRows } = await conn.query(
+      'SELECT table_number FROM restaurant_tables WHERE restaurant_id = $1',
+      [restaurantId]
+    );
+    const existingSet = new Set(existingRows.map((row) => row.table_number));
+
+    for (let i = 1; i <= tableCount; i += 1) {
+      const tableNumber = `Table ${i}`;
+      if (existingSet.has(tableNumber)) continue;
+
+      const token = `${restaurantId}-${tableNumber.replace(/\s+/g, '-')}-${Date.now()}-${i}`;
+      const tableResult = await conn.query(
+        'INSERT INTO restaurant_tables (restaurant_id, table_number, qr_token) VALUES ($1, $2, $3) RETURNING id',
+        [restaurantId, tableNumber, token]
+      );
+      const tableId = tableResult.rows[0].id;
+
+      const { qrUrl, qrDataUrl } = await buildQrPayload({
+        restaurantId: Number(restaurantId),
+        tableId,
+      });
+
+      await conn.query(
+        `INSERT INTO qr_codes (restaurant_id, table_id, qr_url, qr_data_url)
+         VALUES ($1, $2, $3, $4)`,
+        [restaurantId, tableId, qrUrl, qrDataUrl]
+      );
+
+      generated.push({ tableId, tableNumber, qrCodeUrl: qrUrl });
+    }
+
+    await conn.query('COMMIT');
+    return res.json({
+      message: 'QR generation completed',
+      restaurantId: Number(restaurantId),
+      generatedCount: generated.length,
+      tables: generated,
+    });
   } catch (error) {
     await conn.query('ROLLBACK');
     throw error;

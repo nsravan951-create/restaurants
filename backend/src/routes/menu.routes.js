@@ -18,6 +18,19 @@ const menuSchema = z.object({
   isAvailable: z.boolean().optional().default(true),
 });
 
+router.get('/', asyncHandler(async (req, res) => {
+  const restaurantId = req.query.restaurantId ? Number(req.query.restaurantId) : null;
+
+  const query = restaurantId
+    ? 'SELECT id, restaurant_id, name, description, price, image_url, category, is_available FROM menu_items WHERE restaurant_id = $1 AND is_available = TRUE ORDER BY category, name'
+    : 'SELECT id, restaurant_id, name, description, price, image_url, category, is_available FROM menu_items ORDER BY restaurant_id, category, name';
+  const params = restaurantId ? [restaurantId] : [];
+
+  const { rows } = await pool.query(query, params);
+
+  return res.json({ menu: rows });
+}));
+
 router.get('/:restaurantId', asyncHandler(async (req, res) => {
   const { restaurantId } = req.params;
 
