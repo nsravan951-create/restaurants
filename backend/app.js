@@ -17,7 +17,9 @@ const app = express();
 app.use(cors({
   origin: [
     'http://localhost:3000',
+    'http://localhost:5173',
     'https://restaurants-os3fs97xx-nsravan951-creates-projects.vercel.app',
+    'https://restaurants-mauve-two.vercel.app',
   ],
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
   credentials: true,
@@ -46,6 +48,7 @@ app.get('/test-db', async (req, res) => {
 });
 
 app.use('/api/auth', authRoutes);
+app.use('/auth', authRoutes);
 app.use('/api/restaurants', restaurantRoutes);
 app.use('/api/menu', menuRoutes);
 app.use('/api/orders', orderRoutes);
@@ -53,8 +56,10 @@ app.use('/menu', menuRoutes);
 app.use('/order', orderRoutes);
 app.use('/api/payments', paymentRoutes);
 app.use('/api/ads', adRoutes);
+app.use('/ads', adRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/table-sessions', tableSessionRoutes);
+app.use('/tables', restaurantRoutes);
 
 
 app.use(errorHandler);
