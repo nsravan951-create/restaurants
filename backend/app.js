@@ -20,7 +20,7 @@ const allowedOrigins = [
   'http://localhost:5173',
   'https://restaurants-git-main-nsravan951-creates-projects.vercel.app',
   'https://restaurants-7l46sycxk-nsravan951-creates-projects.vercel.app',
-  'https://restaurants-os3fs97xx-nsravan951-creates-projects.vercel.app',
+  'https://restaurants-1yve9y4hu-nsravan951-creates-projects.vercel.app/el.app',
   'https://restaurants-mauve-two.vercel.app',
 ];
 
