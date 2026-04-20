@@ -194,6 +194,7 @@
     </main>
 
     <script>
+      const FRONTEND_BASE_URL = "https://restaurants-mauve-two.vercel.app";
       // Replace this with your Render backend URL (without trailing slash).
       const BACKEND_BASE_URL = "https://your-render-backend.onrender.com";
       // If your endpoint or response keys are different, update `endpointUrl`,
@@ -297,11 +298,21 @@
           throw new Error("Invalid QR URL. Missing restaurantId or table query parameter.");
         }
 
-        const endpointUrl = `${BACKEND_BASE_URL}/api/restaurant/${encodeURIComponent(restaurantId)}`;
-        const response = await fetch(endpointUrl);
+        const apiBases = [FRONTEND_BASE_URL, BACKEND_BASE_URL].filter(Boolean);
+        let response = null;
+        let lastStatus = "";
 
-        if (!response.ok) {
-          throw new Error(`API request failed with status ${response.status}.`);
+        for (const base of apiBases) {
+          const endpointUrl = `${base}/api/restaurant/${encodeURIComponent(restaurantId)}`;
+          response = await fetch(endpointUrl);
+          if (response.ok) {
+            break;
+          }
+          lastStatus = response.status;
+        }
+
+        if (!response || !response.ok) {
+          throw new Error(`API request failed${lastStatus ? ` with status ${lastStatus}` : ""}.`);
         }
 
         const data = await response.json();

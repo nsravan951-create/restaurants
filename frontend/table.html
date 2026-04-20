@@ -198,6 +198,7 @@
     </main>
 
     <script>
+      const FRONTEND_BASE_URL = 'https://restaurants-mauve-two.vercel.app';
       // Replace with your Render backend base URL.
       const API_BASE_URL = 'https://your-render-backend.onrender.com/api';
 
@@ -346,29 +347,35 @@
           throw new Error('Invalid QR URL. restaurantId and table query params are required.');
         }
 
-        const resolveResponse = await fetch(
-          `${API_BASE_URL}/restaurants/${encodeURIComponent(restaurantId)}/tables/resolve?table=${encodeURIComponent(table)}`
-        );
+        const apiBases = [`${FRONTEND_BASE_URL}/api`, API_BASE_URL];
+        let resolveData = null;
+        let tableId = null;
 
-        if (!resolveResponse.ok) {
+        for (const base of apiBases) {
+          const resolveResponse = await fetch(
+            `${base}/restaurants/${encodeURIComponent(restaurantId)}/tables/resolve?table=${encodeURIComponent(table)}`
+          );
+          if (!resolveResponse.ok) {
+            continue;
+          }
+          resolveData = await resolveResponse.json();
+          tableId = resolveData?.table?.id;
+          if (tableId) {
+            const menuResponse = await fetch(
+              `${base}/restaurants/${encodeURIComponent(restaurantId)}/table/${encodeURIComponent(tableId)}`
+            );
+
+            if (menuResponse.ok) {
+              return menuResponse.json();
+            }
+          }
+        }
+
+        if (!tableId) {
           throw new Error('Table not found for this restaurant.');
         }
 
-        const resolveData = await resolveResponse.json();
-        const tableId = resolveData?.table?.id;
-        if (!tableId) {
-          throw new Error('Could not resolve table id from backend response.');
-        }
-
-        const menuResponse = await fetch(
-          `${API_BASE_URL}/restaurants/${encodeURIComponent(restaurantId)}/table/${encodeURIComponent(tableId)}`
-        );
-
-        if (!menuResponse.ok) {
-          throw new Error('Failed to fetch menu for this table.');
-        }
-
-        return menuResponse.json();
+        throw new Error('Failed to fetch menu for this table.');
       }
 
       async function loadPage() {
