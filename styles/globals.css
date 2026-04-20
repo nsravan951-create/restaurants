@@ -1,0 +1,85 @@
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+  background: #f8f6f2;
+  color: #2f2921;
+}
+
+a {
+  color: inherit;
+}
+
+.app-shell {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 20px;
+}
+
+.panel {
+  background: #fffdf9;
+  border: 1px solid #e6dccd;
+  border-radius: 12px;
+  padding: 16px;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+}
+
+.row {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.btn {
+  border: 0;
+  border-radius: 8px;
+  background: #b44b21;
+  color: #fff;
+  padding: 8px 12px;
+  cursor: pointer;
+}
+
+.btn.secondary {
+  background: #5f5f5f;
+}
+
+.input,
+.select,
+.textarea {
+  width: 100%;
+  border: 1px solid #dacdb8;
+  border-radius: 8px;
+  padding: 8px;
+}
+
+.muted {
+  color: #6f6354;
+}
+
+.spinner {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 2px solid #ded3c1;
+  border-top-color: #b44b21;
+  animation: spin 0.8s linear infinite;
+  display: inline-block;
+  vertical-align: middle;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
