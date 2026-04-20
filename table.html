@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Table Menu</title>
+    <style>
+      :root {
+        --bg: #f5f1e8;
+        --panel: #fffdf8;
+        --ink: #2b2118;
+        --muted: #6b5b4a;
+        --line: #e6d8c4;
+        --accent: #bf4e22;
+        --danger-bg: #fff1f1;
+        --danger-line: #f4bdbd;
+        --danger-text: #7a1d1d;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+        color: var(--ink);
+        background:
+          radial-gradient(circle at 10% 10%, #fff5df 0%, transparent 32%),
+          radial-gradient(circle at 85% 0%, #f8e4d6 0%, transparent 24%),
+          var(--bg);
+      }
+
+      .page {
+        max-width: 1100px;
+        margin: 0 auto;
+        padding: 20px;
+      }
+
+      .panel {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 14px;
+      }
+
+      .hero {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 16px;
+      }
+
+      .hero h1 {
+        margin: 0;
+        font-size: 1.6rem;
+      }
+
+      .hero p {
+        margin: 4px 0 0;
+        color: var(--muted);
+      }
+
+      .logo {
+        width: 64px;
+        height: 64px;
+        object-fit: cover;
+        border-radius: 12px;
+        border: 1px solid var(--line);
+        background: #f4e7d6;
+      }
+
+      .status {
+        margin-top: 14px;
+        padding: 14px;
+      }
+
+      .hidden {
+        display: none;
+      }
+
+      .spinner-wrap {
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+      }
+
+      .spinner {
+        width: 18px;
+        height: 18px;
+        border-radius: 50%;
+        border: 2px solid #e6d8c4;
+        border-top-color: var(--accent);
+        animation: spin 0.8s linear infinite;
+      }
+
+      @keyframes spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+
+      .error {
+        color: var(--danger-text);
+        background: var(--danger-bg);
+        border-color: var(--danger-line);
+      }
+
+      .retry {
+        margin-top: 8px;
+        border: 0;
+        background: var(--accent);
+        color: white;
+        padding: 8px 12px;
+        border-radius: 8px;
+        cursor: pointer;
+      }
+
+      .menu {
+        margin-top: 16px;
+        display: grid;
+        gap: 14px;
+      }
+
+      .category {
+        padding: 14px;
+      }
+
+      .category h2 {
+        margin: 0 0 12px;
+        font-size: 1.1rem;
+      }
+
+      .items {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        gap: 12px;
+      }
+
+      .item {
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        background: white;
+        padding: 10px;
+      }
+
+      .item h3 {
+        margin: 0 0 6px;
+        font-size: 1rem;
+      }
+
+      .desc {
+        margin: 0;
+        color: var(--muted);
+        font-size: 0.9rem;
+      }
+
+      .price {
+        margin: 8px 0 0;
+        color: var(--accent);
+        font-weight: 600;
+      }
+
+      @media (max-width: 640px) {
+        .hero {
+          align-items: flex-start;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="page">
+      <section class="panel hero">
+        <div>
+          <h1 id="restaurantName">Loading restaurant...</h1>
+          <p id="tableNumber"></p>
+        </div>
+        <img id="restaurantLogo" class="logo hidden" alt="Restaurant logo" />
+      </section>
+
+      <section id="loadingState" class="panel status">
+        <div class="spinner-wrap">
+          <span class="spinner" aria-hidden="true"></span>
+          <span>Loading menu...</span>
+        </div>
+      </section>
+
+      <section id="errorState" class="panel status error hidden">
+        <p id="errorText">Failed to load restaurant data.</p>
+        <button id="retryBtn" class="retry" type="button">Retry</button>
+      </section>
+
+      <section id="menuRoot" class="menu hidden"></section>
+    </main>
+
+    <script>
+      // Replace this with your Render backend URL (without trailing slash).
+      const BACKEND_BASE_URL = "https://your-render-backend.onrender.com";
+      // If your endpoint or response keys are different, update `endpointUrl`,
+      // `restaurantData` and `menuItems` mapping inside `loadRestaurantData`.
+
+      const restaurantNameEl = document.getElementById("restaurantName");
+      const tableNumberEl = document.getElementById("tableNumber");
+      const restaurantLogoEl = document.getElementById("restaurantLogo");
+      const loadingStateEl = document.getElementById("loadingState");
+      const errorStateEl = document.getElementById("errorState");
+      const errorTextEl = document.getElementById("errorText");
+      const retryBtnEl = document.getElementById("retryBtn");
+      const menuRootEl = document.getElementById("menuRoot");
+
+      const query = new URLSearchParams(window.location.search);
+      const restaurantId = query.get("restaurantId");
+      const table = query.get("table");
+
+      function setLoading(isLoading) {
+        loadingStateEl.classList.toggle("hidden", !isLoading);
+      }
+
+      function setError(message) {
+        errorTextEl.textContent = message;
+        errorStateEl.classList.remove("hidden");
+      }
+
+      function clearError() {
+        errorStateEl.classList.add("hidden");
+      }
+
+      function formatPrice(value) {
+        const amount = Number(value || 0);
+        return `INR ${amount.toFixed(2)}`;
+      }
+
+      function groupMenuByCategory(menuItems) {
+        const grouped = new Map();
+        for (const item of menuItems) {
+          const category = item.category || "Other";
+          if (!grouped.has(category)) {
+            grouped.set(category, []);
+          }
+          grouped.get(category).push(item);
+        }
+        return grouped;
+      }
+
+      function renderMenu(menuItems) {
+        menuRootEl.innerHTML = "";
+
+        if (!Array.isArray(menuItems) || menuItems.length === 0) {
+          menuRootEl.innerHTML = "<section class='panel category'><p>No menu items available.</p></section>";
+          menuRootEl.classList.remove("hidden");
+          return;
+        }
+
+        const grouped = groupMenuByCategory(menuItems);
+
+        for (const [category, items] of grouped.entries()) {
+          const categorySection = document.createElement("section");
+          categorySection.className = "panel category";
+
+          const heading = document.createElement("h2");
+          heading.textContent = category;
+          categorySection.appendChild(heading);
+
+          const itemsGrid = document.createElement("div");
+          itemsGrid.className = "items";
+
+          for (const item of items) {
+            const card = document.createElement("article");
+            card.className = "item";
+
+            const name = document.createElement("h3");
+            name.textContent = item.name || "Unnamed item";
+
+            const desc = document.createElement("p");
+            desc.className = "desc";
+            desc.textContent = item.description || "";
+
+            const price = document.createElement("p");
+            price.className = "price";
+            price.textContent = formatPrice(item.price);
+
+            card.appendChild(name);
+            card.appendChild(desc);
+            card.appendChild(price);
+            itemsGrid.appendChild(card);
+          }
+
+          categorySection.appendChild(itemsGrid);
+          menuRootEl.appendChild(categorySection);
+        }
+
+        menuRootEl.classList.remove("hidden");
+      }
+
+      async function loadRestaurantData() {
+        if (!restaurantId || !table) {
+          throw new Error("Invalid QR URL. Missing restaurantId or table query parameter.");
+        }
+
+        const endpointUrl = `${BACKEND_BASE_URL}/api/restaurant/${encodeURIComponent(restaurantId)}`;
+        const response = await fetch(endpointUrl);
+
+        if (!response.ok) {
+          throw new Error(`API request failed with status ${response.status}.`);
+        }
+
+        const data = await response.json();
+
+        const restaurantData = data.restaurant || data;
+        const menuItems = data.menu || data.menuItems || restaurantData.menu || [];
+
+        restaurantNameEl.textContent = restaurantData.name || "Restaurant";
+        tableNumberEl.textContent = `Table ${table}`;
+
+        const logoUrl = restaurantData.logo || restaurantData.logoUrl || restaurantData.logo_url || "";
+        if (logoUrl) {
+          restaurantLogoEl.src = logoUrl;
+          restaurantLogoEl.classList.remove("hidden");
+        } else {
+          restaurantLogoEl.classList.add("hidden");
+        }
+
+        renderMenu(menuItems);
+      }
+
+      async function init() {
+        setLoading(true);
+        clearError();
+        menuRootEl.classList.add("hidden");
+
+        try {
+          await loadRestaurantData();
+        } catch (error) {
+          setError(error.message || "Unable to load restaurant data.");
+        } finally {
+          setLoading(false);
+        }
+      }
+
+      retryBtnEl.addEventListener("click", init);
+      init();
+    </script>
+  </body>
+</html>

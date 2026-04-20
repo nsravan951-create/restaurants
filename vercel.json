@@ -3,7 +3,7 @@
   "rewrites": [
     {
       "source": "/table",
-      "destination": "/frontend/table.html"
+      "destination": "/table.html"
     }
   ]
 }
