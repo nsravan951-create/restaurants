@@ -14,9 +14,9 @@ function normalizeTableQueryValue(tableNumber, tableId) {
 }
 
 async function buildQrPayload({ restaurantId, tableId, tableNumber }) {
-  const publicBaseUrl = process.env.FRONTEND_PUBLIC_URL || 'http://localhost:3000';
+  const publicBaseUrl = (process.env.FRONTEND_PUBLIC_URL || 'https://restaurants-mauve-two.vercel.app').replace(/\/$/, '');
   const tableValue = normalizeTableQueryValue(tableNumber, tableId);
-  const qrUrl = `${publicBaseUrl}/table.html?restaurantId=${encodeURIComponent(restaurantId)}&table=${encodeURIComponent(tableValue)}`;
+  const qrUrl = `${publicBaseUrl}/table?restaurantId=${encodeURIComponent(restaurantId)}&table=${encodeURIComponent(tableValue)}`;
   const qrDataUrl = await QRCode.toDataURL(qrUrl, { width: 400 });
   return { qrUrl, qrDataUrl };
 }
