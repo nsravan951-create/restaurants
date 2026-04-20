@@ -3,82 +3,401 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Table Order</title>
+    <title>Restaurant Menu</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@600;700&family=Sora:wght@400;500;600&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="./assets/css/styles.css" />
-    <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
-    <script>
-      const params = new URLSearchParams(window.location.search);
-      const restaurantId = params.get('restaurantId');
-      const tableNumber = params.get('table');
-
-      console.log('Restaurant:', restaurantId);
-      console.log('Table:', tableNumber);
-
-      if (!restaurantId || !tableNumber) {
-        document.documentElement.innerHTML = `
-          <html lang="en">
-            <head>
-              <meta charset="UTF-8" />
-              <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-              <title>Invalid QR Code</title>
-              <link rel="stylesheet" href="./assets/css/styles.css" />
-            </head>
-            <body>
-              <main class="customer-layout">
-                <section class="panel">
-                  <h2>Invalid QR Code</h2>
-                </section>
-              </main>
-            </body>
-          </html>
-        `;
-        window.stop();
+    <style>
+      :root {
+        --bg: #f4f1eb;
+        --panel: #fffaf2;
+        --ink: #2a2118;
+        --muted: #6d6051;
+        --line: #e8dbc8;
+        --accent: #c84f20;
+        --accent-strong: #9f3a14;
       }
-    </script>
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        font-family: 'Sora', sans-serif;
+        color: var(--ink);
+        background:
+          radial-gradient(circle at 20% 10%, #fff7df 0%, transparent 35%),
+          radial-gradient(circle at 80% 5%, #f9e4d8 0%, transparent 30%),
+          var(--bg);
+      }
+
+      .page {
+        max-width: 1080px;
+        margin: 0 auto;
+        padding: 20px;
+      }
+
+      .hero,
+      .panel {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 16px;
+      }
+
+      .hero {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        padding: 18px;
+      }
+
+      .logo {
+        width: 64px;
+        height: 64px;
+        border-radius: 16px;
+        object-fit: cover;
+        border: 1px solid var(--line);
+        background: linear-gradient(135deg, #f7be8c, #f3d79a);
+      }
+
+      .logo-fallback {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 700;
+        font-size: 1.1rem;
+      }
+
+      .hero h1 {
+        margin: 0;
+        font-family: 'Fraunces', serif;
+        font-size: 1.8rem;
+      }
+
+      .meta {
+        margin: 6px 0 0;
+        color: var(--muted);
+      }
+
+      .state {
+        margin-top: 16px;
+        padding: 14px;
+      }
+
+      .state.hidden,
+      .hidden {
+        display: none;
+      }
+
+      .error {
+        color: #7f1d1d;
+        border-color: #f3b6b6;
+        background: #fff2f2;
+      }
+
+      .menu {
+        margin-top: 16px;
+        display: grid;
+        gap: 16px;
+      }
+
+      .category {
+        padding: 14px;
+      }
+
+      .category h2 {
+        margin: 0 0 12px;
+        font-family: 'Fraunces', serif;
+        font-size: 1.2rem;
+      }
+
+      .items {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        gap: 12px;
+      }
+
+      .item {
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        overflow: hidden;
+        background: #fff;
+      }
+
+      .item img {
+        width: 100%;
+        height: 140px;
+        object-fit: cover;
+        display: block;
+        background: #f4ede2;
+      }
+
+      .item-body {
+        padding: 10px;
+      }
+
+      .item h3 {
+        margin: 0 0 6px;
+        font-size: 1rem;
+      }
+
+      .item p {
+        margin: 0;
+        color: var(--muted);
+        font-size: 0.9rem;
+      }
+
+      .price {
+        margin-top: 8px;
+        color: var(--accent-strong);
+        font-weight: 600;
+      }
+
+      .retry-btn {
+        margin-top: 10px;
+        border: none;
+        border-radius: 10px;
+        background: var(--accent);
+        color: #fff;
+        padding: 8px 12px;
+        font-weight: 600;
+        cursor: pointer;
+      }
+
+      @media (max-width: 600px) {
+        .hero {
+          align-items: flex-start;
+        }
+
+        .hero h1 {
+          font-size: 1.5rem;
+        }
+      }
+    </style>
   </head>
   <body>
-    <main class="customer-layout">
-      <header class="panel">
-        <h1 id="restaurantTitle">Loading menu...</h1>
-        <p id="tableInfo"></p>
-        <p id="sessionTimer" class="message"></p>
-        <div id="tableLockNotice" class="message"></div>
-        <button id="joinSessionBtn" class="btn btn-light hidden" type="button">Join Existing Order Session</button>
+    <main class="page">
+      <header class="hero">
+        <img id="restaurantLogo" class="logo hidden" alt="Restaurant logo" />
+        <div id="restaurantLogoFallback" class="logo logo-fallback">--</div>
+        <div>
+          <h1 id="restaurantTitle">Restaurant</h1>
+          <p id="tableInfo" class="meta"></p>
+        </div>
       </header>
 
-      <section class="panel">
-        <div id="menuContainer" class="menu-grid"></div>
+      <section id="loadingState" class="panel state">Loading menu, please wait...</section>
+
+      <section id="errorState" class="panel state error hidden">
+        <p id="errorText">Something went wrong while loading the menu.</p>
+        <button id="retryBtn" class="retry-btn" type="button">Try again</button>
       </section>
 
-      <aside class="panel sticky-cart">
-        <h2>Your Cart</h2>
-        <div id="cartItems"></div>
-        <p class="total">Total: INR <span id="cartTotal">0</span></p>
-        <input id="customerName" placeholder="Your name (optional)" />
-        <textarea id="orderNotes" placeholder="Notes (optional)"></textarea>
-
-        <div class="payment-actions">
-          <button id="codBtn" class="btn btn-dark">Place COD Order</button>
-          <button id="onlineBtn" class="btn btn-primary">Pay Online (Razorpay)</button>
-        </div>
-        <div id="orderMessage" class="message"></div>
-      </aside>
-
-      <div id="adPopup" class="ad-popup hidden">
-        <button id="closeAd" class="close-btn">X</button>
-        <a id="adLink" target="_blank" rel="noreferrer">
-          <img id="adImage" alt="Promotion" />
-          <h3 id="adTitle"></h3>
-        </a>
-      </div>
+      <section id="menuContainer" class="menu hidden"></section>
     </main>
 
-    <footer class="brand-footer">Powered by Online Solutionzzz</footer>
-    <script src="./assets/js/config.js"></script>
-    <script src="./assets/js/common.js"></script>
-    <script src="./assets/js/customer.js"></script>
+    <script>
+      // Replace with your Render backend base URL.
+      const API_BASE_URL = 'https://your-render-backend.onrender.com/api';
+
+      const restaurantTitleEl = document.getElementById('restaurantTitle');
+      const restaurantLogoEl = document.getElementById('restaurantLogo');
+      const restaurantLogoFallbackEl = document.getElementById('restaurantLogoFallback');
+      const tableInfoEl = document.getElementById('tableInfo');
+      const loadingStateEl = document.getElementById('loadingState');
+      const errorStateEl = document.getElementById('errorState');
+      const errorTextEl = document.getElementById('errorText');
+      const retryBtnEl = document.getElementById('retryBtn');
+      const menuContainerEl = document.getElementById('menuContainer');
+
+      const params = new URLSearchParams(window.location.search);
+      const restaurantId = params.get('restaurantId');
+      const table = params.get('table');
+
+      function setLoading(isLoading) {
+        loadingStateEl.classList.toggle('hidden', !isLoading);
+      }
+
+      function setError(message) {
+        errorTextEl.textContent = message;
+        errorStateEl.classList.remove('hidden');
+      }
+
+      function clearError() {
+        errorStateEl.classList.add('hidden');
+      }
+
+      function setRestaurantLogo(restaurant) {
+        const logoCandidate =
+          restaurant.logo_url ||
+          restaurant.logoUrl ||
+          restaurant.image_url ||
+          restaurant.imageUrl ||
+          '';
+
+        const initials = String(restaurant.name || 'R')
+          .trim()
+          .split(/\s+/)
+          .slice(0, 2)
+          .map((part) => part.charAt(0).toUpperCase())
+          .join('') || 'R';
+
+        restaurantLogoFallbackEl.textContent = initials;
+
+        if (!logoCandidate) {
+          restaurantLogoEl.classList.add('hidden');
+          restaurantLogoFallbackEl.classList.remove('hidden');
+          return;
+        }
+
+        restaurantLogoEl.src = logoCandidate;
+        restaurantLogoEl.onload = () => {
+          restaurantLogoEl.classList.remove('hidden');
+          restaurantLogoFallbackEl.classList.add('hidden');
+        };
+        restaurantLogoEl.onerror = () => {
+          restaurantLogoEl.classList.add('hidden');
+          restaurantLogoFallbackEl.classList.remove('hidden');
+        };
+      }
+
+      function formatPrice(amount) {
+        const value = Number(amount || 0);
+        return `INR ${value.toFixed(2)}`;
+      }
+
+      function groupByCategory(menuItems) {
+        const grouped = new Map();
+        menuItems.forEach((item) => {
+          const category = item.category || 'Other';
+          if (!grouped.has(category)) {
+            grouped.set(category, []);
+          }
+          grouped.get(category).push(item);
+        });
+        return grouped;
+      }
+
+      function renderMenu(menuItems) {
+        menuContainerEl.innerHTML = '';
+
+        if (!menuItems.length) {
+          menuContainerEl.innerHTML = '<section class="panel category"><p>No menu items available right now.</p></section>';
+          menuContainerEl.classList.remove('hidden');
+          return;
+        }
+
+        const groupedMenu = groupByCategory(menuItems);
+        groupedMenu.forEach((items, categoryName) => {
+          const categorySection = document.createElement('section');
+          categorySection.className = 'panel category';
+
+          const title = document.createElement('h2');
+          title.textContent = categoryName;
+          categorySection.appendChild(title);
+
+          const itemsGrid = document.createElement('div');
+          itemsGrid.className = 'items';
+
+          items.forEach((item) => {
+            const card = document.createElement('article');
+            card.className = 'item';
+
+            const image = document.createElement('img');
+            image.alt = item.name || 'Menu item';
+            image.src = item.image_url || item.imageUrl || '';
+            if (!image.src) {
+              image.style.display = 'none';
+            }
+
+            const body = document.createElement('div');
+            body.className = 'item-body';
+
+            const name = document.createElement('h3');
+            name.textContent = item.name || 'Untitled item';
+
+            const desc = document.createElement('p');
+            desc.textContent = item.description || 'No description available.';
+
+            const price = document.createElement('p');
+            price.className = 'price';
+            price.textContent = formatPrice(item.price);
+
+            body.appendChild(name);
+            body.appendChild(desc);
+            body.appendChild(price);
+
+            card.appendChild(image);
+            card.appendChild(body);
+
+            itemsGrid.appendChild(card);
+          });
+
+          categorySection.appendChild(itemsGrid);
+          menuContainerEl.appendChild(categorySection);
+        });
+
+        menuContainerEl.classList.remove('hidden');
+      }
+
+      async function fetchTableData() {
+        if (!restaurantId || !table) {
+          throw new Error('Invalid QR URL. restaurantId and table query params are required.');
+        }
+
+        const resolveResponse = await fetch(
+          `${API_BASE_URL}/restaurants/${encodeURIComponent(restaurantId)}/tables/resolve?table=${encodeURIComponent(table)}`
+        );
+
+        if (!resolveResponse.ok) {
+          throw new Error('Table not found for this restaurant.');
+        }
+
+        const resolveData = await resolveResponse.json();
+        const tableId = resolveData?.table?.id;
+        if (!tableId) {
+          throw new Error('Could not resolve table id from backend response.');
+        }
+
+        const menuResponse = await fetch(
+          `${API_BASE_URL}/restaurants/${encodeURIComponent(restaurantId)}/table/${encodeURIComponent(tableId)}`
+        );
+
+        if (!menuResponse.ok) {
+          throw new Error('Failed to fetch menu for this table.');
+        }
+
+        return menuResponse.json();
+      }
+
+      async function loadPage() {
+        setLoading(true);
+        clearError();
+        menuContainerEl.classList.add('hidden');
+
+        try {
+          const data = await fetchTableData();
+          const restaurant = data.restaurant || {};
+          const tableData = data.table || {};
+          const menu = Array.isArray(data.menu) ? data.menu : [];
+
+          restaurantTitleEl.textContent = restaurant.name || 'Restaurant';
+          tableInfoEl.textContent = tableData.table_number
+            ? `Table: ${tableData.table_number}`
+            : `Table: ${table}`;
+
+          setRestaurantLogo(restaurant);
+          renderMenu(menu);
+        } catch (error) {
+          setError(error.message || 'Unable to load menu. Please try again.');
+        } finally {
+          setLoading(false);
+        }
+      }
+
+      retryBtnEl.addEventListener('click', loadPage);
+      loadPage();
+    </script>
   </body>
 </html>
