@@ -3,11 +3,11 @@
   "rewrites": [
     {
       "source": "/table/:tableId",
-      "destination": "/table.html"
+      "destination": "/pages/table.html"
     },
     {
       "source": "/table",
-      "destination": "/table.html"
+      "destination": "/pages/table.html"
     },
     {
       "source": "/restaurant/:id/table/:tableId",
