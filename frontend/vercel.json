@@ -1,23 +1,14 @@
 {
   "cleanUrls": true,
-  "redirects": [
+  "rewrites": [
+    {
+      "source": "/table/:tableId",
+      "destination": "/table.html"
+    },
     {
       "source": "/table",
-      "destination": "/table.html",
-      "permanent": false
+      "destination": "/table.html"
     },
-    {
-      "source": "/pages/table",
-      "destination": "/table.html",
-      "permanent": false
-    },
-    {
-      "source": "/pages/table.html",
-      "destination": "/table.html",
-      "permanent": false
-    }
-  ],
-  "rewrites": [
     {
       "source": "/restaurant/:id/table/:tableId",
       "destination": "/pages/customer.html"
