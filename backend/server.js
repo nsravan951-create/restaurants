@@ -12,10 +12,7 @@ const server = http.createServer(app);
 const allowedOrigins = [
   'http://localhost:3000',
   'http://localhost:5173',
-  'https://restaurants-git-main-nsravan951-creates-projects.vercel.app',
-  'https://restaurants-7l46sycxk-nsravan951-creates-projects.vercel.app',
-  'https://restaurants-1yve9y4hu-nsravan951-creates-projects.vercel.app/el.app',
-  'https://restaurants-mauve-two.vercel.app',
+  'https://ameerpet.netlify.app',
 ];
 
 const io = new Server(server, {

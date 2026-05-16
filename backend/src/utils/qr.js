@@ -1,7 +1,7 @@
 const QRCode = require('qrcode');
 
 function getFrontendProductionUrl() {
-  return 'https://restaurants-mauve-two.vercel.app';
+  return 'https://ameerpet.netlify.app';
 }
 
 async function buildQrPayload({ tableId }) {
