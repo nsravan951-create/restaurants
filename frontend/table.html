@@ -9,13 +9,15 @@
     <link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@600;700&family=Sora:wght@400;500;600&display=swap" rel="stylesheet" />
     <style>
       :root {
-        --bg: #f4f1eb;
-        --panel: #fffaf2;
-        --ink: #2a2118;
-        --muted: #6d6051;
-        --line: #e8dbc8;
-        --accent: #c84f20;
-        --accent-strong: #9f3a14;
+        --bg: #f5f1e8;
+        --panel: #fffdf8;
+        --ink: #2b2118;
+        --muted: #6b5b4a;
+        --line: #e6d8c4;
+        --accent: #bf4e22;
+        --danger-bg: #fff1f1;
+        --danger-line: #f4bdbd;
+        --danger-text: #7a1d1d;
       }
 
       * {
@@ -24,82 +26,112 @@
 
       body {
         margin: 0;
-        font-family: 'Sora', sans-serif;
+        font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
         color: var(--ink);
         background:
-          radial-gradient(circle at 20% 10%, #fff7df 0%, transparent 35%),
-          radial-gradient(circle at 80% 5%, #f9e4d8 0%, transparent 30%),
+          radial-gradient(circle at 10% 10%, #fff5df 0%, transparent 32%),
+          radial-gradient(circle at 85% 0%, #f8e4d6 0%, transparent 24%),
           var(--bg);
       }
 
       .page {
-        max-width: 1080px;
+        max-width: 1100px;
         margin: 0 auto;
         padding: 20px;
       }
 
-      .hero,
       .panel {
         background: var(--panel);
         border: 1px solid var(--line);
-        border-radius: 16px;
+        border-radius: 14px;
       }
 
       .hero {
         display: flex;
         align-items: center;
-        gap: 16px;
-        padding: 18px;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 16px;
+      }
+
+      .hero h1 {
+        margin: 0;
+        font-size: 1.6rem;
+      }
+
+      .hero p {
+        margin: 4px 0 0;
+        color: var(--muted);
       }
 
       .logo {
         width: 64px;
         height: 64px;
-        border-radius: 16px;
         object-fit: cover;
+        border-radius: 12px;
         border: 1px solid var(--line);
-        background: linear-gradient(135deg, #f7be8c, #f3d79a);
+        background: #f4e7d6;
       }
 
       .logo-fallback {
-        display: inline-flex;
+        display: flex;
         align-items: center;
         justify-content: center;
         font-weight: 700;
-        font-size: 1.1rem;
-      }
-
-      .hero h1 {
-        margin: 0;
-        font-family: 'Fraunces', serif;
-        font-size: 1.8rem;
-      }
-
-      .meta {
-        margin: 6px 0 0;
-        color: var(--muted);
+        font-size: 1.5rem;
+        color: var(--accent);
       }
 
       .state {
-        margin-top: 16px;
+        margin-top: 14px;
         padding: 14px;
       }
 
-      .state.hidden,
       .hidden {
         display: none;
       }
 
+      .spinner-wrap {
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+      }
+
+      .spinner {
+        width: 18px;
+        height: 18px;
+        border-radius: 50%;
+        border: 2px solid #e6d8c4;
+        border-top-color: var(--accent);
+        animation: spin 0.8s linear infinite;
+      }
+
+      @keyframes spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+
       .error {
-        color: #7f1d1d;
-        border-color: #f3b6b6;
-        background: #fff2f2;
+        color: var(--danger-text);
+        background: var(--danger-bg);
+        border-color: var(--danger-line);
+      }
+
+      .retry-btn {
+        margin-top: 8px;
+        border: 0;
+        background: var(--accent);
+        color: white;
+        padding: 8px 12px;
+        border-radius: 8px;
+        cursor: pointer;
       }
 
       .menu {
         margin-top: 16px;
         display: grid;
-        gap: 16px;
+        gap: 14px;
       }
 
       .category {
@@ -108,8 +140,7 @@
 
       .category h2 {
         margin: 0 0 12px;
-        font-family: 'Fraunces', serif;
-        font-size: 1.2rem;
+        font-size: 1.1rem;
       }
 
       .items {
@@ -120,20 +151,8 @@
 
       .item {
         border: 1px solid var(--line);
-        border-radius: 12px;
-        overflow: hidden;
-        background: #fff;
-      }
-
-      .item img {
-        width: 100%;
-        height: 140px;
-        object-fit: cover;
-        display: block;
-        background: #f4ede2;
-      }
-
-      .item-body {
+        border-radius: 10px;
+        background: white;
         padding: 10px;
       }
 
@@ -142,37 +161,45 @@
         font-size: 1rem;
       }
 
-      .item p {
+      .desc {
         margin: 0;
         color: var(--muted);
         font-size: 0.9rem;
       }
 
       .price {
+        margin: 8px 0 0;
+        color: var(--accent);
+        font-weight: 600;
+      }
+
+      .btn-add {
+        width: 100%;
         margin-top: 8px;
-        color: var(--accent-strong);
-        font-weight: 600;
-      }
-
-      .retry-btn {
-        margin-top: 10px;
-        border: none;
-        border-radius: 10px;
-        background: var(--accent);
-        color: #fff;
-        padding: 8px 12px;
-        font-weight: 600;
+        border: 1px solid var(--accent);
+        background: white;
+        color: var(--accent);
+        padding: 8px;
+        border-radius: 6px;
         cursor: pointer;
+        font-weight: 600;
       }
 
-      @media (max-width: 600px) {
+      .btn-add:hover {
+        background: var(--accent);
+        color: white;
+      }
+
+      @media (max-width: 640px) {
         .hero {
           align-items: flex-start;
         }
+      }
 
-        .hero h1 {
-          font-size: 1.5rem;
-        }
+      .meta {
+        margin: 0;
+        color: var(--muted);
+        font-size: 0.95rem;
       }
     </style>
   </head>
@@ -187,7 +214,12 @@
         </div>
       </header>
 
-      <section id="loadingState" class="panel state">Loading menu, please wait...</section>
+      <section id="loadingState" class="panel state">
+        <div class="spinner-wrap">
+          <span class="spinner" aria-hidden="true"></span>
+          <span>Loading menu, please wait...</span>
+        </div>
+      </section>
 
       <section id="errorState" class="panel state error hidden">
         <p id="errorText">Something went wrong while loading the menu.</p>
@@ -198,37 +230,100 @@
     </main>
 
     <script>
-      // Backend URL for your Render deployment
+      // Configuration: Query Parameter Routing
       const BACKEND_BASE_URL = 'https://restaurant-backend-rxqz.onrender.com';
-      const API_BASE_URL = `${BACKEND_BASE_URL}/api/menu`;
 
+      // DOM Elements
       const restaurantTitleEl = document.getElementById('restaurantTitle');
+      const tableInfoEl = document.getElementById('tableInfo');
       const restaurantLogoEl = document.getElementById('restaurantLogo');
       const restaurantLogoFallbackEl = document.getElementById('restaurantLogoFallback');
-      const tableInfoEl = document.getElementById('tableInfo');
       const loadingStateEl = document.getElementById('loadingState');
       const errorStateEl = document.getElementById('errorState');
       const errorTextEl = document.getElementById('errorText');
       const retryBtnEl = document.getElementById('retryBtn');
       const menuContainerEl = document.getElementById('menuContainer');
 
+      // Session State
       const cart = new Map();
       let currentContext = null;
-      let cartElements = null;
 
-      function getTableIdFromPath() {
-        const match = window.location.pathname.match(/\/table\/([^/?#]+)/i);
-        if (match && match[1]) {
-          return decodeURIComponent(match[1]);
+      /**
+       * Extract table ID from query parameter: ?id=64
+       */
+      function getTableIdFromQuery() {
+        const params = new URLSearchParams(window.location.search);
+        const tableId = params.get('id');
+        return tableId && String(tableId).trim() ? String(tableId).trim() : null;
+      }
+
+      /**
+       * Generate storage key namespace for a specific table
+       */
+      function getStorageNamespace(tableId) {
+        return `qr_table_${tableId}`;
+      }
+
+      /**
+       * Store cart items to localStorage
+       */
+      function persistCart(tableId) {
+        const namespace = getStorageNamespace(tableId);
+        const cartArray = Array.from(cart.values());
+        localStorage.setItem(`${namespace}_cart`, JSON.stringify(cartArray));
+      }
+
+      /**
+       * Load cart from localStorage
+       */
+      function loadCart(tableId) {
+        const namespace = getStorageNamespace(tableId);
+        const stored = localStorage.getItem(`${namespace}_cart`);
+        if (stored) {
+          try {
+            const items = JSON.parse(stored);
+            cart.clear();
+            for (const item of items) {
+              cart.set(item.id, item);
+            }
+          } catch (e) {
+            console.warn('Failed to parse stored cart', e);
+          }
         }
+      }
 
-        const parts = window.location.pathname.split('/').filter(Boolean);
-        const tableIndex = parts.lastIndexOf('table');
-        if (tableIndex !== -1 && parts[tableIndex + 1]) {
-          return decodeURIComponent(parts[tableIndex + 1]);
+      /**
+       * Store session state to localStorage
+       */
+      function persistSession(tableId, sessionData) {
+        const namespace = getStorageNamespace(tableId);
+        localStorage.setItem(`${namespace}_session`, JSON.stringify(sessionData || null));
+      }
+
+      /**
+       * Load session state from localStorage
+       */
+      function loadSession(tableId) {
+        const namespace = getStorageNamespace(tableId);
+        const stored = localStorage.getItem(`${namespace}_session`);
+        if (stored) {
+          try {
+            return JSON.parse(stored);
+          } catch (e) {
+            console.warn('Failed to parse stored session', e);
+          }
         }
-
         return null;
+      }
+
+      /**
+       * Clear all stored data for a table (used after successful payment)
+       */
+      function clearStoredState(tableId) {
+        const namespace = getStorageNamespace(tableId);
+        localStorage.removeItem(`${namespace}_cart`);
+        localStorage.removeItem(`${namespace}_session`);
+        cart.clear();
       }
 
       function setLoading(isLoading) {
@@ -249,588 +344,284 @@
         return `INR ${value.toFixed(2)}`;
       }
 
-      function escapeStoragePart(value) {
-        return String(value || '').trim().replace(/[^a-zA-Z0-9_-]/g, '_');
-      }
-
-      function getStorageNamespace(context) {
-        const parts = [escapeStoragePart(window.location.hostname)];
-
-        if (context?.restaurant?.id) {
-          parts.push(`r${escapeStoragePart(context.restaurant.id)}`);
-        }
-
-        if (context?.table?.id) {
-          parts.push(`t${escapeStoragePart(context.table.id)}`);
-        } else if (context?.tableId) {
-          parts.push(`t${escapeStoragePart(context.tableId)}`);
-        }
-
-        return parts.join(':');
-      }
-
-      function getCartKey(namespace) {
-        return `qr_table_cart_${namespace}`;
-      }
-
-      function getSessionKey(namespace) {
-        return `qr_table_session_${namespace}`;
-      }
-
-      function readJsonStorage(key) {
-        const raw = localStorage.getItem(key);
-        if (!raw) {
-          return null;
-        }
-
-        try {
-          return JSON.parse(raw);
-        } catch (error) {
-          return null;
-        }
-      }
-
-      function writeJsonStorage(key, value) {
-        localStorage.setItem(key, JSON.stringify(value));
-      }
-
-      function buildFallbackInitials(name) {
-        return String(name || 'R')
-          .trim()
-          .split(/\s+/)
-          .slice(0, 2)
-          .map((part) => part.charAt(0).toUpperCase())
-          .join('') || 'R';
-      }
-
-      function setRestaurantLogo(restaurant) {
-        const logoCandidate =
-          restaurant.logo_url ||
-          restaurant.logoUrl ||
-          restaurant.image_url ||
-          restaurant.imageUrl ||
-          '';
-
-        restaurantLogoFallbackEl.textContent = buildFallbackInitials(restaurant.name || 'R');
-
-        if (!logoCandidate) {
-          restaurantLogoEl.classList.add('hidden');
-          restaurantLogoFallbackEl.classList.remove('hidden');
-          return;
-        }
-
-        restaurantLogoEl.src = logoCandidate;
-        restaurantLogoEl.onload = () => {
-          restaurantLogoEl.classList.remove('hidden');
-          restaurantLogoFallbackEl.classList.add('hidden');
-        };
-        restaurantLogoEl.onerror = () => {
-          restaurantLogoEl.classList.add('hidden');
-          restaurantLogoFallbackEl.classList.remove('hidden');
-        };
-      }
-
-      function normalizeMenuItems(items) {
-        if (!Array.isArray(items)) {
-          return [];
-        }
-
-        return items.map((item) => ({
-          id: item.id,
-          name: item.name || 'Untitled item',
-          description: item.description || 'No description available.',
-          category: item.category || 'Other',
-          price: Number(item.price || 0),
-          imageUrl: item.image_url || item.imageUrl || '',
-          isAvailable: item.is_available !== false,
-        }));
-      }
-
-      function groupByCategory(menuItems) {
+      function groupMenuByCategory(menuItems) {
         const grouped = new Map();
-
-        menuItems.forEach((item) => {
+        for (const item of menuItems) {
           const category = item.category || 'Other';
           if (!grouped.has(category)) {
             grouped.set(category, []);
           }
           grouped.get(category).push(item);
-        });
-
+        }
         return grouped;
       }
 
-      function ensureStyleTag() {
-        if (document.getElementById('tablePageDynamicStyles')) {
-          return;
-        }
-
-        const style = document.createElement('style');
-        style.id = 'tablePageDynamicStyles';
-        style.textContent = `
-          .table-session-panel {
-            margin-top: 16px;
-            padding: 16px;
-          }
-
-          .table-session-grid {
-            display: grid;
-            grid-template-columns: 1.4fr 0.9fr;
-            gap: 16px;
-            margin-top: 16px;
-          }
-
-          .cart-panel {
-            position: sticky;
-            top: 16px;
-            align-self: start;
-            padding: 16px;
-          }
-
-          .cart-panel h2,
-          .checkout-card h3,
-          .menu-panel h2 {
-            margin: 0 0 12px;
-            font-family: 'Fraunces', serif;
-          }
-
-          .cart-items {
-            display: grid;
-            gap: 10px;
-          }
-
-          .cart-item {
-            border: 1px solid var(--line);
-            border-radius: 12px;
-            padding: 10px;
-            background: #fff;
-          }
-
-          .cart-empty,
-          .session-hint {
-            color: var(--muted);
-            font-size: 0.95rem;
-          }
-
-          .cart-total {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin: 14px 0 0;
-            padding-top: 12px;
-            border-top: 1px solid var(--line);
-            font-weight: 700;
-          }
-
-          .checkout-field,
-          .checkout-textarea {
-            width: 100%;
-            margin-top: 10px;
-            padding: 10px 12px;
-            border: 1px solid var(--line);
-            border-radius: 10px;
-            background: #fff;
-            color: var(--ink);
-            font: inherit;
-          }
-
-          .checkout-actions {
-            display: grid;
-            gap: 10px;
-            margin-top: 12px;
-          }
-
-          .checkout-btn,
-          .add-btn,
-          .clear-btn {
-            border: none;
-            border-radius: 10px;
-            padding: 10px 12px;
-            font-weight: 600;
-            cursor: pointer;
-          }
-
-          .add-btn,
-          .checkout-btn.primary {
-            background: var(--accent);
-            color: #fff;
-          }
-
-          .checkout-btn.secondary,
-          .clear-btn {
-            background: #efe5d7;
-            color: var(--ink);
-          }
-
-          .order-message {
-            margin-top: 12px;
-            font-size: 0.95rem;
-          }
-
-          .order-message.error {
-            color: #7f1d1d;
-          }
-
-          .order-message.success {
-            color: #0f5132;
-          }
-
-          .menu-panel {
-            padding: 16px;
-          }
-
-          .menu-item-card {
-            display: grid;
-            grid-template-rows: auto 1fr;
-            border: 1px solid var(--line);
-            border-radius: 12px;
-            overflow: hidden;
-            background: #fff;
-          }
-
-          .menu-item-card img {
-            width: 100%;
-            height: 140px;
-            object-fit: cover;
-            background: #f4ede2;
-          }
-
-          .menu-item-body {
-            display: grid;
-            gap: 8px;
-            padding: 12px;
-          }
-
-          .menu-item-price {
-            color: var(--accent-strong);
-            font-weight: 700;
-          }
-
-          @media (max-width: 900px) {
-            .table-session-grid {
-              grid-template-columns: 1fr;
-            }
-
-            .cart-panel {
-              position: static;
-            }
-          }
-        `;
-        document.head.appendChild(style);
-      }
-
-      function ensureCommerceUi() {
-        if (cartElements) {
-          return cartElements;
-        }
-
-        ensureStyleTag();
-
-        const sessionPanel = document.createElement('section');
-        sessionPanel.className = 'panel table-session-panel';
-        sessionPanel.innerHTML = `
-          <div class="session-hint" id="sessionHint">Loading table session...</div>
-          <div class="table-session-grid">
-            <section class="panel menu-panel">
-              <h2>Menu</h2>
-              <div id="menuRoot"></div>
-            </section>
-            <aside class="panel cart-panel">
-              <h2>Your Cart</h2>
-              <div id="cartItems" class="cart-items"></div>
-              <div class="cart-total">
-                <span>Total</span>
-                <span id="cartTotal">INR 0.00</span>
-              </div>
-              <input id="customerName" class="checkout-field" type="text" placeholder="Your name (optional)" />
-              <textarea id="orderNotes" class="checkout-textarea" rows="3" placeholder="Notes for the kitchen (optional)"></textarea>
-              <div class="checkout-actions">
-                <button id="codBtn" class="checkout-btn primary" type="button">Place Order</button>
-                <button id="onlineBtn" class="checkout-btn secondary" type="button">Pay Online</button>
-                <button id="clearCartBtn" class="clear-btn" type="button">Clear Cart</button>
-              </div>
-              <div id="orderMessage" class="order-message"></div>
-            </aside>
-          </div>
-        `;
-
-        menuContainerEl.classList.add('hidden');
-        menuContainerEl.insertAdjacentElement('beforebegin', sessionPanel);
-
-        cartElements = {
-          sessionHintEl: document.getElementById('sessionHint'),
-          menuRootEl: document.getElementById('menuRoot'),
-          cartItemsEl: document.getElementById('cartItems'),
-          cartTotalEl: document.getElementById('cartTotal'),
-          customerNameEl: document.getElementById('customerName'),
-          orderNotesEl: document.getElementById('orderNotes'),
-          codBtnEl: document.getElementById('codBtn'),
-          onlineBtnEl: document.getElementById('onlineBtn'),
-          clearCartBtnEl: document.getElementById('clearCartBtn'),
-          orderMessageEl: document.getElementById('orderMessage'),
-        };
-
-        return cartElements;
-      }
-
-      function updateSessionHint(message) {
-        const elements = ensureCommerceUi();
-        elements.sessionHintEl.textContent = message;
-      }
-
-      function persistState() {
-        if (!currentContext) {
-          return;
-        }
-
-        const namespace = getStorageNamespace(currentContext);
-        writeJsonStorage(getCartKey(namespace), Array.from(cart.values()));
-        writeJsonStorage(getSessionKey(namespace), currentContext.session || null);
-      }
-
-      function loadStoredState(context) {
-        const namespaceCandidates = [
-          getStorageNamespace(context),
-          [escapeStoragePart(window.location.hostname), `t${escapeStoragePart(context.tableId)}`].join(':'),
-        ];
-
-        const resolved = { cart: [], session: null };
-
-        for (const namespace of namespaceCandidates) {
-          const storedCart = readJsonStorage(getCartKey(namespace));
-          const storedSession = readJsonStorage(getSessionKey(namespace));
-
-          if (Array.isArray(storedCart) || storedSession) {
-            resolved.cart = Array.isArray(storedCart) ? storedCart : [];
-            resolved.session = storedSession || null;
-            break;
-          }
-        }
-
-        return resolved;
-      }
-
-      function syncCartFromStoredItems(storedItems) {
-        cart.clear();
-
-        storedItems.forEach((item) => {
-          if (!item || item.id === undefined || item.id === null) {
-            return;
-          }
-
-          cart.set(String(item.id), {
-            id: item.id,
-            name: item.name || 'Untitled item',
-            price: Number(item.price || 0),
-            quantity: Number(item.quantity || 1),
-            category: item.category || 'Other',
-            imageUrl: item.imageUrl || '',
-          });
-        });
-      }
-
-      function renderCart() {
-        const { cartItemsEl, cartTotalEl } = ensureCommerceUi();
-        const entries = Array.from(cart.values());
-
-        if (!entries.length) {
-          cartItemsEl.innerHTML = '<p class="cart-empty">Your cart is empty. Add items from the menu to start a table-specific order.</p>';
-          cartTotalEl.textContent = 'INR 0.00';
-          persistState();
-          return;
-        }
-
-        let total = 0;
-        cartItemsEl.innerHTML = '';
-
-        entries.forEach((item) => {
-          const lineTotal = Number(item.price || 0) * Number(item.quantity || 0);
-          total += lineTotal;
-
-          const row = document.createElement('article');
-          row.className = 'cart-item';
-          row.innerHTML = `
-            <strong>${item.name}</strong>
-            <div>Qty: ${item.quantity}</div>
-            <div>${formatPrice(lineTotal)}</div>
-            <button type="button" class="clear-btn" data-remove-id="${String(item.id)}">Remove</button>
-          `;
-          cartItemsEl.appendChild(row);
-        });
-
-        cartTotalEl.textContent = formatPrice(total);
-
-        cartItemsEl.querySelectorAll('button[data-remove-id]').forEach((button) => {
-          button.addEventListener('click', () => {
-            const itemId = String(button.dataset.removeId);
-            cart.delete(itemId);
-            renderCart();
-          });
-        });
-
-        persistState();
-      }
-
-      function addToCart(item) {
-        const key = String(item.id);
-        const existing = cart.get(key);
-
-        if (existing) {
-          existing.quantity += 1;
-        } else {
-          cart.set(key, {
-            id: item.id,
-            name: item.name,
-            price: Number(item.price || 0),
-            quantity: 1,
-            category: item.category || 'Other',
-            imageUrl: item.imageUrl || '',
-          });
-        }
-
-        renderCart();
-      }
-
-      function setOrderingState(disabled, message) {
-        const elements = ensureCommerceUi();
-        [elements.codBtnEl, elements.onlineBtnEl, elements.clearCartBtnEl].forEach((button) => {
-          if (button) {
-            button.disabled = disabled;
-          }
-        });
-
-        elements.orderMessageEl.textContent = message || '';
-        elements.orderMessageEl.className = message ? 'order-message success' : 'order-message';
-      }
-
       function renderMenu(menuItems) {
-        const { menuRootEl } = ensureCommerceUi();
-        menuRootEl.innerHTML = '';
+        menuContainerEl.innerHTML = '';
 
-        if (!menuItems.length) {
-          menuRootEl.innerHTML = '<section class="panel category"><p>No menu items available right now.</p></section>';
+        if (!Array.isArray(menuItems) || menuItems.length === 0) {
+          menuContainerEl.innerHTML = '<section class="category panel"><p>No menu items available.</p></section>';
+          menuContainerEl.classList.remove('hidden');
           return;
         }
 
-        const groupedMenu = groupByCategory(menuItems);
+        const grouped = groupMenuByCategory(menuItems);
 
-        groupedMenu.forEach((items, categoryName) => {
+        for (const [category, items] of grouped.entries()) {
           const categorySection = document.createElement('section');
-          categorySection.className = 'panel category';
+          categorySection.className = 'category panel';
 
-          const title = document.createElement('h2');
-          title.textContent = categoryName;
-          categorySection.appendChild(title);
+          const categoryTitle = document.createElement('h2');
+          categoryTitle.textContent = category;
+          categorySection.appendChild(categoryTitle);
 
           const itemsGrid = document.createElement('div');
           itemsGrid.className = 'items';
 
-          items.forEach((item) => {
-            const card = document.createElement('article');
-            card.className = 'menu-item-card';
+          for (const item of items) {
+            const itemDiv = document.createElement('div');
+            itemDiv.className = 'item';
 
-            if (item.imageUrl) {
-              const image = document.createElement('img');
-              image.alt = item.name;
-              image.src = item.imageUrl;
-              card.appendChild(image);
+            const itemTitle = document.createElement('h3');
+            itemTitle.textContent = item.name;
+            itemDiv.appendChild(itemTitle);
+
+            if (item.description) {
+              const desc = document.createElement('p');
+              desc.className = 'desc';
+              desc.textContent = item.description;
+              itemDiv.appendChild(desc);
             }
 
-            const body = document.createElement('div');
-            body.className = 'menu-item-body';
-
-            const name = document.createElement('h3');
-            name.textContent = item.name;
-
-            const desc = document.createElement('p');
-            desc.textContent = item.description;
-
-            const price = document.createElement('div');
-            price.className = 'menu-item-price';
+            const price = document.createElement('p');
+            price.className = 'price';
             price.textContent = formatPrice(item.price);
+            itemDiv.appendChild(price);
 
-            const addButton = document.createElement('button');
-            addButton.type = 'button';
-            addButton.className = 'add-btn';
-            addButton.textContent = 'Add to Cart';
-            addButton.disabled = item.isAvailable === false;
-            addButton.addEventListener('click', () => addToCart(item));
+            const addBtn = document.createElement('button');
+            addBtn.textContent = 'Add to Cart';
+            addBtn.className = 'btn-add';
+            addBtn.addEventListener('click', () => addToCart(item));
+            itemDiv.appendChild(addBtn);
 
-            body.appendChild(name);
-            body.appendChild(desc);
-            body.appendChild(price);
-            body.appendChild(addButton);
-            card.appendChild(body);
-            itemsGrid.appendChild(card);
-          });
+            itemsGrid.appendChild(itemDiv);
+          }
 
           categorySection.appendChild(itemsGrid);
-          menuRootEl.appendChild(categorySection);
+          menuContainerEl.appendChild(categorySection);
+        }
+
+        menuContainerEl.classList.remove('hidden');
+      }
+
+      function addToCart(item) {
+        if (cart.has(item.id)) {
+          const existing = cart.get(item.id);
+          existing.quantity += 1;
+          cart.set(item.id, existing);
+        } else {
+          cart.set(item.id, { ...item, quantity: 1 });
+        }
+        renderCart();
+        persistCart(currentContext.tableId);
+      }
+
+      function removeFromCart(itemId) {
+        cart.delete(itemId);
+        renderCart();
+        persistCart(currentContext.tableId);
+      }
+
+      function updateQuantity(itemId, quantity) {
+        if (quantity <= 0) {
+          removeFromCart(itemId);
+        } else {
+          const item = cart.get(itemId);
+          if (item) {
+            item.quantity = quantity;
+            cart.set(itemId, item);
+            renderCart();
+            persistCart(currentContext.tableId);
+          }
+        }
+      }
+
+      function calculateCartTotal() {
+        let total = 0;
+        for (const item of cart.values()) {
+          total += (item.price || 0) * (item.quantity || 1);
+        }
+        return total;
+      }
+
+      /**
+       * Fetch table context from backend using tableId
+       */
+      async function fetchTableContext(tableId) {
+        const response = await fetch(
+          `${BACKEND_BASE_URL}/api/restaurants/table/${encodeURIComponent(tableId)}`
+        );
+        if (!response.ok) {
+          throw new Error(`Failed to load table data. Server returned ${response.status}.`);
+        }
+        return response.json();
+      }
+
+      /**
+       * Render the cart panel with checkout functionality
+       */
+      function renderCartPanel() {
+        let cartPanel = document.getElementById('cartPanel');
+
+        if (!cartPanel) {
+          // Create cart panel if it doesn't exist
+          cartPanel = document.createElement('section');
+          cartPanel.id = 'cartPanel';
+          cartPanel.className = 'panel';
+          cartPanel.style.cssText = `
+            margin-top: 16px;
+            padding: 16px;
+            background: var(--panel);
+            border: 1px solid var(--line);
+            border-radius: 14px;
+          `;
+
+          menuContainerEl.parentNode.insertBefore(cartPanel, menuContainerEl.nextSibling);
+        }
+
+        const cartTotal = calculateCartTotal();
+
+        cartPanel.innerHTML = `
+          <h2 style="margin: 0 0 16px; font-size: 1.2rem;">Your Cart</h2>
+          <div id="cartItemsList" style="margin-bottom: 16px; max-height: 200px; overflow-y: auto;"></div>
+          <div style="display: flex; justify-content: space-between; margin-bottom: 16px; padding-top: 12px; border-top: 1px solid var(--line); font-weight: 600;">
+            <span>Total:</span>
+            <span>${formatPrice(cartTotal)}</span>
+          </div>
+          <input id="customerName" type="text" placeholder="Your name (optional)" style="width: 100%; padding: 8px; border: 1px solid var(--line); border-radius: 6px; margin-bottom: 8px;" />
+          <textarea id="orderNotes" rows="2" placeholder="Notes for kitchen (optional)" style="width: 100%; padding: 8px; border: 1px solid var(--line); border-radius: 6px; margin-bottom: 8px; resize: none;"></textarea>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 8px;">
+            <button id="checkoutBtn" class="retry-btn" type="button" style="background: var(--accent); color: white; margin-top: 0;">Checkout</button>
+            <button id="clearCartBtn" type="button" style="background: var(--muted); color: white; padding: 8px; border: none; border-radius: 8px; cursor: pointer;">Clear Cart</button>
+          </div>
+          <div id="orderMessage" style="display: none; padding: 8px; border-radius: 6px; text-align: center; font-size: 0.9rem;"></div>
+        `;
+
+        // Render cart items
+        const cartItemsList = cartPanel.querySelector('#cartItemsList');
+        if (cart.size === 0) {
+          cartItemsList.innerHTML = '<p style="color: var(--muted);">Your cart is empty</p>';
+        } else {
+          for (const item of cart.values()) {
+            const itemDiv = document.createElement('div');
+            itemDiv.style.cssText = `
+              display: flex;
+              justify-content: space-between;
+              align-items: center;
+              padding: 8px;
+              border-bottom: 1px solid var(--line);
+            `;
+
+            const itemInfo = document.createElement('span');
+            itemInfo.textContent = `${item.name} × ${item.quantity}`;
+            itemInfo.style.fontWeight = '500';
+
+            const itemPrice = document.createElement('span');
+            itemPrice.textContent = formatPrice(item.price * item.quantity);
+
+            itemDiv.appendChild(itemInfo);
+            itemDiv.appendChild(itemPrice);
+            cartItemsList.appendChild(itemDiv);
+          }
+        }
+
+        // Attach event listeners
+        cartPanel.querySelector('#checkoutBtn').addEventListener('click', triggerCheckout);
+        cartPanel.querySelector('#clearCartBtn').addEventListener('click', () => {
+          cart.clear();
+          persistCart(currentContext.tableId);
+          renderCartPanel();
         });
       }
 
-      async function triggerCheckout(paymentMethod) {
-        const elements = ensureCommerceUi();
-        const tableId = currentContext?.tableId;
-        const restaurantId = currentContext?.restaurant?.id || null;
-        const sessionToken = currentContext?.session?.sessionToken || null;
-        const sessionId = currentContext?.session?.id || null;
-        const items = Array.from(cart.values()).map((item) => ({
-          menuItemId: item.id,
-          name: item.name,
-          price: item.price,
-          quantity: item.quantity,
-        }));
+      /**
+       * Handle checkout: post order and clear on success
+       */
+      async function triggerCheckout() {
+        const cartTotal = calculateCartTotal();
 
-        if (!items.length) {
-          elements.orderMessageEl.textContent = 'Add at least one menu item before checkout.';
-          elements.orderMessageEl.className = 'order-message error';
+        if (cartTotal <= 0) {
+          const orderMsg = document.getElementById('orderMessage');
+          orderMsg.textContent = 'Cart is empty. Add items before checkout.';
+          orderMsg.style.display = 'block';
+          orderMsg.style.backgroundColor = '#f8d7da';
+          orderMsg.style.color = '#721c24';
           return;
         }
 
         const checkoutPayload = {
-          tableId,
-          restaurantId,
-          tableSessionId: sessionId,
-          sessionToken,
-          customerName: elements.customerNameEl.value.trim(),
-          notes: elements.orderNotesEl.value.trim(),
-          paymentMethod,
-          items,
+          tableId: currentContext.tableId,
+          restaurantId: currentContext.restaurant?.id,
+          items: Array.from(cart.values()),
+          total: cartTotal,
+          customerName: (document.getElementById('customerName')?.value || 'Guest').trim(),
+          notes: (document.getElementById('orderNotes')?.value || '').trim(),
         };
 
-        // Connect your final checkout/payment trigger here.
-        // Replace this placeholder with the POST request that creates the order,
-        // starts the payment intent/session, and confirms the table-scoped session.
-        console.info('Checkout payload for table session:', checkoutPayload);
+        const orderMsg = document.getElementById('orderMessage');
+        orderMsg.textContent = 'Processing checkout...';
+        orderMsg.style.display = 'block';
+        orderMsg.style.backgroundColor = '#e2e3e5';
+        orderMsg.style.color = '#383d41';
 
-        // Example hook point:
-        // await fetch('https://my-render-backend.onrender.com/api/orders', {
-        //   method: 'POST',
-        //   headers: { 'Content-Type': 'application/json' },
-        //   body: JSON.stringify(checkoutPayload),
-        // });
+        try {
+          const response = await fetch(`${BACKEND_BASE_URL}/api/orders`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(checkoutPayload),
+          });
 
-        elements.orderMessageEl.textContent = paymentMethod === 'online'
-          ? 'Checkout trigger is ready. Wire your payment gateway here.'
-          : 'Order trigger is ready. Wire your final order confirmation endpoint here.';
-        elements.orderMessageEl.className = 'order-message success';
-      }
+          if (!response.ok) {
+            throw new Error(`Checkout failed: ${response.status}`);
+          }
 
-      async function fetchTableData(tableId) {
-        const response = await fetch(`${BACKEND_BASE_URL}/api/restaurants/table/${encodeURIComponent(tableId)}`);
-        if (!response.ok) {
-          throw new Error(`Failed to load table data. Server returned ${response.status}.`);
+          const result = await response.json();
+
+          // Check if payment was successful
+          if (result.success || result.paymentStatus === 'completed') {
+            orderMsg.textContent = 'Order confirmed! Thank you.';
+            orderMsg.style.backgroundColor = '#d4edda';
+            orderMsg.style.color = '#155724';
+
+            // Clear session and cart after successful payment
+            clearStoredState(currentContext.tableId);
+
+            setTimeout(() => {
+              location.reload();
+            }, 2000);
+          } else {
+            orderMsg.textContent = 'Order created. Awaiting payment confirmation.';
+            orderMsg.style.backgroundColor = '#e2e3e5';
+            orderMsg.style.color = '#383d41';
+          }
+        } catch (error) {
+          orderMsg.textContent = `Checkout error: ${error.message}`;
+          orderMsg.style.display = 'block';
+          orderMsg.style.backgroundColor = '#f8d7da';
+          orderMsg.style.color = '#721c24';
         }
-
-        return response.json();
       }
 
+      /**
+       * Initialize page: extract tableId from query param, load context, restore cart
+       */
       async function loadPage() {
-        const tableId = getTableIdFromPath();
+        const tableId = getTableIdFromQuery();
 
         if (!tableId) {
-          throw new Error('Invalid table URL. Expected a path like /table/5.');
+          setError('Invalid table URL. Expected: /table.html?id=64');
+          setLoading(false);
+          return;
         }
 
         setLoading(true);
@@ -838,80 +629,55 @@
         menuContainerEl.classList.add('hidden');
 
         try {
-          const data = await fetchTableData(tableId);
-          const restaurant = data.restaurant || data.tenant || {};
-          const table = data.table || { id: tableId, table_number: data.tableNumber || tableId };
-          const menu = normalizeMenuItems(data.menu || data.items || []);
-          const lock = data.lock || {};
-          const session = data.session || data.tableSession || lock.session || null;
+          // Fetch table context from backend
+          const data = await fetchTableContext(tableId);
+          const restaurant = data.restaurant || {};
+          const table = data.table || { id: tableId, table_number: tableId };
+          const menu = data.menu || [];
 
           currentContext = {
             tableId,
             restaurant,
             table,
-            session,
           };
 
-          const stored = loadStoredState(currentContext);
-          syncCartFromStoredItems(stored.cart);
+          // Load persisted cart and session from localStorage
+          loadCart(tableId);
+          const storedSession = loadSession(tableId);
 
-          if (!currentContext.session && stored.session) {
-            currentContext.session = stored.session;
-          }
-
+          // Update page header
           restaurantTitleEl.textContent = restaurant.name || 'Restaurant';
           tableInfoEl.textContent = table.table_number
             ? `Table: ${table.table_number}`
             : `Table: ${tableId}`;
 
-          setRestaurantLogo(restaurant);
-          ensureCommerceUi();
-          updateSessionHint(
-            currentContext.session
-              ? `Table session active for table ${table.table_number || tableId}. Your cart is stored separately for this table.`
-              : `Viewing table ${table.table_number || tableId}. Your cart is stored separately for this table.`
-          );
-          renderMenu(menu);
-          renderCart();
-
-          if (lock.isLocked) {
-            setOrderingState(false, lock.expiresAt
-              ? `This table already has an active session until ${new Date(lock.expiresAt).toLocaleString()}.`
-              : 'This table already has an active session.');
+          // Set restaurant logo if available
+          if (restaurant.logo_url || restaurant.logo) {
+            restaurantLogoEl.src = restaurant.logo_url || restaurant.logo;
+            restaurantLogoEl.classList.remove('hidden');
+            restaurantLogoFallbackEl.classList.add('hidden');
           } else {
-            setOrderingState(false, 'Cart and checkout are scoped to this table only.');
+            restaurantLogoFallbackEl.textContent = (restaurant.name || 'R').charAt(0).toUpperCase();
+            restaurantLogoEl.classList.add('hidden');
+            restaurantLogoFallbackEl.classList.remove('hidden');
           }
 
-          menuContainerEl.classList.remove('hidden');
+          // Render menu and cart
+          renderMenu(menu);
+          renderCartPanel();
+
         } catch (error) {
-          setError(error.message || 'Unable to load menu. Please try again.');
+          setError(error.message || 'Unable to load menu. Please refresh and try again.');
         } finally {
           setLoading(false);
         }
       }
 
+      // Retry button
       retryBtnEl.addEventListener('click', loadPage);
 
-      document.addEventListener('click', (event) => {
-        if (event.target && event.target.id === 'codBtn') {
-          triggerCheckout('cod');
-        }
-
-        if (event.target && event.target.id === 'onlineBtn') {
-          triggerCheckout('online');
-        }
-
-        if (event.target && event.target.id === 'clearCartBtn') {
-          cart.clear();
-          renderCart();
-          const elements = ensureCommerceUi();
-          elements.orderMessageEl.textContent = 'Cart cleared for this table session.';
-          elements.orderMessageEl.className = 'order-message success';
-        }
-      });
-
-      window.addEventListener('beforeunload', persistState);
-      loadPage();
+      // Initialize on page load
+      document.addEventListener('DOMContentLoaded', loadPage);
     </script>
   </body>
 </html>

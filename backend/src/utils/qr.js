@@ -1,12 +1,12 @@
 const QRCode = require('qrcode');
 
 function getFrontendProductionUrl() {
-  return 'https://restaurants.netlify.app';
+  return 'https://restaurants.netlify.app/table.html?id=';
 }
 
 async function buildQrPayload({ tableId }) {
   const publicBaseUrl = getFrontendProductionUrl();
-  const qrUrl = `${publicBaseUrl}/table/${encodeURIComponent(tableId)}`;
+  const qrUrl = `${publicBaseUrl}${encodeURIComponent(tableId)}`;
   const qrDataUrl = await QRCode.toDataURL(qrUrl, { width: 400 });
   return { qrUrl, qrDataUrl };
 }
