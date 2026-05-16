@@ -1,8 +1,7 @@
 const QRCode = require('qrcode');
 
 function getFrontendProductionUrl() {
-  const fallbackUrl = 'https://your-main-app-name.vercel.app';
-  return String(process.env.FRONTEND_PRODUCTION_URL || process.env.FRONTEND_PUBLIC_URL || fallbackUrl).replace(/\/$/, '');
+  return 'https://restaurants-mauve-two.vercel.app';
 }
 
 async function buildQrPayload({ tableId }) {
