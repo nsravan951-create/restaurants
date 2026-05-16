@@ -1,22 +1,13 @@
 const QRCode = require('qrcode');
 
-function normalizeTableQueryValue(tableNumber, tableId) {
-  if (tableNumber !== undefined && tableNumber !== null) {
-    const raw = String(tableNumber).trim();
-    const numericOnly = raw.match(/\d+/);
-    if (/^table\s*\d+$/i.test(raw) && numericOnly) {
-      return numericOnly[0];
-    }
-    return raw;
-  }
-
-  return String(tableId);
+function getFrontendProductionUrl() {
+  const fallbackUrl = 'https://your-main-app-name.vercel.app';
+  return String(process.env.FRONTEND_PRODUCTION_URL || process.env.FRONTEND_PUBLIC_URL || fallbackUrl).replace(/\/$/, '');
 }
 
-async function buildQrPayload({ restaurantId, tableId, tableNumber }) {
-  const publicBaseUrl = (process.env.FRONTEND_PUBLIC_URL || 'https://restaurants-mauve-two.vercel.app').replace(/\/$/, '');
-  const tableValue = normalizeTableQueryValue(tableNumber, tableId);
-  const qrUrl = `${publicBaseUrl}/table?restaurantId=${encodeURIComponent(restaurantId)}&table=${encodeURIComponent(tableValue)}`;
+async function buildQrPayload({ tableId }) {
+  const publicBaseUrl = getFrontendProductionUrl();
+  const qrUrl = `${publicBaseUrl}/table/${encodeURIComponent(tableId)}`;
   const qrDataUrl = await QRCode.toDataURL(qrUrl, { width: 400 });
   return { qrUrl, qrDataUrl };
 }
