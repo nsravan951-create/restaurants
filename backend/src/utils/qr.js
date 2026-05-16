@@ -1,7 +1,7 @@
 const QRCode = require('qrcode');
 
 function getFrontendProductionUrl() {
-  return 'https://ameerpet.netlify.app';
+  return 'https://restaurants.netlify.app';
 }
 
 async function buildQrPayload({ tableId }) {

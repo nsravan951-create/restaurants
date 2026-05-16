@@ -73,6 +73,70 @@ router.get('/:restaurantId/tables/resolve', asyncHandler(async (req, res) => {
   return res.json({ table: rows[0] });
 }));
 
+// Public endpoint: Fetch table context (restaurant, table, menu) by tableId
+// Used by QR code scanning interface
+router.get('/table/:tableId', asyncHandler(async (req, res) => {
+  const tableId = Number(req.params.tableId);
+
+  if (!tableId || tableId <= 0) {
+    return res.status(400).json({ error: 'Invalid table ID' });
+  }
+
+  // Fetch table with restaurant and menu data
+  const { rows: tableRows } = await pool.query(
+    `SELECT 
+       t.id, 
+       t.table_number, 
+       t.restaurant_id,
+       r.name as restaurant_name,
+       r.phone as restaurant_phone,
+       r.address as restaurant_address,
+       r.logo_url as restaurant_logo
+     FROM restaurant_tables t
+     INNER JOIN restaurants r ON r.id = t.restaurant_id
+     WHERE t.id = $1
+     LIMIT 1`,
+    [tableId]
+  );
+
+  if (!tableRows.length) {
+    return res.status(404).json({ error: 'Table not found' });
+  }
+
+  const tableData = tableRows[0];
+
+  // Fetch menu items for this restaurant
+  const { rows: menuRows } = await pool.query(
+    `SELECT 
+       id, 
+       name, 
+       description, 
+       price, 
+       image_url, 
+       category, 
+       is_available
+     FROM menu_items
+     WHERE restaurant_id = $1 AND is_available = TRUE
+     ORDER BY category, name`,
+    [tableData.restaurant_id]
+  );
+
+  return res.json({
+    table: {
+      id: tableData.id,
+      table_number: tableData.table_number,
+    },
+    restaurant: {
+      id: tableData.restaurant_id,
+      name: tableData.restaurant_name,
+      phone: tableData.restaurant_phone,
+      address: tableData.restaurant_address,
+      logo: tableData.restaurant_logo,
+    },
+    menu: menuRows,
+  });
+}));
+
 router.post('/:restaurantId/tables', requireAuth(['owner', 'super_admin']), asyncHandler(async (req, res) => {
   const { restaurantId } = req.params;
   const data = tableSchema.parse(req.body);

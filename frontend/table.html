@@ -198,7 +198,9 @@
     </main>
 
     <script>
-      const API_BASE_URL = 'https://my-render-backend.onrender.com/api/menu';
+      // Backend URL for your Render deployment
+      const BACKEND_BASE_URL = 'https://restaurant-backend-rxqz.onrender.com';
+      const API_BASE_URL = `${BACKEND_BASE_URL}/api/menu`;
 
       const restaurantTitleEl = document.getElementById('restaurantTitle');
       const restaurantLogoEl = document.getElementById('restaurantLogo');
@@ -816,7 +818,7 @@
       }
 
       async function fetchTableData(tableId) {
-        const response = await fetch(`${API_BASE_URL}?table=${encodeURIComponent(tableId)}`);
+        const response = await fetch(`${BACKEND_BASE_URL}/api/restaurants/table/${encodeURIComponent(tableId)}`);
         if (!response.ok) {
           throw new Error(`Failed to load table data. Server returned ${response.status}.`);
         }
