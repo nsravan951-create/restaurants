@@ -15,12 +15,9 @@ const errorHandler = require('./src/middleware/errorHandler');
 
 const app = express();
 
-const allowedOrigins = [
-  'http://localhost:3000',
-  'http://localhost:5173',
-  'https://restaurants.netlify.app',
-  'https://restaurantts.netlify.app',
-];
+const allowedOrigins = (process.env.CORS_ORIGIN || 'http://localhost:3000,http://localhost:5173')
+  .split(',')
+  .map((s) => s.trim());
 
 const corsOptions = {
   origin(origin, callback) {
