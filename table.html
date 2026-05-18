@@ -3,107 +3,779 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Restaurant Menu</title>
+    <meta name="theme-color" content="#111111" />
+    <title>Table Order</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@600;700&family=Sora:wght@400;500;600&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@600;700;800&family=Sora:wght@400;500;600;700&display=swap" rel="stylesheet" />
     <style>
       :root {
-        --bg: #f5f1e8;
-        --panel: #fffdf8;
-        --ink: #2b2118;
-        --muted: #6b5b4a;
-        --line: #e6d8c4;
-        --accent: #bf4e22;
-        --danger-bg: #fff1f1;
-        --danger-line: #f4bdbd;
-        --danger-text: #7a1d1d;
+        --bg-1: #f6efe6;
+        --bg-2: #f0e4d6;
+        --surface: rgba(255, 252, 247, 0.92);
+        --surface-strong: #fffaf3;
+        --surface-dark: #231813;
+        --ink: #241712;
+        --muted: #6c5b50;
+        --line: rgba(68, 47, 35, 0.12);
+        --shadow: 0 18px 45px rgba(68, 47, 35, 0.12);
+        --shadow-soft: 0 8px 24px rgba(68, 47, 35, 0.08);
+        --accent: #bf542f;
+        --accent-hover: #a84222;
+        --accent-2: #1f6f52;
+        --success: #1f7a59;
+        --danger: #a33b32;
+        --warning: #98601c;
+        --radius-xl: 28px;
+        --radius-lg: 22px;
+        --radius-md: 16px;
+        --radius-sm: 12px;
+        --font-display: 'Fraunces', Georgia, serif;
+        --font-body: 'Sora', 'Trebuchet MS', sans-serif;
       }
 
       * {
         box-sizing: border-box;
       }
 
+      html {
+        scroll-behavior: smooth;
+      }
+
       body {
         margin: 0;
-        font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+        font-family: var(--font-body);
         color: var(--ink);
         background:
-          radial-gradient(circle at 10% 10%, #fff5df 0%, transparent 32%),
-          radial-gradient(circle at 85% 0%, #f8e4d6 0%, transparent 24%),
-          var(--bg);
+          radial-gradient(circle at top left, rgba(255, 214, 164, 0.55), transparent 32%),
+          radial-gradient(circle at top right, rgba(223, 195, 168, 0.5), transparent 28%),
+          linear-gradient(180deg, var(--bg-1), var(--bg-2));
+        min-height: 100vh;
       }
 
-      .page {
-        max-width: 1100px;
+      body::before {
+        content: '';
+        position: fixed;
+        inset: 0;
+        pointer-events: none;
+        background-image: linear-gradient(rgba(255, 255, 255, 0.22) 1px, transparent 1px), linear-gradient(90deg, rgba(255, 255, 255, 0.18) 1px, transparent 1px);
+        background-size: 24px 24px;
+        opacity: 0.25;
+        mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0.85), rgba(0, 0, 0, 0.1));
+      }
+
+      button,
+      input,
+      textarea {
+        font: inherit;
+      }
+
+      button {
+        border: 0;
+        cursor: pointer;
+      }
+
+      .app {
+        width: min(1180px, calc(100% - 20px));
         margin: 0 auto;
-        padding: 20px;
+        padding: 16px 0 124px;
       }
 
-      .panel {
-        background: var(--panel);
-        border: 1px solid var(--line);
-        border-radius: 14px;
+      .topbar {
+        position: sticky;
+        top: 10px;
+        z-index: 20;
+        margin-bottom: 16px;
+        padding: 14px;
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        background: rgba(255, 251, 245, 0.82);
+        backdrop-filter: blur(18px);
+        border: 1px solid rgba(255, 255, 255, 0.55);
+        border-radius: var(--radius-xl);
+        box-shadow: var(--shadow-soft);
+      }
+
+      .brand-mark {
+        width: 58px;
+        height: 58px;
+        border-radius: 18px;
+        overflow: hidden;
+        flex: 0 0 auto;
+        background: linear-gradient(135deg, #1f6f52, #bf542f);
+        display: grid;
+        place-items: center;
+        color: white;
+        font-family: var(--font-display);
+        font-size: 1.2rem;
+        letter-spacing: 0.04em;
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.22);
+      }
+
+      .brand-mark img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        display: block;
+      }
+
+      .brand-copy {
+        min-width: 0;
+        flex: 1;
+      }
+
+      .brand-copy h1 {
+        margin: 0;
+        font-family: var(--font-display);
+        font-size: clamp(1.15rem, 2.5vw, 2rem);
+        line-height: 1.02;
+        letter-spacing: -0.02em;
+      }
+
+      .brand-copy p {
+        margin: 6px 0 0;
+        color: var(--muted);
+        font-size: 0.92rem;
+      }
+
+      .header-badges {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        justify-content: flex-end;
+      }
+
+      .badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 10px 12px;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.78);
+        color: var(--muted);
+        border: 1px solid rgba(68, 47, 35, 0.08);
+        font-size: 0.82rem;
+        white-space: nowrap;
+      }
+
+      .badge strong {
+        color: var(--ink);
       }
 
       .hero {
+        display: grid;
+        gap: 14px;
+        grid-template-columns: 1fr;
+        margin-bottom: 16px;
+      }
+
+      .hero-panel,
+      .section-panel,
+      .cart-panel,
+      .status-panel,
+      .receipt-panel,
+      .state-panel {
+        background: var(--surface);
+        backdrop-filter: blur(20px);
+        border: 1px solid rgba(255, 255, 255, 0.55);
+        border-radius: var(--radius-xl);
+        box-shadow: var(--shadow);
+      }
+
+      .hero-panel {
+        overflow: hidden;
+        padding: 0;
+      }
+
+      .hero-grid {
+        display: grid;
+        grid-template-columns: 1fr;
+      }
+
+      .hero-copy {
+        padding: 22px 18px 18px;
+      }
+
+      .eyebrow {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 12px;
+        border-radius: 999px;
+        background: rgba(31, 111, 82, 0.09);
+        color: var(--accent-2);
+        font-size: 0.79rem;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      .hero-copy h2 {
+        margin: 14px 0 10px;
+        font-family: var(--font-display);
+        font-size: clamp(1.8rem, 5vw, 3.6rem);
+        line-height: 0.98;
+        letter-spacing: -0.04em;
+      }
+
+      .hero-copy p {
+        margin: 0;
+        color: var(--muted);
+        max-width: 62ch;
+        line-height: 1.65;
+      }
+
+      .hero-stats {
+        padding: 0 18px 18px;
+        display: grid;
+        gap: 10px;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .stat {
+        padding: 14px;
+        border-radius: var(--radius-md);
+        background: rgba(255, 255, 255, 0.72);
+        border: 1px solid rgba(68, 47, 35, 0.08);
+      }
+
+      .stat span {
+        display: block;
+        color: var(--muted);
+        font-size: 0.78rem;
+        margin-bottom: 6px;
+      }
+
+      .stat strong {
+        font-size: 1rem;
+      }
+
+      .hero-art {
+        min-height: 160px;
+        background:
+          radial-gradient(circle at 30% 20%, rgba(255, 255, 255, 0.42), transparent 26%),
+          linear-gradient(135deg, rgba(191, 84, 47, 0.95), rgba(31, 111, 82, 0.92));
+        position: relative;
+        overflow: hidden;
+      }
+
+      .hero-art::before,
+      .hero-art::after {
+        content: '';
+        position: absolute;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.14);
+      }
+
+      .hero-art::before {
+        width: 220px;
+        height: 220px;
+        left: -48px;
+        top: -38px;
+      }
+
+      .hero-art::after {
+        width: 140px;
+        height: 140px;
+        right: -18px;
+        bottom: -24px;
+      }
+
+      .hero-art-content {
+        position: absolute;
+        inset: 0;
+        display: grid;
+        place-items: center;
+        padding: 18px;
+        text-align: center;
+        color: white;
+      }
+
+      .hero-art-content strong {
+        display: block;
+        font-family: var(--font-display);
+        font-size: clamp(2.6rem, 9vw, 5rem);
+        line-height: 0.9;
+        letter-spacing: -0.05em;
+      }
+
+      .hero-art-content span {
+        margin-top: 10px;
+        display: block;
+        font-size: 0.85rem;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        opacity: 0.85;
+      }
+
+      .layout {
+        display: grid;
+        gap: 16px;
+      }
+
+      .menu-column,
+      .cart-column {
+        min-width: 0;
+      }
+
+      .section-panel {
+        padding: 18px;
+      }
+
+      .section-heading {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 10px;
+        margin-bottom: 16px;
+      }
+
+      .section-heading h3,
+      .section-heading h4 {
+        margin: 0;
+        font-family: var(--font-display);
+        font-size: clamp(1.2rem, 2.4vw, 1.7rem);
+      }
+
+      .section-heading p {
+        margin: 0;
+        color: var(--muted);
+        font-size: 0.88rem;
+      }
+
+      .menu-groups {
+        display: grid;
+        gap: 16px;
+      }
+
+      .group {
+        padding: 4px 0 0;
+      }
+
+      .group-title {
         display: flex;
         align-items: center;
         justify-content: space-between;
-        gap: 12px;
-        padding: 16px;
+        gap: 10px;
+        margin: 0 0 12px;
       }
 
-      .hero h1 {
+      .group-title h4 {
         margin: 0;
-        font-size: 1.6rem;
+        font-size: 0.98rem;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--accent-2);
       }
 
-      .hero p {
-        margin: 4px 0 0;
+      .group-title span {
         color: var(--muted);
+        font-size: 0.84rem;
       }
 
-      .logo {
-        width: 64px;
-        height: 64px;
+      .cards {
+        display: grid;
+        gap: 14px;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      }
+
+      .item-card {
+        overflow: hidden;
+        border-radius: var(--radius-lg);
+        background: var(--surface-strong);
+        border: 1px solid rgba(68, 47, 35, 0.08);
+        box-shadow: var(--shadow-soft);
+        display: grid;
+        grid-template-rows: auto 1fr;
+        transition: transform 180ms ease, box-shadow 180ms ease, border-color 180ms ease;
+      }
+
+      .item-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 18px 36px rgba(68, 47, 35, 0.14);
+        border-color: rgba(191, 84, 47, 0.22);
+      }
+
+      .item-image {
+        width: 100%;
+        aspect-ratio: 1.25 / 1;
         object-fit: cover;
-        border-radius: 12px;
-        border: 1px solid var(--line);
-        background: #f4e7d6;
+        display: block;
+        background: linear-gradient(135deg, rgba(191, 84, 47, 0.18), rgba(31, 111, 82, 0.18));
       }
 
-      .logo-fallback {
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-weight: 700;
-        font-size: 1.5rem;
-        color: var(--accent);
-      }
-
-      .state {
-        margin-top: 14px;
-        padding: 14px;
-      }
-
-      .hidden {
-        display: none;
-      }
-
-      .spinner-wrap {
-        display: inline-flex;
-        align-items: center;
+      .item-body {
+        padding: 15px;
+        display: grid;
         gap: 10px;
       }
 
+      .item-top {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 10px;
+      }
+
+      .item-title {
+        margin: 0;
+        font-size: 1rem;
+        line-height: 1.35;
+      }
+
+      .item-desc {
+        margin: 0;
+        color: var(--muted);
+        font-size: 0.88rem;
+        line-height: 1.55;
+      }
+
+      .item-price {
+        flex: 0 0 auto;
+        font-weight: 700;
+        color: var(--accent);
+      }
+
+      .item-footer {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+      }
+
+      .qty-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 10px;
+        border-radius: 999px;
+        background: rgba(31, 111, 82, 0.08);
+        color: var(--accent-2);
+        font-size: 0.82rem;
+        font-weight: 700;
+      }
+
+      .btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        padding: 13px 16px;
+        border-radius: 16px;
+        font-weight: 700;
+        letter-spacing: 0.01em;
+        transition: transform 160ms ease, background 160ms ease, box-shadow 160ms ease, opacity 160ms ease;
+        user-select: none;
+      }
+
+      .btn:active {
+        transform: translateY(1px) scale(0.99);
+      }
+
+      .btn-primary {
+        background: linear-gradient(135deg, var(--accent), #d56a3d);
+        color: #fff8f4;
+        box-shadow: 0 12px 24px rgba(191, 84, 47, 0.24);
+      }
+
+      .btn-primary:hover {
+        background: linear-gradient(135deg, var(--accent-hover), #c85b30);
+      }
+
+      .btn-secondary {
+        background: rgba(31, 111, 82, 0.09);
+        color: var(--accent-2);
+      }
+
+      .btn-secondary:hover {
+        background: rgba(31, 111, 82, 0.14);
+      }
+
+      .btn-ghost {
+        background: rgba(68, 47, 35, 0.07);
+        color: var(--ink);
+      }
+
+      .btn-ghost:hover {
+        background: rgba(68, 47, 35, 0.11);
+      }
+
+      .btn[disabled] {
+        opacity: 0.45;
+        cursor: not-allowed;
+        transform: none;
+        box-shadow: none;
+      }
+
+      .cart-panel,
+      .status-panel,
+      .receipt-panel,
+      .state-panel {
+        padding: 18px;
+      }
+
+      .cart-summary {
+        display: grid;
+        gap: 12px;
+      }
+
+      .cart-head {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 12px;
+      }
+
+      .cart-head h3,
+      .status-panel h3,
+      .receipt-panel h3,
+      .state-panel h3 {
+        margin: 0;
+        font-family: var(--font-display);
+        font-size: 1.45rem;
+      }
+
+      .cart-head p,
+      .status-panel p,
+      .receipt-panel p,
+      .state-panel p {
+        margin: 6px 0 0;
+        color: var(--muted);
+        line-height: 1.55;
+      }
+
+      .cart-total-box {
+        display: grid;
+        gap: 8px;
+        padding: 14px;
+        border-radius: var(--radius-md);
+        background: rgba(31, 111, 82, 0.08);
+        border: 1px solid rgba(31, 111, 82, 0.1);
+      }
+
+      .cart-total-box .label {
+        color: var(--muted);
+        font-size: 0.84rem;
+      }
+
+      .cart-total-box .amount {
+        font-size: 1.8rem;
+        font-weight: 800;
+        letter-spacing: -0.04em;
+      }
+
+      .cart-list {
+        display: grid;
+        gap: 10px;
+      }
+
+      .cart-row {
+        display: grid;
+        grid-template-columns: 1fr auto;
+        gap: 10px;
+        align-items: center;
+        padding: 12px 0;
+        border-bottom: 1px solid var(--line);
+      }
+
+      .cart-row:last-child {
+        border-bottom: 0;
+        padding-bottom: 0;
+      }
+
+      .cart-row h4 {
+        margin: 0 0 4px;
+        font-size: 0.95rem;
+      }
+
+      .cart-row p {
+        margin: 0;
+        color: var(--muted);
+        font-size: 0.84rem;
+      }
+
+      .cart-row .right {
+        text-align: right;
+      }
+
+      .quantity-controls {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        margin-top: 8px;
+      }
+
+      .icon-btn {
+        width: 32px;
+        height: 32px;
+        border-radius: 10px;
+        background: rgba(68, 47, 35, 0.08);
+        color: var(--ink);
+        display: inline-grid;
+        place-items: center;
+        transition: transform 160ms ease, background 160ms ease;
+      }
+
+      .icon-btn:hover {
+        background: rgba(68, 47, 35, 0.14);
+      }
+
+      .icon-btn:active {
+        transform: translateY(1px);
+      }
+
+      .text-input,
+      .text-area {
+        width: 100%;
+        padding: 14px 15px;
+        border-radius: 16px;
+        border: 1px solid rgba(68, 47, 35, 0.12);
+        background: rgba(255, 255, 255, 0.82);
+        color: var(--ink);
+        outline: none;
+        transition: border-color 160ms ease, box-shadow 160ms ease;
+      }
+
+      .text-input:focus,
+      .text-area:focus {
+        border-color: rgba(191, 84, 47, 0.4);
+        box-shadow: 0 0 0 4px rgba(191, 84, 47, 0.08);
+      }
+
+      .text-area {
+        min-height: 96px;
+        resize: vertical;
+      }
+
+      .message {
+        padding: 14px 15px;
+        border-radius: 16px;
+        display: grid;
+        gap: 4px;
+        line-height: 1.45;
+      }
+
+      .message.info {
+        background: rgba(31, 111, 82, 0.08);
+        color: #13503a;
+        border: 1px solid rgba(31, 111, 82, 0.12);
+      }
+
+      .message.warn {
+        background: rgba(152, 96, 28, 0.1);
+        color: var(--warning);
+        border: 1px solid rgba(152, 96, 28, 0.14);
+      }
+
+      .message.error {
+        background: rgba(163, 59, 50, 0.1);
+        color: var(--danger);
+        border: 1px solid rgba(163, 59, 50, 0.16);
+      }
+
+      .message strong {
+        color: inherit;
+      }
+
+      .stack {
+        display: grid;
+        gap: 12px;
+      }
+
+      .status-list,
+      .receipt-list {
+        display: grid;
+        gap: 10px;
+      }
+
+      .order-item,
+      .receipt-item {
+        display: grid;
+        grid-template-columns: 1fr auto;
+        gap: 10px;
+        padding: 12px 0;
+        border-bottom: 1px solid var(--line);
+      }
+
+      .order-item:last-child,
+      .receipt-item:last-child {
+        border-bottom: 0;
+      }
+
+      .order-item strong,
+      .receipt-item strong {
+        display: block;
+        margin-bottom: 4px;
+      }
+
+      .order-item span,
+      .receipt-item span {
+        color: var(--muted);
+        font-size: 0.84rem;
+      }
+
+      .timer {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 10px 12px;
+        border-radius: 999px;
+        background: rgba(191, 84, 47, 0.1);
+        color: var(--accent);
+        font-weight: 700;
+        width: fit-content;
+      }
+
+      .receipt-banner {
+        display: grid;
+        gap: 12px;
+        padding: 18px;
+        border-radius: var(--radius-lg);
+        background: linear-gradient(135deg, rgba(31, 111, 82, 0.1), rgba(191, 84, 47, 0.1));
+        border: 1px solid rgba(68, 47, 35, 0.08);
+      }
+
+      .receipt-banner h3 {
+        margin: 0;
+        font-family: var(--font-display);
+        font-size: 2rem;
+      }
+
+      .receipt-banner p {
+        margin: 0;
+        color: var(--muted);
+      }
+
+      .receipt-total {
+        display: flex;
+        justify-content: space-between;
+        gap: 16px;
+        padding-top: 12px;
+        border-top: 1px solid var(--line);
+      }
+
+      .receipt-total strong {
+        font-size: 1.4rem;
+      }
+
+      .loading-state,
+      .error-state,
+      .locked-state {
+        min-height: 220px;
+        display: grid;
+        place-items: center;
+        text-align: center;
+        padding: 24px;
+      }
+
       .spinner {
-        width: 18px;
-        height: 18px;
-        border-radius: 50%;
-        border: 2px solid #e6d8c4;
+        width: 44px;
+        height: 44px;
+        border-radius: 999px;
+        border: 3px solid rgba(191, 84, 47, 0.14);
         border-top-color: var(--accent);
-        animation: spin 0.8s linear infinite;
+        animation: spin 0.85s linear infinite;
       }
 
       @keyframes spin {
@@ -112,847 +784,1323 @@
         }
       }
 
-      .error {
-        color: var(--danger-text);
-        background: var(--danger-bg);
-        border-color: var(--danger-line);
+      .floating-cta {
+        position: fixed;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        z-index: 30;
+        padding: 12px 10px calc(12px + env(safe-area-inset-bottom));
+        background: linear-gradient(180deg, rgba(246, 239, 230, 0), rgba(246, 239, 230, 0.88) 22%, rgba(246, 239, 230, 0.98));
+        backdrop-filter: blur(18px);
       }
 
-      .retry-btn {
-        margin-top: 8px;
-        border: 0;
-        background: var(--accent);
-        color: white;
-        padding: 8px 12px;
-        border-radius: 8px;
-        cursor: pointer;
-      }
-
-      .menu {
-        margin-top: 16px;
+      .floating-cta-inner {
+        width: min(1180px, calc(100% - 20px));
+        margin: 0 auto;
+        border-radius: 24px;
+        border: 1px solid rgba(68, 47, 35, 0.1);
+        background: rgba(255, 252, 247, 0.95);
+        box-shadow: var(--shadow);
+        padding: 12px;
         display: grid;
-        gap: 14px;
+        gap: 10px;
       }
 
-      .category {
-        padding: 14px;
-      }
-
-      .category h2 {
-        margin: 0 0 12px;
-        font-size: 1.1rem;
-      }
-
-      .items {
+      .cta-grid {
         display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-        gap: 12px;
+        gap: 10px;
+        grid-template-columns: 1fr auto;
+        align-items: center;
       }
 
-      .item {
-        border: 1px solid var(--line);
-        border-radius: 10px;
-        background: white;
-        padding: 10px;
+      .cta-copy {
+        min-width: 0;
       }
 
-      .item h3 {
-        margin: 0 0 6px;
+      .cta-copy strong {
+        display: block;
         font-size: 1rem;
       }
 
-      .desc {
-        margin: 0;
+      .cta-copy span {
         color: var(--muted);
-        font-size: 0.9rem;
+        font-size: 0.84rem;
       }
 
-      .price {
-        margin: 8px 0 0;
-        color: var(--accent);
-        font-weight: 600;
+      .cta-amount {
+        font-size: 1.25rem;
+        font-weight: 800;
+        letter-spacing: -0.03em;
       }
 
-      .item img {
+      .floating-cta .btn {
         width: 100%;
-        height: 140px;
-        object-fit: cover;
-        border-radius: 10px;
-        margin-bottom: 8px;
-        display: block;
+        min-height: 52px;
       }
 
-      .btn-add.added {
-        transform: scale(0.98);
-        transition: transform 140ms ease;
-        box-shadow: 0 4px 10px rgba(0,0,0,0.08) inset;
+      .hidden {
+        display: none !important;
       }
 
-      .btn-add {
-        width: 100%;
-        margin-top: 8px;
-        border: 1px solid var(--accent);
-        background: white;
-        color: var(--accent);
-        padding: 8px;
-        border-radius: 6px;
-        cursor: pointer;
-        font-weight: 600;
+      .sr-only {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        padding: 0;
+        margin: -1px;
+        overflow: hidden;
+        clip: rect(0, 0, 0, 0);
+        white-space: nowrap;
+        border: 0;
       }
 
-      .btn-add:hover {
-        background: var(--accent);
-        color: white;
-      }
+      @media (min-width: 768px) {
+        .app {
+          padding-top: 20px;
+          padding-bottom: 136px;
+        }
 
-      @media (max-width: 640px) {
-        .hero {
-          align-items: flex-start;
+        .hero-grid {
+          grid-template-columns: 1.3fr 0.8fr;
+          min-height: 260px;
+        }
+
+        .hero-copy {
+          padding: 28px;
+        }
+
+        .hero-stats {
+          padding: 0 28px 28px;
+          grid-template-columns: repeat(3, minmax(0, 1fr));
+        }
+
+        .hero-art {
+          min-height: 260px;
+        }
+
+        .layout {
+          grid-template-columns: minmax(0, 1.45fr) minmax(320px, 0.75fr);
+          align-items: start;
+        }
+
+        .cart-column {
+          position: sticky;
+          top: 92px;
+        }
+
+        .floating-cta-inner {
+          padding: 14px;
+        }
+
+        .floating-cta .btn {
+          min-height: 56px;
         }
       }
 
-      .meta {
-        margin: 0;
-        color: var(--muted);
-        font-size: 0.95rem;
+      @media (max-width: 767px) {
+        .header-badges {
+          justify-content: flex-start;
+        }
+
+        .cta-grid {
+          grid-template-columns: 1fr;
+        }
       }
     </style>
   </head>
   <body>
-    <main class="page">
-      <header class="hero">
-        <img id="restaurantLogo" class="logo hidden" alt="Restaurant logo" />
-        <div id="restaurantLogoFallback" class="logo logo-fallback">--</div>
-        <div>
-          <h1 id="restaurantTitle">Restaurant</h1>
-          <p id="tableInfo" class="meta"></p>
+    <main class="app" id="appRoot">
+      <header class="topbar" aria-label="Restaurant and table summary">
+        <div class="brand-mark" id="brandMark">R</div>
+        <div class="brand-copy">
+          <h1 id="restaurantName">Loading restaurant</h1>
+          <p id="tableSubtitle">Fetching table details...</p>
+        </div>
+        <div class="header-badges" aria-live="polite">
+          <span class="badge">Table <strong id="tableBadge">--</strong></span>
+          <span class="badge">Status <strong id="sessionBadge">Loading</strong></span>
         </div>
       </header>
 
-      <section id="loadingState" class="panel state">
-        <div class="spinner-wrap">
-          <span class="spinner" aria-hidden="true"></span>
-          <span>Loading menu, please wait...</span>
+      <section class="hero hero-panel" aria-labelledby="heroTitle">
+        <div class="hero-grid">
+          <div class="hero-copy">
+            <span class="eyebrow">QR Code Dining</span>
+            <h2 id="heroTitle">Elegant ordering for a faster table turn.</h2>
+            <p id="heroText">
+              Browse the menu, add dishes to your cart, and checkout with a single tap. Your table stays locked while the kitchen prepares your order and the session ends only when the backend confirms it has been paid or closed.
+            </p>
+          </div>
+          <div class="hero-art" aria-hidden="true">
+            <div class="hero-art-content">
+              <div>
+                <strong id="heroTableNumber">--</strong>
+                <span>Table order</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="hero-stats">
+          <div class="stat">
+            <span>Total Amount</span>
+            <strong id="heroTotal">INR 0.00</strong>
+          </div>
+          <div class="stat">
+            <span>Items in Cart</span>
+            <strong id="heroCartCount">0</strong>
+          </div>
+          <div class="stat">
+            <span>Prep Estimate</span>
+            <strong id="heroPrepEstimate">Ready in 15-20 minutes</strong>
+          </div>
         </div>
       </section>
 
-      <section id="errorState" class="panel state error hidden">
-        <p id="errorText">Something went wrong while loading the menu.</p>
-        <button id="retryBtn" class="retry-btn" type="button">Try again</button>
+      <section id="loadingState" class="state-panel loading-state">
+        <div class="stack">
+          <div class="spinner" aria-hidden="true"></div>
+          <div>
+            <h3>Loading menu</h3>
+            <p>Fetching the restaurant, table, and live menu for this QR code.</p>
+          </div>
+        </div>
       </section>
 
-      <section id="menuContainer" class="menu hidden"></section>
+      <section id="errorState" class="state-panel error-state hidden" aria-live="assertive">
+        <div class="stack">
+          <div>
+            <h3>Something went wrong</h3>
+            <p id="errorMessage">We could not load the table menu.</p>
+          </div>
+          <button id="retryButton" class="btn btn-primary" type="button">Try again</button>
+        </div>
+      </section>
+
+      <section id="lockedState" class="state-panel locked-state hidden" aria-live="polite">
+        <div class="stack">
+          <div>
+            <h3>Table busy</h3>
+            <p id="lockedMessage">This table is already in an active ordering session.</p>
+          </div>
+          <button id="forceRefreshButton" class="btn btn-secondary" type="button">Refresh status</button>
+        </div>
+      </section>
+
+      <section id="menuState" class="layout hidden" aria-label="Menu and cart">
+        <div class="menu-column">
+          <div class="section-panel">
+            <div class="section-heading">
+              <div>
+                <h3>Menu</h3>
+                <p>Tap any item to add it to your cart.</p>
+              </div>
+              <div class="badge">Live updates <strong id="menuCount">0 items</strong></div>
+            </div>
+            <div id="menuGroups" class="menu-groups"></div>
+          </div>
+        </div>
+
+        <aside class="cart-column">
+          <div class="cart-panel">
+            <div class="cart-summary">
+              <div class="cart-head">
+                <div>
+                  <h3>Your Cart</h3>
+                  <p>Review items before proceeding to checkout.</p>
+                </div>
+                <button id="clearCartButton" class="btn btn-ghost" type="button">Clear</button>
+              </div>
+
+              <div class="cart-total-box">
+                <span class="label">Total Amount</span>
+                <span id="cartTotal" class="amount">INR 0.00</span>
+              </div>
+
+              <div id="cartList" class="cart-list"></div>
+
+              <div class="stack">
+                <label class="sr-only" for="customerName">Customer name</label>
+                <input id="customerName" class="text-input" type="text" placeholder="Customer name (optional)" autocomplete="name" />
+
+                <label class="sr-only" for="orderNotes">Order notes</label>
+                <textarea id="orderNotes" class="text-area" rows="3" placeholder="Notes for the kitchen (optional)"></textarea>
+              </div>
+            </div>
+          </div>
+        </aside>
+      </section>
+
+      <section id="trackingState" class="layout hidden" aria-label="Order tracking">
+        <div class="menu-column">
+          <div class="status-panel">
+            <div class="section-heading">
+              <div>
+                <h3>Order Status</h3>
+                <p>Your table remains locked until the backend marks the session closed or paid.</p>
+              </div>
+              <div class="badge">Order <strong id="trackingOrderId">#--</strong></div>
+            </div>
+
+            <div class="stack">
+              <div class="message info">
+                <strong id="trackingHeadline">Preparing your order</strong>
+                <span id="trackingCopy">We are holding your table while the kitchen works.</span>
+              </div>
+
+              <div class="timer" id="prepTimer">Ready in 18:00</div>
+
+              <div class="cart-total-box">
+                <span class="label">Order Total</span>
+                <span id="trackingTotal" class="amount">INR 0.00</span>
+              </div>
+
+              <div id="trackingItems" class="status-list"></div>
+            </div>
+          </div>
+        </div>
+
+        <aside class="cart-column">
+          <div class="status-panel">
+            <div class="section-heading">
+              <div>
+                <h3>Preparation Window</h3>
+                <p>Static ETA and live session watch.</p>
+              </div>
+            </div>
+            <div class="message warn">
+              <strong>Estimated Time to Prepare and Serve</strong>
+              <span>Ready in 15-20 minutes</span>
+            </div>
+            <div class="message info" style="margin-top: 12px;">
+              <strong>Session state</strong>
+              <span id="trackingSessionText">Waiting for server confirmation that the session is closed.</span>
+            </div>
+          </div>
+        </aside>
+      </section>
+
+      <section id="receiptState" class="receipt-panel hidden" aria-label="Paid receipt">
+        <div class="receipt-banner">
+          <div class="eyebrow">Paid Receipt</div>
+          <h3>Thank you</h3>
+          <p id="receiptMessage">Your table session has been closed and your local cart has been cleared.</p>
+          <div class="receipt-total">
+            <div>
+              <span class="label">Table</span>
+              <strong id="receiptTable">--</strong>
+            </div>
+            <div style="text-align:right;">
+              <span class="label">Total Amount</span>
+              <strong id="receiptTotal">INR 0.00</strong>
+            </div>
+          </div>
+        </div>
+
+        <div style="margin-top: 16px;" class="section-panel">
+          <div class="section-heading">
+            <div>
+              <h3>Invoice Summary</h3>
+              <p id="receiptTimestamp">--</p>
+            </div>
+          </div>
+          <div id="receiptItems" class="receipt-list"></div>
+        </div>
+      </section>
     </main>
 
+    <div id="floatingCta" class="floating-cta hidden" aria-live="polite">
+      <div class="floating-cta-inner">
+        <div class="cta-grid">
+          <div class="cta-copy">
+            <strong id="ctaTitle">Ready to checkout</strong>
+            <span id="ctaSubtitle">Secure your order with a single tap.</span>
+          </div>
+          <div class="cta-amount" id="ctaTotal">INR 0.00</div>
+        </div>
+        <button id="checkoutButton" class="btn btn-primary" type="button">Proceed to Checkout</button>
+      </div>
+    </div>
+
     <script>
-      // Configuration: Query Parameter Routing
-      const BACKEND_BASE_URL = 'https://restaurant-backend-rxqz.onrender.com';
+      (function () {
+        const API_BASE_URL = 'https://restaurant-backend-rxqz.onrender.com';
+        const CART_KEY_PREFIX = 'qr_table_';
+        const SESSION_KEY_SUFFIX = '_session';
+        const CART_KEY_SUFFIX = '_cart';
+        const INVOICE_KEY_SUFFIX = '_invoice';
+        const PREP_MINUTES = 18;
+        const SESSION_POLL_INTERVAL_MS = 8000;
+        const KEEP_ALIVE_INTERVAL_MS = 60000;
+        const state = {
+          tableId: null,
+          restaurant: null,
+          table: null,
+          menu: [],
+          cart: new Map(),
+          session: null,
+          order: null,
+          mode: 'loading',
+          sessionLocked: false,
+          lockMessage: '',
+          loading: true,
+          error: '',
+          prepEndsAt: 0,
+          prepTimer: null,
+          pollTimer: null,
+          keepAliveTimer: null,
+          clientId: null,
+          syncAttempted: false,
+          receiptShown: false,
+        };
 
-      // DOM Elements
-      const restaurantTitleEl = document.getElementById('restaurantTitle');
-      const tableInfoEl = document.getElementById('tableInfo');
-      const restaurantLogoEl = document.getElementById('restaurantLogo');
-      const restaurantLogoFallbackEl = document.getElementById('restaurantLogoFallback');
-      const loadingStateEl = document.getElementById('loadingState');
-      const errorStateEl = document.getElementById('errorState');
-      const errorTextEl = document.getElementById('errorText');
-      const retryBtnEl = document.getElementById('retryBtn');
-      const menuContainerEl = document.getElementById('menuContainer');
+        const els = {
+          restaurantName: document.getElementById('restaurantName'),
+          tableSubtitle: document.getElementById('tableSubtitle'),
+          tableBadge: document.getElementById('tableBadge'),
+          sessionBadge: document.getElementById('sessionBadge'),
+          heroTableNumber: document.getElementById('heroTableNumber'),
+          heroTotal: document.getElementById('heroTotal'),
+          heroCartCount: document.getElementById('heroCartCount'),
+          heroPrepEstimate: document.getElementById('heroPrepEstimate'),
+          brandMark: document.getElementById('brandMark'),
+          heroTitle: document.getElementById('heroTitle'),
+          heroText: document.getElementById('heroText'),
+          menuCount: document.getElementById('menuCount'),
+          loadingState: document.getElementById('loadingState'),
+          errorState: document.getElementById('errorState'),
+          errorMessage: document.getElementById('errorMessage'),
+          retryButton: document.getElementById('retryButton'),
+          lockedState: document.getElementById('lockedState'),
+          lockedMessage: document.getElementById('lockedMessage'),
+          forceRefreshButton: document.getElementById('forceRefreshButton'),
+          menuState: document.getElementById('menuState'),
+          trackingState: document.getElementById('trackingState'),
+          receiptState: document.getElementById('receiptState'),
+          menuGroups: document.getElementById('menuGroups'),
+          cartList: document.getElementById('cartList'),
+          cartTotal: document.getElementById('cartTotal'),
+          customerName: document.getElementById('customerName'),
+          orderNotes: document.getElementById('orderNotes'),
+          clearCartButton: document.getElementById('clearCartButton'),
+          checkoutButton: document.getElementById('checkoutButton'),
+          floatingCta: document.getElementById('floatingCta'),
+          ctaTitle: document.getElementById('ctaTitle'),
+          ctaSubtitle: document.getElementById('ctaSubtitle'),
+          ctaTotal: document.getElementById('ctaTotal'),
+          trackingOrderId: document.getElementById('trackingOrderId'),
+          trackingHeadline: document.getElementById('trackingHeadline'),
+          trackingCopy: document.getElementById('trackingCopy'),
+          prepTimer: document.getElementById('prepTimer'),
+          trackingTotal: document.getElementById('trackingTotal'),
+          trackingItems: document.getElementById('trackingItems'),
+          trackingSessionText: document.getElementById('trackingSessionText'),
+          receiptMessage: document.getElementById('receiptMessage'),
+          receiptTable: document.getElementById('receiptTable'),
+          receiptTotal: document.getElementById('receiptTotal'),
+          receiptTimestamp: document.getElementById('receiptTimestamp'),
+          receiptItems: document.getElementById('receiptItems'),
+        };
 
-      // Session State
-      const cart = new Map();
-      let currentContext = null;
+        function getStorageNamespace(tableId) {
+          return `${CART_KEY_PREFIX}${tableId}`;
+        }
 
-      // Session state
-      let isCartLocked = false;
-      let currentSession = null;
-      let keepAliveInterval = null;
+        function getCartStorageKey(tableId) {
+          return `${getStorageNamespace(tableId)}${CART_KEY_SUFFIX}`;
+        }
 
-      /**
-       * Extract table ID from query parameter: ?id=64
-       */
-      function getTableIdFromQuery() {
-        const params = new URLSearchParams(window.location.search);
-        const tableId = params.get('id');
-        return tableId && String(tableId).trim() ? String(tableId).trim() : null;
-      }
+        function getSessionStorageKey(tableId) {
+          return `${getStorageNamespace(tableId)}${SESSION_KEY_SUFFIX}`;
+        }
 
-      /**
-       * Generate storage key namespace for a specific table
-       */
-      function getStorageNamespace(tableId) {
-        return `qr_table_${tableId}`;
-      }
+        function getInvoiceStorageKey(tableId) {
+          return `${getStorageNamespace(tableId)}${INVOICE_KEY_SUFFIX}`;
+        }
 
-      /**
-       * Store cart items to localStorage
-       */
-      function persistCart(tableId) {
-        const namespace = getStorageNamespace(tableId);
-        const cartArray = Array.from(cart.values());
-        localStorage.setItem(`${namespace}_cart`, JSON.stringify(cartArray));
-      }
+        function parseCurrency(value) {
+          return Number(value || 0) || 0;
+        }
 
-      /**
-       * Load cart from localStorage
-       */
-      function loadCart(tableId) {
-        const namespace = getStorageNamespace(tableId);
-        const stored = localStorage.getItem(`${namespace}_cart`);
-        if (stored) {
+        function formatMoney(value) {
+          return `INR ${parseCurrency(value).toFixed(2)}`;
+        }
+
+        function escapeHtml(value) {
+          return String(value ?? '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+        }
+
+        function safeUrl(value) {
+          const raw = String(value || '').trim();
+          if (!raw) return '';
+          if (/^data:/i.test(raw) || /^https?:\/\//i.test(raw)) return raw;
+          if (raw.startsWith('//')) return `https:${raw}`;
+          return `https://${raw.replace(/^\/+/, '')}`;
+        }
+
+        function extractTableId() {
+          const url = new URL(window.location.href);
+          const pathMatch = url.pathname.match(/\/table\/(\d+)/i);
+          const queryCandidates = [
+            url.searchParams.get('id'),
+            url.searchParams.get('tableId'),
+            url.searchParams.get('table'),
+          ];
+          const candidate = pathMatch?.[1] || queryCandidates.find((item) => item && String(item).trim());
+          const trimmed = candidate ? String(candidate).trim() : '';
+          return /^\d+$/.test(trimmed) ? trimmed : trimmed || null;
+        }
+
+        function getClientId() {
+          let id = localStorage.getItem('qr_client_id');
+          if (!id) {
+            id = `client_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+            localStorage.setItem('qr_client_id', id);
+          }
+          return id;
+        }
+
+        function loadSavedCart(tableId) {
+          const raw = localStorage.getItem(getCartStorageKey(tableId));
+          if (!raw) return [];
           try {
-            const items = JSON.parse(stored);
-            cart.clear();
+            return JSON.parse(raw) || [];
+          } catch (error) {
+            return [];
+          }
+        }
+
+        function saveCart() {
+          if (!state.tableId) return;
+          localStorage.setItem(getCartStorageKey(state.tableId), JSON.stringify(Array.from(state.cart.values())));
+        }
+
+        function loadSavedSession(tableId) {
+          const raw = localStorage.getItem(getSessionStorageKey(tableId));
+          if (!raw) return null;
+          try {
+            return JSON.parse(raw);
+          } catch (error) {
+            return null;
+          }
+        }
+
+        function saveSession(session) {
+          if (!state.tableId) return;
+          if (session) {
+            localStorage.setItem(getSessionStorageKey(state.tableId), JSON.stringify(session));
+          } else {
+            localStorage.removeItem(getSessionStorageKey(state.tableId));
+          }
+        }
+
+        function saveInvoiceSnapshot(invoice) {
+          if (!state.tableId) return;
+          localStorage.setItem(getInvoiceStorageKey(state.tableId), JSON.stringify(invoice));
+        }
+
+        function loadSavedInvoiceSnapshot(tableId) {
+          const raw = localStorage.getItem(getInvoiceStorageKey(tableId));
+          if (!raw) return null;
+          try {
+            return JSON.parse(raw);
+          } catch (error) {
+            return null;
+          }
+        }
+
+        function clearStoredState() {
+          if (!state.tableId) return;
+          localStorage.removeItem(getCartStorageKey(state.tableId));
+          localStorage.removeItem(getSessionStorageKey(state.tableId));
+          localStorage.removeItem(getInvoiceStorageKey(state.tableId));
+          state.cart.clear();
+          state.session = null;
+          state.syncAttempted = false;
+        }
+
+        function setMode(mode) {
+          state.mode = mode;
+          const panels = [els.loadingState, els.errorState, els.lockedState, els.menuState, els.trackingState, els.receiptState];
+          panels.forEach((panel) => panel.classList.add('hidden'));
+
+          if (mode === 'loading') els.loadingState.classList.remove('hidden');
+          if (mode === 'error') els.errorState.classList.remove('hidden');
+          if (mode === 'locked') els.lockedState.classList.remove('hidden');
+          if (mode === 'menu') els.menuState.classList.remove('hidden');
+          if (mode === 'tracking') els.trackingState.classList.remove('hidden');
+          if (mode === 'receipt') els.receiptState.classList.remove('hidden');
+
+          els.floatingCta.classList.toggle('hidden', mode !== 'menu');
+        }
+
+        function setError(message) {
+          state.error = message;
+          els.errorMessage.textContent = message;
+          setMode('error');
+        }
+
+        function setLocked(message) {
+          state.lockMessage = message;
+          els.lockedMessage.textContent = message;
+          setMode('locked');
+        }
+
+        function groupMenu(menuItems) {
+          const grouped = new Map();
+          for (const item of menuItems) {
+            const category = (item.category || 'Featured').trim() || 'Featured';
+            if (!grouped.has(category)) grouped.set(category, []);
+            grouped.get(category).push(item);
+          }
+          return grouped;
+        }
+
+        function calculateCartTotal() {
+          let total = 0;
+          let count = 0;
+          for (const item of state.cart.values()) {
+            const quantity = Number(item.quantity || 0);
+            total += parseCurrency(item.price) * quantity;
+            count += quantity;
+          }
+          return { total, count };
+        }
+
+        function buildCartSnapshot() {
+          return Array.from(state.cart.values()).map((item) => ({
+            menuItemId: Number(item.id),
+            name: item.name,
+            quantity: Number(item.quantity || 1),
+            itemPrice: parseCurrency(item.price),
+            lineTotal: parseCurrency(item.price) * Number(item.quantity || 1),
+          }));
+        }
+
+        function updateHeader() {
+          const restaurantName = state.restaurant?.name || 'Restaurant';
+          const tableNumber = state.table?.table_number || state.tableId || '--';
+          els.restaurantName.textContent = restaurantName;
+          els.tableSubtitle.textContent = state.table
+            ? `Table ${tableNumber} • ${state.restaurant?.address || 'Quick, contactless ordering'}`
+            : 'Fetching table details...';
+          els.tableBadge.textContent = tableNumber;
+          els.heroTableNumber.textContent = tableNumber;
+          els.brandMark.textContent = (restaurantName || 'R').trim().charAt(0).toUpperCase();
+          els.heroTitle.textContent = `Order for Table ${tableNumber}`;
+          els.heroText.textContent = state.restaurant?.name
+            ? `Welcome to ${state.restaurant.name}. Add your favorites, checkout when ready, and keep your table locked while the backend handles the session lifecycle.`
+            : els.heroText.textContent;
+        }
+
+        function updateStats() {
+          const { total, count } = calculateCartTotal();
+          els.heroTotal.textContent = formatMoney(total);
+          els.heroCartCount.textContent = String(count);
+          els.cartTotal.textContent = formatMoney(total);
+          els.ctaTotal.textContent = formatMoney(total);
+          els.heroPrepEstimate.textContent = 'Ready in 15-20 minutes';
+          els.menuCount.textContent = `${state.menu.length} items`;
+          els.trackingTotal.textContent = formatMoney(state.order?.totalAmount || total);
+          els.receiptTotal.textContent = formatMoney(state.order?.totalAmount || total);
+        }
+
+        function renderMenu() {
+          els.menuGroups.innerHTML = '';
+          if (!state.menu.length) {
+            els.menuGroups.innerHTML = `
+              <div class="message warn">
+                <strong>No menu items found</strong>
+                <span>This restaurant has not published any available dishes yet.</span>
+              </div>
+            `;
+            return;
+          }
+
+          const grouped = groupMenu(state.menu);
+          for (const [category, items] of grouped.entries()) {
+            const group = document.createElement('div');
+            group.className = 'group';
+            const totalItems = items.length;
+            group.innerHTML = `
+              <div class="group-title">
+                <h4>${escapeHtml(category)}</h4>
+                <span>${totalItems} item${totalItems === 1 ? '' : 's'}</span>
+              </div>
+              <div class="cards"></div>
+            `;
+
+            const cardWrap = group.querySelector('.cards');
+
             for (const item of items) {
-              cart.set(item.id, item);
+              const card = document.createElement('article');
+              card.className = 'item-card';
+              const imageUrl = safeUrl(item.image_url || '');
+              card.innerHTML = `
+                <img class="item-image" alt="${escapeHtml(item.name || 'Menu item')}" src="${imageUrl || 'data:image/svg+xml;utf8,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="800" height="640"><rect width="100%" height="100%" fill="#efe4d9"/><circle cx="80%" cy="20%" r="140" fill="#d9b59f" opacity="0.55"/><circle cx="18%" cy="82%" r="120" fill="#d8e6dd" opacity="0.7"/></svg>')}" />
+                <div class="item-body">
+                  <div class="item-top">
+                    <div>
+                      <h4 class="item-title">${escapeHtml(item.name || 'Menu item')}</h4>
+                    </div>
+                    <div class="item-price">${formatMoney(item.price)}</div>
+                  </div>
+                  <p class="item-desc">${escapeHtml(item.description || 'Freshly prepared and available to order now.')}</p>
+                  <div class="item-footer">
+                    <span class="qty-pill">Live price</span>
+                    <button class="btn btn-secondary" type="button" data-action="add-item" data-item-id="${escapeHtml(item.id)}">Add to Cart</button>
+                  </div>
+                </div>
+              `;
+              cardWrap.appendChild(card);
             }
-          } catch (e) {
-            console.warn('Failed to parse stored cart', e);
+
+            els.menuGroups.appendChild(group);
           }
         }
-      }
 
-      /**
-       * Store session state to localStorage
-       */
-      function persistSession(tableId, sessionData) {
-        const namespace = getStorageNamespace(tableId);
-        localStorage.setItem(`${namespace}_session`, JSON.stringify(sessionData || null));
-      }
+        function renderCart() {
+          const { total, count } = calculateCartTotal();
+          updateStats();
 
-      /**
-       * Load session state from localStorage
-       */
-      function loadSession(tableId) {
-        const namespace = getStorageNamespace(tableId);
-        const stored = localStorage.getItem(`${namespace}_session`);
-        if (stored) {
-          try {
-            return JSON.parse(stored);
-          } catch (e) {
-            console.warn('Failed to parse stored session', e);
+          if (!count) {
+            els.cartList.innerHTML = `
+              <div class="message info">
+                <strong>Your cart is empty</strong>
+                <span>Add menu items to unlock checkout.</span>
+              </div>
+            `;
+            els.checkoutButton.textContent = 'Proceed to Checkout';
+            els.ctaTitle.textContent = 'Ready to checkout';
+            els.ctaSubtitle.textContent = 'Secure your order with a single tap.';
+            els.checkoutButton.disabled = true;
+            return;
+          }
+
+          els.checkoutButton.disabled = false;
+          els.ctaTitle.textContent = 'Proceed to Checkout';
+          els.ctaSubtitle.textContent = `${count} item${count === 1 ? '' : 's'} in your cart`;
+
+          els.cartList.innerHTML = '';
+          for (const item of state.cart.values()) {
+            const row = document.createElement('div');
+            row.className = 'cart-row';
+            const lineTotal = parseCurrency(item.price) * Number(item.quantity || 1);
+            row.innerHTML = `
+              <div>
+                <h4>${escapeHtml(item.name || 'Menu item')}</h4>
+                <p>${formatMoney(item.price)} each</p>
+                <div class="quantity-controls">
+                  <button class="icon-btn" type="button" data-action="decrease" data-item-id="${escapeHtml(item.id)}" aria-label="Decrease ${escapeHtml(item.name || 'item')}">−</button>
+                  <strong>${Number(item.quantity || 1)}</strong>
+                  <button class="icon-btn" type="button" data-action="increase" data-item-id="${escapeHtml(item.id)}" aria-label="Increase ${escapeHtml(item.name || 'item')}">+</button>
+                </div>
+              </div>
+              <div class="right">
+                <strong>${formatMoney(lineTotal)}</strong>
+                <p>Line total</p>
+              </div>
+            `;
+            els.cartList.appendChild(row);
+          }
+
+          els.heroTotal.textContent = formatMoney(total);
+          els.cartTotal.textContent = formatMoney(total);
+          els.ctaTotal.textContent = formatMoney(total);
+        }
+
+        function renderTracking() {
+          setMode('tracking');
+          const order = state.order || {};
+          els.trackingOrderId.textContent = order.orderId ? `#${order.orderId}` : '#--';
+          els.trackingHeadline.textContent = 'Your order is in progress';
+          els.trackingCopy.textContent = 'We will keep watching the backend for the final paid or closed confirmation.';
+          els.trackingSessionText.textContent = state.sessionLocked
+            ? 'Session is still active and locked while the kitchen prepares the meal.'
+            : 'Awaiting the backend to release the session.';
+
+          els.trackingItems.innerHTML = '';
+          const items = state.order?.items || buildCartSnapshot();
+          if (!items.length) {
+            els.trackingItems.innerHTML = `
+              <div class="message warn">
+                <strong>No tracking items</strong>
+                <span>We could not restore the ordered items locally.</span>
+              </div>
+            `;
+            return;
+          }
+
+          for (const item of items) {
+            const row = document.createElement('div');
+            row.className = 'order-item';
+            row.innerHTML = `
+              <div>
+                <strong>${escapeHtml(item.name || item.item_name || 'Menu item')}</strong>
+                <span>${Number(item.quantity || 1)} x ${formatMoney(item.itemPrice ?? item.item_price ?? 0)}</span>
+              </div>
+              <div style="text-align:right; font-weight:700;">${formatMoney(item.lineTotal ?? item.line_total ?? 0)}</div>
+            `;
+            els.trackingItems.appendChild(row);
           }
         }
-        return null;
-      }
 
-      /**
-       * Clear all stored data for a table (used after successful payment)
-       */
-      function clearStoredState(tableId) {
-        const namespace = getStorageNamespace(tableId);
-        localStorage.removeItem(`${namespace}_cart`);
-        localStorage.removeItem(`${namespace}_session`);
-        cart.clear();
-        currentSession = null;
-        isCartLocked = false;
-      }
+        function renderReceipt() {
+          setMode('receipt');
+          els.receiptTable.textContent = `Table ${state.table?.table_number || state.tableId || '--'}`;
+          els.receiptTimestamp.textContent = state.order?.closedAt
+            ? `Closed at ${new Date(state.order.closedAt).toLocaleString()}`
+            : `Completed at ${new Date().toLocaleString()}`;
+          els.receiptMessage.textContent = 'Your table session is closed. The cart has been cleared and the invoice payload has been synchronized or queued for sync.';
 
-      /**
-       * Get unique client ID for this browser
-       */
-      function getClientId() {
-        let id = localStorage.getItem('clientId');
-        if (!id) {
-          id = `client_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-          localStorage.setItem('clientId', id);
+          const items = state.order?.items || [];
+          els.receiptItems.innerHTML = '';
+          if (!items.length) {
+            els.receiptItems.innerHTML = `
+              <div class="message info">
+                <strong>Receipt ready</strong>
+                <span>No line items were stored locally, but the total amount has been preserved.</span>
+              </div>
+            `;
+            return;
+          }
+
+          for (const item of items) {
+            const row = document.createElement('div');
+            row.className = 'receipt-item';
+            row.innerHTML = `
+              <div>
+                <strong>${escapeHtml(item.name || item.item_name || 'Menu item')}</strong>
+                <span>${Number(item.quantity || 1)} x ${formatMoney(item.itemPrice ?? item.item_price ?? 0)}</span>
+              </div>
+              <div style="text-align:right; font-weight:700;">${formatMoney(item.lineTotal ?? item.line_total ?? 0)}</div>
+            `;
+            els.receiptItems.appendChild(row);
+          }
         }
-        return id;
-      }
 
-      /**
-       * Check if table has an active session (locked by another user)
-       */
-      async function checkTableLock(restaurantId, tableId) {
-        try {
-          const response = await fetch(
-            `${BACKEND_BASE_URL}/api/restaurants/${restaurantId}/table/${tableId}`
-          );
-          if (!response.ok) return { isLocked: false };
-          const data = await response.json();
-          return data.lock || { isLocked: false };
-        } catch (err) {
-          console.warn('Failed to check table lock:', err);
-          return { isLocked: false };
+        function startPrepTimer() {
+          stopPrepTimer();
+          const duration = PREP_MINUTES * 60 * 1000;
+          state.prepEndsAt = Date.now() + duration;
+          updatePrepTimer();
+          state.prepTimer = setInterval(updatePrepTimer, 1000);
         }
-      }
 
-      /**
-       * Start a session for this table
-       */
-      async function startSession(restaurantId, tableId) {
-        try {
-          const payload = {
-            restaurantId: Number(restaurantId),
-            tableId: Number(tableId),
-            clientId: getClientId(),
-            joinExisting: false,
+        function stopPrepTimer() {
+          if (state.prepTimer) {
+            clearInterval(state.prepTimer);
+            state.prepTimer = null;
+          }
+        }
+
+        function updatePrepTimer() {
+          const remaining = Math.max(0, state.prepEndsAt - Date.now());
+          const totalSeconds = Math.floor(remaining / 1000);
+          const minutes = String(Math.floor(totalSeconds / 60)).padStart(2, '0');
+          const seconds = String(totalSeconds % 60).padStart(2, '0');
+          if (els.prepTimer) {
+            els.prepTimer.textContent = remaining > 0 ? `Ready in ${minutes}:${seconds}` : 'Almost ready';
+          }
+        }
+
+        function stopKeepAlive() {
+          if (state.keepAliveTimer) {
+            clearInterval(state.keepAliveTimer);
+            state.keepAliveTimer = null;
+          }
+        }
+
+        function startKeepAlive() {
+          stopKeepAlive();
+          if (!state.session?.id || !state.session?.sessionToken) return;
+          state.keepAliveTimer = setInterval(async () => {
+            try {
+              await fetch(`${API_BASE_URL}/api/table-sessions/${state.session.id}/ping`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ sessionToken: state.session.sessionToken }),
+              });
+            } catch (error) {
+              console.warn('Keep-alive ping failed', error);
+            }
+          }, KEEP_ALIVE_INTERVAL_MS);
+        }
+
+        async function startSessionIfNeeded() {
+          if (state.session?.id && state.session?.sessionToken) {
+            return state.session;
+          }
+
+          const response = await fetch(`${API_BASE_URL}/api/table-sessions/start`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              restaurantId: Number(state.restaurant.id),
+              tableId: Number(state.tableId),
+              clientId: getClientId(),
+              joinExisting: false,
+            }),
+          });
+
+          const data = await response.json().catch(() => ({}));
+
+          if (response.status === 409) {
+            state.sessionLocked = true;
+            throw new Error(data.message || 'This table is currently locked by another order session.');
+          }
+
+          if (!response.ok) {
+            throw new Error(data.message || data.error || 'Failed to start table session.');
+          }
+
+          state.session = data.session;
+          state.sessionLocked = false;
+          saveSession(state.session);
+          startKeepAlive();
+          return state.session;
+        }
+
+        async function fetchTableContext(tableId) {
+          const response = await fetch(`${API_BASE_URL}/api/restaurants/table/${encodeURIComponent(tableId)}?format=json`, {
+            headers: { Accept: 'application/json' },
+          });
+
+          const data = await response.json().catch(() => ({}));
+          if (!response.ok) {
+            throw new Error(data.error || data.message || `Failed to load table ${tableId}`);
+          }
+          return data;
+        }
+
+        async function ensureMenuAccess() {
+          const context = await fetchTableContext(state.tableId);
+          state.restaurant = context.restaurant || null;
+          state.table = context.table || null;
+          state.menu = Array.isArray(context.menu) ? context.menu : [];
+          state.sessionLocked = Boolean(context.lock?.isLocked);
+          updateHeader();
+          renderMenu();
+          renderCart();
+          return context;
+        }
+
+        function restorePersistedState() {
+          const cartItems = loadSavedCart(state.tableId);
+          state.cart.clear();
+          for (const item of cartItems) {
+            if (item && item.id != null) state.cart.set(String(item.id), item);
+          }
+          state.session = loadSavedSession(state.tableId);
+
+          const savedInvoice = loadSavedInvoiceSnapshot(state.tableId);
+          if (savedInvoice && savedInvoice.orderId) {
+            state.order = {
+              orderId: Number(savedInvoice.orderId || 0),
+              totalAmount: Number(savedInvoice.finalTotalAmount || savedInvoice.totalAmount || 0),
+              items: Array.isArray(savedInvoice.itemizedFoodList)
+                ? savedInvoice.itemizedFoodList.map((item) => ({
+                    id: item.menuItemId,
+                    name: item.name,
+                    quantity: Number(item.quantity || 1),
+                    itemPrice: parseCurrency(item.itemPrice),
+                    lineTotal: parseCurrency(item.lineTotal),
+                  }))
+                : [],
+              createdAt: savedInvoice.timestamp || new Date().toISOString(),
+            };
+          }
+        }
+
+        function openCartState() {
+          setMode('menu');
+          renderCart();
+          updateStats();
+        }
+
+        async function addItemToCart(itemId) {
+          const item = state.menu.find((menuItem) => String(menuItem.id) === String(itemId));
+          if (!item) return;
+
+          if (state.mode === 'receipt' || state.mode === 'tracking') {
+            return;
+          }
+
+          if (!state.session?.id) {
+            try {
+              els.sessionBadge.textContent = 'Locking';
+              await startSessionIfNeeded();
+            } catch (error) {
+              setLocked(error.message);
+              els.sessionBadge.textContent = 'Locked';
+              return;
+            }
+          }
+
+          if (window.navigator && typeof window.navigator.vibrate === 'function') {
+            window.navigator.vibrate(50);
+          }
+
+          const existing = state.cart.get(String(item.id));
+          if (existing) {
+            existing.quantity = Number(existing.quantity || 1) + 1;
+            state.cart.set(String(item.id), existing);
+          } else {
+            state.cart.set(String(item.id), {
+              id: item.id,
+              name: item.name,
+              price: item.price,
+              description: item.description,
+              image_url: item.image_url,
+              category: item.category,
+              quantity: 1,
+            });
+          }
+
+          saveCart();
+          renderCart();
+        }
+
+        function changeQuantity(itemId, delta) {
+          const key = String(itemId);
+          const item = state.cart.get(key);
+          if (!item) return;
+
+          const nextQuantity = Number(item.quantity || 1) + delta;
+          if (nextQuantity <= 0) {
+            state.cart.delete(key);
+          } else {
+            item.quantity = nextQuantity;
+            state.cart.set(key, item);
+          }
+
+          saveCart();
+          renderCart();
+        }
+
+        function clearCart() {
+          state.cart.clear();
+          saveCart();
+          renderCart();
+        }
+
+        function buildOrderPayload(session) {
+          const items = Array.from(state.cart.values()).map((item) => ({
+            menuItemId: Number(item.id),
+            itemPrice: parseCurrency(item.price),
+            quantity: Number(item.quantity || 1),
+          }));
+          const { total } = calculateCartTotal();
+
+          return {
+            restaurantId: Number(state.restaurant.id),
+            tableId: Number(state.table.id),
+            tableSessionId: Number(session.id),
+            sessionToken: session.sessionToken,
+            customerName: (els.customerName.value || '').trim(),
+            paymentMethod: 'cod',
+            items,
+            notes: (els.orderNotes.value || '').trim(),
+            totalAmount: total,
           };
+        }
 
-          const response = await fetch(`${BACKEND_BASE_URL}/api/table-sessions/start`, {
+        function buildInvoicePayload(orderResponse, session) {
+          const cartSnapshot = Array.from(state.cart.values()).map((item) => ({
+            menuItemId: Number(item.id),
+            name: item.name,
+            quantity: Number(item.quantity || 1),
+            itemPrice: parseCurrency(item.price),
+            lineTotal: parseCurrency(item.price) * Number(item.quantity || 1),
+          }));
+          const { total } = calculateCartTotal();
+          return {
+            tableId: Number(state.table.id),
+            tableNumber: state.table.table_number,
+            restaurantId: Number(state.restaurant.id),
+            restaurantName: state.restaurant.name,
+            orderId: Number(orderResponse?.orderId || 0),
+            sessionId: Number(session.id),
+            sessionToken: session.sessionToken,
+            itemizedFoodList: cartSnapshot,
+            finalTotalAmount: Number(orderResponse?.totalAmount ?? total),
+            timestamp: new Date().toISOString(),
+            customerName: (els.customerName.value || '').trim(),
+            notes: (els.orderNotes.value || '').trim(),
+          };
+        }
+
+        async function postJson(path, payload) {
+          const response = await fetch(`${API_BASE_URL}${path}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload),
           });
 
-          const data = await response.json();
-
-          if (response.status === 201 || response.ok) {
-            currentSession = data.session;
-            persistSession(tableId, data.session);
-            startKeepAlive(tableId);
-            isCartLocked = false;
-            return { success: true, session: data.session };
-          }
-
-          if (response.status === 409) {
-            // Table locked by another user
-            isCartLocked = true;
-            return { success: false, locked: true, message: data.message };
-          }
-
-          return { success: false, message: data.error || 'Failed to start session' };
-        } catch (err) {
-          console.error('Error starting session:', err);
-          return { success: false, message: err.message };
+          const data = await response.json().catch(() => ({}));
+          return { response, data };
         }
-      }
 
-      /**
-       * Keep session alive with periodic pings
-       */
-      function startKeepAlive(tableId) {
-        if (keepAliveInterval) clearInterval(keepAliveInterval);
+        function getInvoiceSyncTargets(orderId) {
+          return [
+            '/api/invoices',
+            '/api/owner/invoices',
+            `/api/orders/${orderId}/invoice-data`,
+            `/api/orders/${orderId}/invoice`,
+          ];
+        }
 
-        keepAliveInterval = setInterval(async () => {
-          if (!currentSession || !currentSession.id) {
-            clearInterval(keepAliveInterval);
-            keepAliveInterval = null;
+        async function syncInvoicePayload(payload) {
+          const targets = getInvoiceSyncTargets(payload.orderId);
+
+          for (const path of targets) {
+            try {
+              const { response, data } = await postJson(path, payload);
+              if (response.ok) {
+                return { ok: true, endpoint: path, data };
+              }
+            } catch (error) {
+              continue;
+            }
+          }
+
+          try {
+            const beaconPayload = JSON.stringify(payload);
+            if (navigator.sendBeacon) {
+              navigator.sendBeacon(`${API_BASE_URL}/api/invoices`, new Blob([beaconPayload], { type: 'application/json' }));
+            }
+          } catch (error) {
+            console.warn('Beacon fallback failed', error);
+          }
+
+          return { ok: false };
+        }
+
+        async function submitCheckout() {
+          if (!state.cart.size) {
+            setError('Add at least one item before checking out.');
             return;
           }
 
           try {
-            await fetch(
-              `${BACKEND_BASE_URL}/api/table-sessions/${currentSession.id}/ping`,
-              {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ sessionToken: currentSession.sessionToken }),
-              }
-            );
-          } catch (err) {
-            console.warn('Keep-alive ping failed:', err);
-          }
-        }, 60000); // every minute
-      }
+            els.checkoutButton.disabled = true;
+            els.checkoutButton.textContent = 'Submitting...';
 
-      /**
-       * End the current session
-       */
-      async function endSession(tableId, reason = 'payment_completed') {
-        if (!currentSession) return;
+            const session = await startSessionIfNeeded();
+            const orderPayload = buildOrderPayload(session);
+            const { response, data } = await postJson('/api/orders', orderPayload);
 
-        try {
-          await fetch(`${BACKEND_BASE_URL}/api/table-sessions/${currentSession.id}/end`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              sessionToken: currentSession.sessionToken,
-              reason,
-            }),
-          });
-
-          if (keepAliveInterval) {
-            clearInterval(keepAliveInterval);
-            keepAliveInterval = null;
-          }
-        } catch (err) {
-          console.warn('Error ending session:', err);
-        }
-      }
-
-      /**
-       * Show cart lock message
-       */
-      function showCartLockMessage() {
-        const orderMsg = document.getElementById('orderMessage');
-        if (orderMsg) {
-          orderMsg.textContent =
-            'Cart is locked. Click "Start Ordering" to begin a new session.';
-          orderMsg.style.display = 'block';
-          orderMsg.style.backgroundColor = '#ffeaa7';
-          orderMsg.style.color = '#2d3436';
-        }
-      }
-
-      function setLoading(isLoading) {
-        loadingStateEl.classList.toggle('hidden', !isLoading);
-      }
-
-      function setError(message) {
-        errorTextEl.textContent = message;
-        errorStateEl.classList.remove('hidden');
-      }
-
-      function clearError() {
-        errorStateEl.classList.add('hidden');
-      }
-
-      function formatPrice(amount) {
-        const value = Number(amount || 0);
-        return `INR ${value.toFixed(2)}`;
-      }
-
-      function groupMenuByCategory(menuItems) {
-        const grouped = new Map();
-        for (const item of menuItems) {
-          const category = item.category || 'Other';
-          if (!grouped.has(category)) {
-            grouped.set(category, []);
-          }
-          grouped.get(category).push(item);
-        }
-        return grouped;
-      }
-
-      function renderMenu(menuItems) {
-        menuContainerEl.innerHTML = '';
-
-        if (!Array.isArray(menuItems) || menuItems.length === 0) {
-          menuContainerEl.innerHTML = '<section class="category panel"><p>No menu items available.</p></section>';
-          menuContainerEl.classList.remove('hidden');
-          return;
-        }
-
-        const grouped = groupMenuByCategory(menuItems);
-
-        for (const [category, items] of grouped.entries()) {
-          const categorySection = document.createElement('section');
-          categorySection.className = 'category panel';
-
-          const categoryTitle = document.createElement('h2');
-          categoryTitle.textContent = category;
-          categorySection.appendChild(categoryTitle);
-
-          const itemsGrid = document.createElement('div');
-          itemsGrid.className = 'items';
-
-          for (const item of items) {
-            const itemDiv = document.createElement('div');
-            itemDiv.className = 'item';
-
-            // Image (owner-provided)
-            if (item.image_url) {
-              const img = document.createElement('img');
-              img.src = item.image_url;
-              img.alt = item.name || 'Menu image';
-              img.loading = 'lazy';
-              img.addEventListener('error', () => {
-                img.style.display = 'none';
-              });
-              itemDiv.appendChild(img);
+            if (!response.ok) {
+              throw new Error(data.message || data.error || 'Checkout failed.');
             }
 
-            const itemTitle = document.createElement('h3');
-            itemTitle.textContent = item.name;
-            itemDiv.appendChild(itemTitle);
+            const { total } = calculateCartTotal();
+            state.order = {
+              orderId: Number(data.orderId || 0),
+              totalAmount: Number(data.totalAmount || total),
+              items: Array.from(state.cart.values()).map((item) => ({
+                id: item.id,
+                name: item.name,
+                quantity: Number(item.quantity || 1),
+                itemPrice: parseCurrency(item.price),
+                lineTotal: parseCurrency(item.price) * Number(item.quantity || 1),
+              })),
+              createdAt: new Date().toISOString(),
+            };
 
-            if (item.description) {
-              const desc = document.createElement('p');
-              desc.className = 'desc';
-              desc.textContent = item.description;
-              itemDiv.appendChild(desc);
-            }
-
-            const price = document.createElement('p');
-            price.className = 'price';
-            price.textContent = formatPrice(item.price);
-            itemDiv.appendChild(price);
-
-            const addBtn = document.createElement('button');
-            addBtn.textContent = 'Add to Cart';
-            addBtn.className = 'btn-add';
-            addBtn.addEventListener('click', () => {
-              // small vibration on supported devices
-              if (navigator.vibrate) navigator.vibrate(50);
-              // visual feedback
-              addBtn.classList.add('added');
-              setTimeout(() => addBtn.classList.remove('added'), 160);
-              addToCart(item);
-            });
-            itemDiv.appendChild(addBtn);
-
-            itemsGrid.appendChild(itemDiv);
-          }
-
-          categorySection.appendChild(itemsGrid);
-          menuContainerEl.appendChild(categorySection);
-        }
-
-        menuContainerEl.classList.remove('hidden');
-      }
-
-      function addToCart(item) {
-        if (isCartLocked && !currentSession) {
-          showCartLockMessage();
-          return;
-        }
-
-        if (cart.has(item.id)) {
-          const existing = cart.get(item.id);
-          existing.quantity += 1;
-          cart.set(item.id, existing);
-        } else {
-          cart.set(item.id, { ...item, quantity: 1 });
-        }
-        renderCart();
-        persistCart(currentContext.tableId);
-      }
-
-      function removeFromCart(itemId) {
-        cart.delete(itemId);
-        renderCart();
-        persistCart(currentContext.tableId);
-      }
-
-      function updateQuantity(itemId, quantity) {
-        if (quantity <= 0) {
-          removeFromCart(itemId);
-        } else {
-          const item = cart.get(itemId);
-          if (item) {
-            item.quantity = quantity;
-            cart.set(itemId, item);
-            renderCart();
-            persistCart(currentContext.tableId);
+            saveInvoiceSnapshot(buildInvoicePayload(data, session));
+            state.prepEndsAt = Date.now() + PREP_MINUTES * 60 * 1000;
+            startPrepTimer();
+            renderTracking();
+            state.mode = 'tracking';
+            setMode('tracking');
+            els.sessionBadge.textContent = 'Tracking';
+            els.trackingSessionText.textContent = 'Waiting for the server to mark the session closed or paid.';
+            startSessionPoll();
+          } catch (error) {
+            setError(error.message || 'Unable to submit checkout.');
+          } finally {
+            els.checkoutButton.disabled = false;
+            els.checkoutButton.textContent = 'Proceed to Checkout';
           }
         }
-      }
 
-      function calculateCartTotal() {
-        let total = 0;
-        for (const item of cart.values()) {
-          total += (item.price || 0) * (item.quantity || 1);
-        }
-        return total;
-      }
-
-      /**
-       * Fetch table context from backend using tableId
-       */
-      async function fetchTableContext(tableId) {
-        const url = `${BACKEND_BASE_URL}/api/restaurants/table/${encodeURIComponent(tableId)}`;
-        const response = await fetch(url);
-        if (!response.ok) {
-          // Try to extract JSON error body, otherwise text
-          let bodyText = '';
-          try {
-            const text = await response.text();
-            bodyText = text;
+        async function startSessionPoll() {
+          stopSessionPoll();
+          state.pollTimer = setInterval(async () => {
+            if (state.mode !== 'tracking' || state.receiptShown) return;
             try {
-              const json = JSON.parse(text);
-              bodyText = json.message || JSON.stringify(json);
-            } catch (e) {
-              // not JSON
+              const context = await fetchTableContext(state.tableId);
+              state.sessionLocked = Boolean(context.lock?.isLocked);
+              els.sessionBadge.textContent = state.sessionLocked ? 'Locked' : 'Closed';
+              els.trackingSessionText.textContent = state.sessionLocked
+                ? 'Session is still active. We are waiting for the backend to close or mark it paid.'
+                : 'Backend confirmed the session is closed or paid.';
+
+              if (!state.sessionLocked) {
+                await finalizePaidSession();
+              }
+            } catch (error) {
+              console.warn('Polling failed', error);
             }
-          } catch (e) {
-            bodyText = '(no response body)';
-          }
-          console.error('Failed to load table data:', response.status, bodyText, url);
-          throw new Error(`Failed to load table data. Server returned ${response.status}: ${bodyText}`);
-        }
-        return response.json();
-      }
-
-      /**
-       * Render the cart panel with checkout functionality
-       */
-      function renderCartPanel() {
-        let cartPanel = document.getElementById('cartPanel');
-
-        if (!cartPanel) {
-          // Create cart panel if it doesn't exist
-          cartPanel = document.createElement('section');
-          cartPanel.id = 'cartPanel';
-          cartPanel.className = 'panel';
-          cartPanel.style.cssText = `
-            margin-top: 16px;
-            padding: 16px;
-            background: var(--panel);
-            border: 1px solid var(--line);
-            border-radius: 14px;
-          `;
-
-          menuContainerEl.parentNode.insertBefore(cartPanel, menuContainerEl.nextSibling);
+          }, SESSION_POLL_INTERVAL_MS);
         }
 
-        const cartTotal = calculateCartTotal();
-        const cartCount = Array.from(cart.values()).reduce((s, it) => s + (it.quantity || 0), 0);
-        const hasSession = !!currentSession;
-
-        let buttonsHtml = '';
-        if (!hasSession) {
-          // Show "Start Ordering" button if no active session
-          buttonsHtml = `
-            <button id="startOrderingBtn" class="retry-btn" type="button" style="background: var(--accent); color: white; margin-top: 0; width: 100%;">
-              Start Ordering
-            </button>
-          `;
-        } else {
-          // Show checkout and clear buttons if session is active
-          buttonsHtml = `
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 8px;">
-              <button id="checkoutBtn" class="retry-btn" type="button" style="background: var(--accent); color: white; margin-top: 0;">Checkout</button>
-              <button id="clearCartBtn" type="button" style="background: var(--muted); color: white; padding: 8px; border: none; border-radius: 8px; cursor: pointer;">Clear Cart</button>
-            </div>
-          `;
-        }
-
-        cartPanel.innerHTML = `
-          <h2 style="margin: 0 0 16px; font-size: 1.2rem;">Your Cart</h2>
-          <div id="cartItemsList" style="margin-bottom: 16px; max-height: 200px; overflow-y: auto;"></div>
-          <div style="display: flex; justify-content: space-between; margin-bottom: 16px; padding-top: 12px; border-top: 1px solid var(--line); font-weight: 600;">
-            <span>Items: ${cartCount}</span>
-            <span>Total: ${formatPrice(cartTotal)}</span>
-          </div>
-          <input id="customerName" type="text" placeholder="Your name (optional)" style="width: 100%; padding: 8px; border: 1px solid var(--line); border-radius: 6px; margin-bottom: 8px;" />
-          <textarea id="orderNotes" rows="2" placeholder="Notes for kitchen (optional)" style="width: 100%; padding: 8px; border: 1px solid var(--line); border-radius: 6px; margin-bottom: 8px; resize: none;"></textarea>
-          ${buttonsHtml}
-          <div id="orderMessage" style="display: none; padding: 8px; border-radius: 6px; text-align: center; font-size: 0.9rem;"></div>
-        `;
-
-        // Render cart items
-        const cartItemsList = cartPanel.querySelector('#cartItemsList');
-        if (cart.size === 0) {
-          cartItemsList.innerHTML = '<p style="color: var(--muted);">Your cart is empty</p>';
-        } else {
-          for (const item of cart.values()) {
-            const itemDiv = document.createElement('div');
-            itemDiv.style.cssText = `
-              display: flex;
-              justify-content: space-between;
-              align-items: center;
-              padding: 8px;
-              border-bottom: 1px solid var(--line);
-            `;
-
-            const itemInfo = document.createElement('span');
-            itemInfo.textContent = `${item.name} × ${item.quantity}`;
-            itemInfo.style.fontWeight = '500';
-
-            const itemPrice = document.createElement('span');
-            itemPrice.textContent = formatPrice(item.price * item.quantity);
-
-            itemDiv.appendChild(itemInfo);
-            itemDiv.appendChild(itemPrice);
-            cartItemsList.appendChild(itemDiv);
+        function stopSessionPoll() {
+          if (state.pollTimer) {
+            clearInterval(state.pollTimer);
+            state.pollTimer = null;
           }
         }
 
-        // Attach event listeners
-        const startOrderingBtn = cartPanel.querySelector('#startOrderingBtn');
-        if (startOrderingBtn) {
-          startOrderingBtn.addEventListener('click', handleStartOrdering);
-        }
+        async function finalizePaidSession() {
+          if (state.receiptShown) return;
+          state.receiptShown = true;
+          stopSessionPoll();
+          stopKeepAlive();
+          stopPrepTimer();
 
-        const checkoutBtn = cartPanel.querySelector('#checkoutBtn');
-        if (checkoutBtn) {
-          checkoutBtn.addEventListener('click', triggerCheckout);
-        }
-
-        const clearCartBtn = cartPanel.querySelector('#clearCartBtn');
-        if (clearCartBtn) {
-          clearCartBtn.addEventListener('click', () => {
-            cart.clear();
-            persistCart(currentContext.tableId);
-            renderCartPanel();
-          });
-        }
-      }
-
-      /**
-       * Handle "Start Ordering" button click
-       */
-      async function handleStartOrdering() {
-        const orderMsg = document.getElementById('orderMessage');
-        if (!orderMsg) return;
-
-        orderMsg.textContent = 'Starting session...';
-        orderMsg.style.display = 'block';
-        orderMsg.style.backgroundColor = '#e2e3e5';
-        orderMsg.style.color = '#383d41';
-
-        const result = await startSession(
-          currentContext.restaurant.id,
-          currentContext.tableId
-        );
-
-        if (result.success) {
-          orderMsg.textContent = 'Session started! You can now add items to cart.';
-          orderMsg.style.backgroundColor = '#d4edda';
-          orderMsg.style.color = '#155724';
-          renderCartPanel();
-          setTimeout(() => {
-            orderMsg.style.display = 'none';
-          }, 3000);
-        } else {
-          orderMsg.textContent = result.message || 'Failed to start session';
-          orderMsg.style.backgroundColor = '#f8d7da';
-          orderMsg.style.color = '#721c24';
-        }
-      }
-
-      /**
-       * Handle checkout: post order and clear on success
-       */
-      async function triggerCheckout() {
-        const cartTotal = calculateCartTotal();
-
-        if (cartTotal <= 0) {
-          const orderMsg = document.getElementById('orderMessage');
-          orderMsg.textContent = 'Cart is empty. Add items before checkout.';
-          orderMsg.style.display = 'block';
-          orderMsg.style.backgroundColor = '#f8d7da';
-          orderMsg.style.color = '#721c24';
-          return;
-        }
-
-        const checkoutPayload = {
-          tableId: currentContext.tableId,
-          restaurantId: currentContext.restaurant?.id,
-          items: Array.from(cart.values()),
-          total: cartTotal,
-          customerName: (document.getElementById('customerName')?.value || 'Guest').trim(),
-          notes: (document.getElementById('orderNotes')?.value || '').trim(),
-        };
-
-        const orderMsg = document.getElementById('orderMessage');
-        orderMsg.textContent = 'Processing checkout...';
-        orderMsg.style.display = 'block';
-        orderMsg.style.backgroundColor = '#e2e3e5';
-        orderMsg.style.color = '#383d41';
-
-        try {
-          const response = await fetch(`${BACKEND_BASE_URL}/api/orders`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(checkoutPayload),
-          });
-
-          if (!response.ok) {
-            throw new Error(`Checkout failed: ${response.status}`);
+          const invoicePayload = buildInvoicePayload({ orderId: state.order?.orderId, totalAmount: state.order?.totalAmount }, state.session || loadSavedSession(state.tableId) || {});
+          if (!state.syncAttempted) {
+            state.syncAttempted = true;
+            await syncInvoicePayload(invoicePayload);
           }
 
-          const result = await response.json();
-
-          // Check if payment was successful
-          if (result.success || result.paymentStatus === 'completed') {
-            orderMsg.textContent = 'Your order is confirmed. Wait for 5 min.';
-            orderMsg.style.backgroundColor = '#d4edda';
-            orderMsg.style.color = '#155724';
-
-            // End session after successful payment
-            await endSession(currentContext.tableId, 'payment_completed');
-
-            // Clear session and cart after successful payment
-            clearStoredState(currentContext.tableId);
-
-            setTimeout(() => {
-              location.reload();
-            }, 2000);
-          } else {
-            orderMsg.textContent = 'Order created. Awaiting payment confirmation.';
-            orderMsg.style.backgroundColor = '#e2e3e5';
-            orderMsg.style.color = '#383d41';
-          }
-        } catch (error) {
-          orderMsg.textContent = `Checkout error: ${error.message}`;
-          orderMsg.style.display = 'block';
-          orderMsg.style.backgroundColor = '#f8d7da';
-          orderMsg.style.color = '#721c24';
-        }
-      }
-
-      /**
-       * Initialize page: extract tableId from query param, load context, restore cart and session
-       */
-      async function loadPage() {
-        const tableId = getTableIdFromQuery();
-
-        if (!tableId) {
-          setError('Invalid table URL. Expected: /table.html?id=64');
-          setLoading(false);
-          return;
-        }
-
-        setLoading(true);
-        clearError();
-        menuContainerEl.classList.add('hidden');
-
-        try {
-          // Fetch table context from backend
-          const data = await fetchTableContext(tableId);
-          const restaurant = data.restaurant || {};
-          const table = data.table || { id: tableId, table_number: tableId };
-          const menu = data.menu || [];
-
-          currentContext = {
-            tableId,
-            restaurant,
-            table,
+          clearStoredState();
+          state.order = {
+            ...(state.order || {}),
+            closedAt: new Date().toISOString(),
           };
-
-          // Load persisted cart and session from localStorage
-          loadCart(tableId);
-          const storedSession = loadSession(tableId);
-
-          // Check if there's an active session and restore it
-          if (storedSession && storedSession.id && storedSession.sessionToken) {
-            currentSession = storedSession;
-            startKeepAlive(tableId);
-            isCartLocked = false;
-          } else {
-            // Check if table is locked by another user
-            const lock = await checkTableLock(restaurant.id, tableId);
-            if (lock.isLocked) {
-              isCartLocked = true;
-            }
-          }
-
-          // Update page header
-          restaurantTitleEl.textContent = restaurant.name || 'Restaurant';
-          tableInfoEl.textContent = table.table_number
-            ? `Table: ${table.table_number}`
-            : `Table: ${tableId}`;
-
-          // Set restaurant logo if available
-          if (restaurant.logo_url || restaurant.logo) {
-            restaurantLogoEl.src = restaurant.logo_url || restaurant.logo;
-            restaurantLogoEl.classList.remove('hidden');
-            restaurantLogoFallbackEl.classList.add('hidden');
-          } else {
-            restaurantLogoFallbackEl.textContent = (restaurant.name || 'R')
-              .charAt(0)
-              .toUpperCase();
-            restaurantLogoEl.classList.add('hidden');
-            restaurantLogoFallbackEl.classList.remove('hidden');
-          }
-
-          // Render menu and cart
-          renderMenu(menu);
-          renderCartPanel();
-        } catch (error) {
-          setError(error.message || 'Unable to load menu. Please refresh and try again.');
-        } finally {
-          setLoading(false);
+          renderReceipt();
+          updateStats();
+          els.sessionBadge.textContent = 'Closed';
+          window.scrollTo({ top: 0, behavior: 'smooth' });
         }
-      }
 
-      // Retry button
-      retryBtnEl.addEventListener('click', loadPage);
+        async function refreshSessionStatus() {
+          if (!state.tableId) return;
+          setMode('loading');
+          try {
+            await ensureMenuAccess();
+            const savedSession = loadSavedSession(state.tableId);
+            if (savedSession?.id && savedSession?.sessionToken) {
+              state.session = savedSession;
+              startKeepAlive();
+            }
 
-      // Initialize on page load
-      document.addEventListener('DOMContentLoaded', loadPage);
+            if (state.session?.id) {
+              els.sessionBadge.textContent = 'Active';
+            } else if (state.sessionLocked) {
+              els.sessionBadge.textContent = 'Locked';
+            } else {
+              els.sessionBadge.textContent = 'Ready';
+            }
+
+            if (state.mode === 'loading') {
+              state.sessionLocked ? setLocked('This table already has an active ordering session.') : openCartState();
+            }
+          } catch (error) {
+            setError(error.message || 'Unable to refresh table status.');
+          }
+        }
+
+        async function loadPage() {
+          state.tableId = extractTableId();
+
+          if (!state.tableId) {
+            setError('Invalid table URL. Expected /table/123 or ?id=123.');
+            return;
+          }
+
+          state.clientId = getClientId();
+          setMode('loading');
+          els.sessionBadge.textContent = 'Loading';
+
+          try {
+            const context = await fetchTableContext(state.tableId);
+            state.restaurant = context.restaurant || null;
+            state.table = context.table || null;
+            state.menu = Array.isArray(context.menu) ? context.menu : [];
+            state.sessionLocked = Boolean(context.lock?.isLocked);
+            restorePersistedState();
+            updateHeader();
+            renderMenu();
+            renderCart();
+
+            const hasSavedSession = Boolean(state.session?.id && state.session?.sessionToken);
+            const hasSavedInvoice = Boolean(state.order?.orderId);
+
+            if (hasSavedSession) {
+              els.sessionBadge.textContent = 'Active';
+              startKeepAlive();
+              if (state.order?.orderId) {
+                state.mode = 'tracking';
+                setMode('tracking');
+                renderTracking();
+                startPrepTimer();
+                startSessionPoll();
+              } else {
+                openCartState();
+              }
+            } else if (hasSavedInvoice && !state.sessionLocked) {
+              els.sessionBadge.textContent = 'Closed';
+              state.receiptShown = true;
+              renderReceipt();
+              updateStats();
+            } else if (state.sessionLocked) {
+              els.sessionBadge.textContent = 'Locked';
+              setLocked('This table is already in an active ordering session. Refresh if the situation has changed.');
+            } else {
+              els.sessionBadge.textContent = 'Ready';
+              openCartState();
+            }
+
+            updateStats();
+          } catch (error) {
+            setError(error.message || 'Unable to load table content.');
+          }
+        }
+
+        document.addEventListener('click', async (event) => {
+          const addButton = event.target.closest('[data-action="add-item"]');
+          if (addButton) {
+            await addItemToCart(addButton.getAttribute('data-item-id'));
+            return;
+          }
+
+          const controlButton = event.target.closest('[data-action="increase"], [data-action="decrease"]');
+          if (controlButton) {
+            const itemId = controlButton.getAttribute('data-item-id');
+            changeQuantity(itemId, controlButton.getAttribute('data-action') === 'increase' ? 1 : -1);
+          }
+        });
+
+        els.checkoutButton.addEventListener('click', submitCheckout);
+        els.clearCartButton.addEventListener('click', clearCart);
+        els.retryButton.addEventListener('click', loadPage);
+        els.forceRefreshButton.addEventListener('click', refreshSessionStatus);
+
+        window.addEventListener('beforeunload', () => {
+          stopKeepAlive();
+          stopSessionPoll();
+          stopPrepTimer();
+          if (state.tableId && state.cart.size) saveCart();
+          if (state.session?.id && state.session?.sessionToken) saveSession(state.session);
+        });
+
+        document.addEventListener('visibilitychange', () => {
+          if (document.visibilityState === 'visible' && state.mode === 'tracking') {
+            refreshSessionStatus();
+          }
+        });
+
+        window.addEventListener('load', loadPage);
+      })();
     </script>
   </body>
 </html>
