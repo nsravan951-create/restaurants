@@ -173,6 +173,21 @@
         font-weight: 600;
       }
 
+      .item img {
+        width: 100%;
+        height: 140px;
+        object-fit: cover;
+        border-radius: 10px;
+        margin-bottom: 8px;
+        display: block;
+      }
+
+      .btn-add.added {
+        transform: scale(0.98);
+        transition: transform 140ms ease;
+        box-shadow: 0 4px 10px rgba(0,0,0,0.08) inset;
+      }
+
       .btn-add {
         width: 100%;
         margin-top: 8px;
@@ -526,6 +541,18 @@
             const itemDiv = document.createElement('div');
             itemDiv.className = 'item';
 
+            // Image (owner-provided)
+            if (item.image_url) {
+              const img = document.createElement('img');
+              img.src = item.image_url;
+              img.alt = item.name || 'Menu image';
+              img.loading = 'lazy';
+              img.addEventListener('error', () => {
+                img.style.display = 'none';
+              });
+              itemDiv.appendChild(img);
+            }
+
             const itemTitle = document.createElement('h3');
             itemTitle.textContent = item.name;
             itemDiv.appendChild(itemTitle);
@@ -545,7 +572,14 @@
             const addBtn = document.createElement('button');
             addBtn.textContent = 'Add to Cart';
             addBtn.className = 'btn-add';
-            addBtn.addEventListener('click', () => addToCart(item));
+            addBtn.addEventListener('click', () => {
+              // small vibration on supported devices
+              if (navigator.vibrate) navigator.vibrate(50);
+              // visual feedback
+              addBtn.classList.add('added');
+              setTimeout(() => addBtn.classList.remove('added'), 160);
+              addToCart(item);
+            });
             itemDiv.appendChild(addBtn);
 
             itemsGrid.appendChild(itemDiv);
@@ -653,6 +687,7 @@
         }
 
         const cartTotal = calculateCartTotal();
+        const cartCount = Array.from(cart.values()).reduce((s, it) => s + (it.quantity || 0), 0);
         const hasSession = !!currentSession;
 
         let buttonsHtml = '';
@@ -677,8 +712,8 @@
           <h2 style="margin: 0 0 16px; font-size: 1.2rem;">Your Cart</h2>
           <div id="cartItemsList" style="margin-bottom: 16px; max-height: 200px; overflow-y: auto;"></div>
           <div style="display: flex; justify-content: space-between; margin-bottom: 16px; padding-top: 12px; border-top: 1px solid var(--line); font-weight: 600;">
-            <span>Total:</span>
-            <span>${formatPrice(cartTotal)}</span>
+            <span>Items: ${cartCount}</span>
+            <span>Total: ${formatPrice(cartTotal)}</span>
           </div>
           <input id="customerName" type="text" placeholder="Your name (optional)" style="width: 100%; padding: 8px; border: 1px solid var(--line); border-radius: 6px; margin-bottom: 8px;" />
           <textarea id="orderNotes" rows="2" placeholder="Notes for kitchen (optional)" style="width: 100%; padding: 8px; border: 1px solid var(--line); border-radius: 6px; margin-bottom: 8px; resize: none;"></textarea>
@@ -812,7 +847,7 @@
 
           // Check if payment was successful
           if (result.success || result.paymentStatus === 'completed') {
-            orderMsg.textContent = 'Order confirmed! Thank you.';
+            orderMsg.textContent = 'Your order is confirmed. Wait for 5 min.';
             orderMsg.style.backgroundColor = '#d4edda';
             orderMsg.style.color = '#155724';
 
