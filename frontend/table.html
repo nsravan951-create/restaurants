@@ -572,28 +572,23 @@
             <div class="brand-badge" id="restaurantBadge">R</div>
             <div class="brand-copy">
               <h1 id="restaurantTitle">Loading restaurant...</h1>
-              <p id="heroSubtitle">Scan-to-order menu, live cart, and secure checkout.</p>
+              <p id="heroSubtitle">Scan-to-order menu with live cart and secure checkout.</p>
             </div>
           </div>
           <div class="hero-meta">
             <div class="pill"><strong id="tableLabel">Table</strong></div>
             <div class="pill-row">
-              <span class="pill">Session: <strong id="sessionStatus">Starting...</strong></span>
               <span class="pill">ETA: <strong id="etaLabel">15-20 min</strong></span>
             </div>
           </div>
         </div>
         <div class="pill-row" id="heroPills"></div>
-        <div class="pill-row">
-          <button class="btn btn-primary" id="sessionActionBtn" type="button">Start Ordering</button>
-          <span class="pill" id="sessionHint">Tap to unlock ordering for this table.</span>
-        </div>
       </section>
 
       <section id="loadingState" class="panel loading">
         <div class="spinner-wrap">
           <span class="spinner" aria-hidden="true"></span>
-          <span>Loading your menu and table session...</span>
+          <span>Loading your menu...</span>
         </div>
       </section>
 
@@ -733,11 +728,8 @@
         restaurantTitle: document.getElementById('restaurantTitle'),
         restaurantBadge: document.getElementById('restaurantBadge'),
         tableLabel: document.getElementById('tableLabel'),
-        sessionStatus: document.getElementById('sessionStatus'),
         etaLabel: document.getElementById('etaLabel'),
         heroPills: document.getElementById('heroPills'),
-        sessionActionBtn: document.getElementById('sessionActionBtn'),
-        sessionHint: document.getElementById('sessionHint'),
         loadingState: document.getElementById('loadingState'),
         errorState: document.getElementById('errorState'),
         errorText: document.getElementById('errorText'),
@@ -781,7 +773,6 @@
         socket: null,
         pingTimer: null,
         timerInterval: null,
-        locked: false,
         invoicePayload: null,
         estimatedMinutes: '15-20',
       };
@@ -931,7 +922,7 @@
         els.stickyBar.classList.toggle('hidden', view !== 'menu');
       }
 
-      function setLoading(message = 'Loading your menu and table session...') {
+      function setLoading(message = 'Loading your menu...') {
         setView('loading');
         els.loadingState.querySelector('.spinner-wrap span:last-child').textContent = message;
       }
@@ -945,29 +936,12 @@
         els.restaurantTitle.textContent = context.restaurant?.name || 'Restaurant';
         els.restaurantBadge.textContent = (context.restaurant?.name || 'R').charAt(0).toUpperCase();
         els.tableLabel.textContent = `Table ${context.table?.table_number || context.table?.id || ''}`;
-        els.sessionStatus.textContent = state.session ? 'Active' : (context.lock?.isLocked ? 'Locked' : 'Ready');
         els.etaLabel.textContent = state.estimatedMinutes === '15-20' ? '15-20 min' : state.estimatedMinutes;
         els.heroPills.innerHTML = `
           <span class="pill">Restaurant: <strong>${context.restaurant?.name || 'N/A'}</strong></span>
           <span class="pill">Table: <strong>${context.table?.table_number || context.table?.id || 'N/A'}</strong></span>
-          <span class="pill">Status: <strong>${state.session ? 'Ordering' : (context.lock?.isLocked ? 'Locked' : 'Ready')}</strong></span>
+          <span class="pill">Status: <strong>${state.session ? 'Ordering' : 'Ready'}</strong></span>
         `;
-        renderSessionAction();
-      }
-
-      function renderSessionAction() {
-        const locked = Boolean(state.context?.lock?.isLocked && !state.session);
-        if (state.session) {
-          els.sessionActionBtn.classList.add('hidden');
-          els.sessionHint.textContent = 'Cart is unlocked and ready.';
-          return;
-        }
-
-        els.sessionActionBtn.classList.remove('hidden');
-        els.sessionActionBtn.textContent = locked ? 'Join Existing Session' : 'Start Ordering';
-        els.sessionHint.textContent = locked
-          ? 'This table is already in use. Join the active session to continue.'
-          : 'Tap to unlock ordering for this table.';
       }
 
       function cartTotals() {
@@ -1115,10 +1089,6 @@
 
         els.menuContainer.querySelectorAll('[data-add-item]').forEach((btn) => {
           btn.addEventListener('click', () => {
-            if (!state.session) {
-              setError('Start ordering session first.');
-              return;
-            }
             const item = menuItems.find((menuItem) => Number(menuItem.id) === Number(btn.dataset.addItem));
             if (!item) return;
             btn.classList.add('added');
@@ -1242,22 +1212,6 @@
         showReceiptView(invoicePayload);
       }
 
-      function startSessionCountdown(expiresAt) {
-        if (state.timerInterval) clearInterval(state.timerInterval);
-        const tick = () => {
-          const remaining = new Date(expiresAt).getTime() - Date.now();
-          if (remaining <= 0) {
-            els.sessionStatus.textContent = 'Expired';
-            setError('Table session expired. Please refresh and start again.');
-            return;
-          }
-          const sec = Math.floor(remaining / 1000);
-          els.sessionStatus.textContent = `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}`;
-        };
-        tick();
-        state.timerInterval = setInterval(tick, 1000);
-      }
-
       async function startOrJoinSession(joinExisting = false) {
         const stored = loadSession();
         try {
@@ -1274,17 +1228,9 @@
 
           state.session = data.session;
           saveSession();
-          state.locked = false;
-          els.sessionStatus.textContent = 'Active';
-          startSessionCountdown(data.session.expiresAt);
           startSessionPing();
-          renderSessionAction();
-          setView('menu');
-          renderCart();
         } catch (error) {
           if (error.status === 409 && error.data?.locked) {
-            state.locked = true;
-            els.sessionStatus.textContent = 'Locked';
             setError(error.message || 'Table is currently in an active session.');
             return;
           }
@@ -1304,13 +1250,10 @@
             });
             state.session.expiresAt = data.expiresAt;
             saveSession();
-            startSessionCountdown(state.session.expiresAt);
           } catch (error) {
             console.warn('Session ping failed:', error.message);
             resetTimers();
             state.session = null;
-            state.locked = true;
-            renderSessionAction();
             setError('Table session ended. Please start again.');
           }
         }, 60000);
@@ -1358,21 +1301,20 @@
           const storedSession = loadSession();
           if (storedSession) {
             state.session = storedSession;
-            startSessionCountdown(state.session.expiresAt);
             startSessionPing();
+          }
+
+          if (!state.session) {
+            if (data.lock?.isLocked) {
+              setError('This table is already in use. Please scan the QR on the active table session.');
+              return;
+            }
+            await startOrJoinSession(false);
           }
 
           renderMenu(data.menu || []);
           renderCart();
           connectSocket();
-          renderSessionAction();
-
-          if (data.lock?.isLocked && !state.session) {
-            state.locked = true;
-            els.sessionStatus.textContent = 'Locked';
-          } else if (!state.session) {
-            await startOrJoinSession(false);
-          }
 
           setView('menu');
         } catch (error) {
@@ -1382,7 +1324,11 @@
 
       async function placeOrder(paymentMethod) {
         if (!state.session) {
-          throw new Error('Table session is not active.');
+          await startOrJoinSession(false);
+        }
+
+        if (!state.session) {
+          throw new Error('Unable to prepare the table session.');
         }
 
         const { subtotal } = cartTotals();
@@ -1512,14 +1458,6 @@
         });
         els.codCheckoutBtn.addEventListener('click', handleCodCheckout);
         els.onlineCheckoutBtn.addEventListener('click', handleOnlineCheckout);
-        els.sessionActionBtn.addEventListener('click', async () => {
-          try {
-            await startOrJoinSession(Boolean(state.context?.lock?.isLocked));
-            renderSessionAction();
-          } catch (error) {
-            setError(error.message || 'Unable to start ordering session');
-          }
-        });
       }
 
       attachEvents();
