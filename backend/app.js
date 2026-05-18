@@ -10,21 +10,29 @@ const ownerRoutes = require('./src/routes/owner.routes');
 const paymentRoutes = require('./src/routes/payment.routes');
 const adRoutes = require('./src/routes/ad.routes');
 const adminRoutes = require('./src/routes/admin.routes');
+const invoiceRoutes = require('./src/routes/invoice.routes');
 const tableSessionRoutes = require('./src/routes/tableSession.routes');
 const errorHandler = require('./src/middleware/errorHandler');
 
 const app = express();
 
-const allowedOrigins = (process.env.CORS_ORIGIN || 'http://localhost:3000,http://localhost:5173')
-  .split(',')
-  .map((s) => s.trim());
+const allowedOrigins = new Set(
+  String(process.env.CORS_ORIGIN || 'http://localhost:3000,http://localhost:5173')
+    .split(',')
+    .map((origin) => origin.trim())
+    .filter(Boolean)
+);
+
+allowedOrigins.add('https://restaurants.netlify.app');
+allowedOrigins.add('https://restaurantts.netlify.app');
+allowedOrigins.add('https://restauranttts.netlify.app');
 
 const corsOptions = {
   origin(origin, callback) {
     if (process.env.NODE_ENV !== 'production') {
       console.log('Request from:', origin);
     }
-    if (!origin || allowedOrigins.includes(origin)) {
+    if (!origin || allowedOrigins.has(origin)) {
       callback(null, true);
       return;
     }
@@ -70,6 +78,7 @@ app.use('/orders', orderRoutes);
 app.use('/menu', menuRoutes);
 app.use('/order', orderRoutes);
 app.use('/api/payments', paymentRoutes);
+app.use('/api/invoices', invoiceRoutes);
 app.use('/api/ads', adRoutes);
 app.use('/ads', adRoutes);
 app.use('/api/admin', adminRoutes);

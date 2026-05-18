@@ -168,6 +168,70 @@ async function loadOrders() {
   });
 }
 
+async function loadInvoices() {
+  if (!ensureRestaurantId()) return;
+  try {
+    const data = await apiRequest(`/api/invoices/restaurant/${restaurantId}`, {}, true);
+    const invoices = data.invoices || [];
+    const container = document.getElementById('invoiceList');
+    if (!invoices.length) {
+      container.innerHTML = '<p>No invoices synced yet.</p>';
+      return;
+    }
+
+    container.innerHTML = invoices.map((inv) => `
+      <div class="card">
+        <strong>Order #${inv.order_id} | Table ${inv.table_number}</strong>
+        <p>${inv.customer_name || 'Guest'} • ${inv.payment_status.toUpperCase()} • ₹${formatCurrency(inv.total_amount)}</p>
+        <p>Synced: ${new Date(inv.synced_at).toLocaleString()}</p>
+        <div class="toolbar">
+          <button class="btn btn-light" data-view-invoice="${inv.id}">View JSON</button>
+          <a class="btn btn-dark" href="#" data-download="${inv.id}">Download JSON</a>
+        </div>
+        <pre id="invoice-json-${inv.id}" class="hidden" style="white-space:pre-wrap;max-height:260px;overflow:auto;margin-top:8px;">${escapeHtml(JSON.stringify(inv.invoice_payload || inv, null, 2))}</pre>
+      </div>
+    `).join('');
+
+    container.querySelectorAll('button[data-view-invoice]').forEach((btn) => {
+      btn.addEventListener('click', (e) => {
+        const id = btn.dataset.viewInvoice;
+        const el = document.getElementById(`invoice-json-${id}`);
+        if (!el) return;
+        el.classList.toggle('hidden');
+      });
+    });
+
+    container.querySelectorAll('a[data-download]').forEach((a) => {
+      a.addEventListener('click', (e) => {
+        e.preventDefault();
+        const id = a.dataset.download;
+        const pre = document.getElementById(`invoice-json-${id}`);
+        if (!pre) return;
+        const blob = new Blob([pre.textContent], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `invoice-${id}.json`;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        URL.revokeObjectURL(url);
+      });
+    });
+  } catch (error) {
+    setMessage('ownerMessage', error.message, true);
+  }
+}
+
+function escapeHtml(str) {
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 function initSocket() {
   if (!ensureRestaurantId()) return;
   const socket = io(window.APP_CONFIG.SOCKET_URL);
@@ -185,6 +249,7 @@ async function initOwner() {
     await loadMenu();
     await loadTables();
     await loadOrders();
+    await loadInvoices();
     initSocket();
   } catch (error) {
     setMessage('ownerMessage', error.message, true);
@@ -284,6 +349,10 @@ document.getElementById('autoTableForm').addEventListener('submit', async (event
 document.getElementById('logoutBtn').addEventListener('click', () => {
   clearAuth();
   window.location.href = './auth.html';
+});
+
+document.getElementById('refreshInvoicesBtn').addEventListener('click', async () => {
+  await loadInvoices();
 });
 
 initOwner();

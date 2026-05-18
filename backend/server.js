@@ -9,17 +9,21 @@ const { expireInactiveSessions } = require('./src/utils/tableSession');
 const PORT = Number(process.env.PORT || 5000);
 const server = http.createServer(app);
 
-const allowedOrigins = [
-  'http://localhost:3000',
-  'http://localhost:5173',
-  'https://restaurants.netlify.app',
-  'https://restaurantts.netlify.app',
-];
+const allowedOrigins = new Set(
+  String(process.env.CORS_ORIGIN || 'http://localhost:3000,http://localhost:5173')
+    .split(',')
+    .map((origin) => origin.trim())
+    .filter(Boolean)
+);
+
+allowedOrigins.add('https://restaurants.netlify.app');
+allowedOrigins.add('https://restaurantts.netlify.app');
+allowedOrigins.add('https://restauranttts.netlify.app');
 
 const io = new Server(server, {
   cors: {
     origin(origin, callback) {
-      if (!origin || allowedOrigins.includes(origin)) {
+      if (!origin || allowedOrigins.has(origin)) {
         callback(null, true);
         return;
       }
