@@ -91,7 +91,7 @@ router.get('/table/:tableId', asyncHandler(async (req, res) => {
        r.name as restaurant_name,
        r.phone as restaurant_phone,
        r.address as restaurant_address,
-       r.logo_url as restaurant_logo
+       NULL as restaurant_logo
      FROM restaurant_tables t
      INNER JOIN restaurants r ON r.id = t.restaurant_id
      WHERE t.id = $1
