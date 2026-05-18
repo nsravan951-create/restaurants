@@ -607,11 +607,25 @@
        * Fetch table context from backend using tableId
        */
       async function fetchTableContext(tableId) {
-        const response = await fetch(
-          `${BACKEND_BASE_URL}/api/restaurants/table/${encodeURIComponent(tableId)}`
-        );
+        const url = `${BACKEND_BASE_URL}/api/restaurants/table/${encodeURIComponent(tableId)}`;
+        const response = await fetch(url);
         if (!response.ok) {
-          throw new Error(`Failed to load table data. Server returned ${response.status}.`);
+          // Try to extract JSON error body, otherwise text
+          let bodyText = '';
+          try {
+            const text = await response.text();
+            bodyText = text;
+            try {
+              const json = JSON.parse(text);
+              bodyText = json.message || JSON.stringify(json);
+            } catch (e) {
+              // not JSON
+            }
+          } catch (e) {
+            bodyText = '(no response body)';
+          }
+          console.error('Failed to load table data:', response.status, bodyText, url);
+          throw new Error(`Failed to load table data. Server returned ${response.status}: ${bodyText}`);
         }
         return response.json();
       }
