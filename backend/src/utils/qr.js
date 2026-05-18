@@ -1,7 +1,9 @@
 const QRCode = require('qrcode');
 
 function getFrontendProductionUrl() {
-  return 'https://restaurants.netlify.app/table.html?id=';
+  // Use a fixed Netlify frontend URL for QR links.
+  // Update here if your Netlify site changes.
+  return 'https://restaurantts.netlify.app/table.html?id=';
 }
 
 async function buildQrPayload({ tableId }) {

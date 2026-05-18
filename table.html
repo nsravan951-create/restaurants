@@ -248,6 +248,11 @@
       const cart = new Map();
       let currentContext = null;
 
+      // Session state
+      let isCartLocked = false;
+      let currentSession = null;
+      let keepAliveInterval = null;
+
       /**
        * Extract table ID from query parameter: ?id=64
        */
@@ -324,6 +329,145 @@
         localStorage.removeItem(`${namespace}_cart`);
         localStorage.removeItem(`${namespace}_session`);
         cart.clear();
+        currentSession = null;
+        isCartLocked = false;
+      }
+
+      /**
+       * Get unique client ID for this browser
+       */
+      function getClientId() {
+        let id = localStorage.getItem('clientId');
+        if (!id) {
+          id = `client_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+          localStorage.setItem('clientId', id);
+        }
+        return id;
+      }
+
+      /**
+       * Check if table has an active session (locked by another user)
+       */
+      async function checkTableLock(restaurantId, tableId) {
+        try {
+          const response = await fetch(
+            `${BACKEND_BASE_URL}/api/restaurants/${restaurantId}/table/${tableId}`
+          );
+          if (!response.ok) return { isLocked: false };
+          const data = await response.json();
+          return data.lock || { isLocked: false };
+        } catch (err) {
+          console.warn('Failed to check table lock:', err);
+          return { isLocked: false };
+        }
+      }
+
+      /**
+       * Start a session for this table
+       */
+      async function startSession(restaurantId, tableId) {
+        try {
+          const payload = {
+            restaurantId: Number(restaurantId),
+            tableId: Number(tableId),
+            clientId: getClientId(),
+            joinExisting: false,
+          };
+
+          const response = await fetch(`${BACKEND_BASE_URL}/api/table-sessions/start`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+          });
+
+          const data = await response.json();
+
+          if (response.status === 201 || response.ok) {
+            currentSession = data.session;
+            persistSession(tableId, data.session);
+            startKeepAlive(tableId);
+            isCartLocked = false;
+            return { success: true, session: data.session };
+          }
+
+          if (response.status === 409) {
+            // Table locked by another user
+            isCartLocked = true;
+            return { success: false, locked: true, message: data.message };
+          }
+
+          return { success: false, message: data.error || 'Failed to start session' };
+        } catch (err) {
+          console.error('Error starting session:', err);
+          return { success: false, message: err.message };
+        }
+      }
+
+      /**
+       * Keep session alive with periodic pings
+       */
+      function startKeepAlive(tableId) {
+        if (keepAliveInterval) clearInterval(keepAliveInterval);
+
+        keepAliveInterval = setInterval(async () => {
+          if (!currentSession || !currentSession.id) {
+            clearInterval(keepAliveInterval);
+            keepAliveInterval = null;
+            return;
+          }
+
+          try {
+            await fetch(
+              `${BACKEND_BASE_URL}/api/table-sessions/${currentSession.id}/ping`,
+              {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ sessionToken: currentSession.sessionToken }),
+              }
+            );
+          } catch (err) {
+            console.warn('Keep-alive ping failed:', err);
+          }
+        }, 60000); // every minute
+      }
+
+      /**
+       * End the current session
+       */
+      async function endSession(tableId, reason = 'payment_completed') {
+        if (!currentSession) return;
+
+        try {
+          await fetch(`${BACKEND_BASE_URL}/api/table-sessions/${currentSession.id}/end`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              sessionToken: currentSession.sessionToken,
+              reason,
+            }),
+          });
+
+          if (keepAliveInterval) {
+            clearInterval(keepAliveInterval);
+            keepAliveInterval = null;
+          }
+        } catch (err) {
+          console.warn('Error ending session:', err);
+        }
+      }
+
+      /**
+       * Show cart lock message
+       */
+      function showCartLockMessage() {
+        const orderMsg = document.getElementById('orderMessage');
+        if (orderMsg) {
+          orderMsg.textContent =
+            'Cart is locked. Click "Start Ordering" to begin a new session.';
+          orderMsg.style.display = 'block';
+          orderMsg.style.backgroundColor = '#ffeaa7';
+          orderMsg.style.color = '#2d3436';
+        }
       }
 
       function setLoading(isLoading) {
@@ -415,6 +559,11 @@
       }
 
       function addToCart(item) {
+        if (isCartLocked && !currentSession) {
+          showCartLockMessage();
+          return;
+        }
+
         if (cart.has(item.id)) {
           const existing = cart.get(item.id);
           existing.quantity += 1;
@@ -490,6 +639,25 @@
         }
 
         const cartTotal = calculateCartTotal();
+        const hasSession = !!currentSession;
+
+        let buttonsHtml = '';
+        if (!hasSession) {
+          // Show "Start Ordering" button if no active session
+          buttonsHtml = `
+            <button id="startOrderingBtn" class="retry-btn" type="button" style="background: var(--accent); color: white; margin-top: 0; width: 100%;">
+              Start Ordering
+            </button>
+          `;
+        } else {
+          // Show checkout and clear buttons if session is active
+          buttonsHtml = `
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 8px;">
+              <button id="checkoutBtn" class="retry-btn" type="button" style="background: var(--accent); color: white; margin-top: 0;">Checkout</button>
+              <button id="clearCartBtn" type="button" style="background: var(--muted); color: white; padding: 8px; border: none; border-radius: 8px; cursor: pointer;">Clear Cart</button>
+            </div>
+          `;
+        }
 
         cartPanel.innerHTML = `
           <h2 style="margin: 0 0 16px; font-size: 1.2rem;">Your Cart</h2>
@@ -500,10 +668,7 @@
           </div>
           <input id="customerName" type="text" placeholder="Your name (optional)" style="width: 100%; padding: 8px; border: 1px solid var(--line); border-radius: 6px; margin-bottom: 8px;" />
           <textarea id="orderNotes" rows="2" placeholder="Notes for kitchen (optional)" style="width: 100%; padding: 8px; border: 1px solid var(--line); border-radius: 6px; margin-bottom: 8px; resize: none;"></textarea>
-          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 8px;">
-            <button id="checkoutBtn" class="retry-btn" type="button" style="background: var(--accent); color: white; margin-top: 0;">Checkout</button>
-            <button id="clearCartBtn" type="button" style="background: var(--muted); color: white; padding: 8px; border: none; border-radius: 8px; cursor: pointer;">Clear Cart</button>
-          </div>
+          ${buttonsHtml}
           <div id="orderMessage" style="display: none; padding: 8px; border-radius: 6px; text-align: center; font-size: 0.9rem;"></div>
         `;
 
@@ -536,12 +701,56 @@
         }
 
         // Attach event listeners
-        cartPanel.querySelector('#checkoutBtn').addEventListener('click', triggerCheckout);
-        cartPanel.querySelector('#clearCartBtn').addEventListener('click', () => {
-          cart.clear();
-          persistCart(currentContext.tableId);
+        const startOrderingBtn = cartPanel.querySelector('#startOrderingBtn');
+        if (startOrderingBtn) {
+          startOrderingBtn.addEventListener('click', handleStartOrdering);
+        }
+
+        const checkoutBtn = cartPanel.querySelector('#checkoutBtn');
+        if (checkoutBtn) {
+          checkoutBtn.addEventListener('click', triggerCheckout);
+        }
+
+        const clearCartBtn = cartPanel.querySelector('#clearCartBtn');
+        if (clearCartBtn) {
+          clearCartBtn.addEventListener('click', () => {
+            cart.clear();
+            persistCart(currentContext.tableId);
+            renderCartPanel();
+          });
+        }
+      }
+
+      /**
+       * Handle "Start Ordering" button click
+       */
+      async function handleStartOrdering() {
+        const orderMsg = document.getElementById('orderMessage');
+        if (!orderMsg) return;
+
+        orderMsg.textContent = 'Starting session...';
+        orderMsg.style.display = 'block';
+        orderMsg.style.backgroundColor = '#e2e3e5';
+        orderMsg.style.color = '#383d41';
+
+        const result = await startSession(
+          currentContext.restaurant.id,
+          currentContext.tableId
+        );
+
+        if (result.success) {
+          orderMsg.textContent = 'Session started! You can now add items to cart.';
+          orderMsg.style.backgroundColor = '#d4edda';
+          orderMsg.style.color = '#155724';
           renderCartPanel();
-        });
+          setTimeout(() => {
+            orderMsg.style.display = 'none';
+          }, 3000);
+        } else {
+          orderMsg.textContent = result.message || 'Failed to start session';
+          orderMsg.style.backgroundColor = '#f8d7da';
+          orderMsg.style.color = '#721c24';
+        }
       }
 
       /**
@@ -593,6 +802,9 @@
             orderMsg.style.backgroundColor = '#d4edda';
             orderMsg.style.color = '#155724';
 
+            // End session after successful payment
+            await endSession(currentContext.tableId, 'payment_completed');
+
             // Clear session and cart after successful payment
             clearStoredState(currentContext.tableId);
 
@@ -613,7 +825,7 @@
       }
 
       /**
-       * Initialize page: extract tableId from query param, load context, restore cart
+       * Initialize page: extract tableId from query param, load context, restore cart and session
        */
       async function loadPage() {
         const tableId = getTableIdFromQuery();
@@ -645,6 +857,19 @@
           loadCart(tableId);
           const storedSession = loadSession(tableId);
 
+          // Check if there's an active session and restore it
+          if (storedSession && storedSession.id && storedSession.sessionToken) {
+            currentSession = storedSession;
+            startKeepAlive(tableId);
+            isCartLocked = false;
+          } else {
+            // Check if table is locked by another user
+            const lock = await checkTableLock(restaurant.id, tableId);
+            if (lock.isLocked) {
+              isCartLocked = true;
+            }
+          }
+
           // Update page header
           restaurantTitleEl.textContent = restaurant.name || 'Restaurant';
           tableInfoEl.textContent = table.table_number
@@ -657,7 +882,9 @@
             restaurantLogoEl.classList.remove('hidden');
             restaurantLogoFallbackEl.classList.add('hidden');
           } else {
-            restaurantLogoFallbackEl.textContent = (restaurant.name || 'R').charAt(0).toUpperCase();
+            restaurantLogoFallbackEl.textContent = (restaurant.name || 'R')
+              .charAt(0)
+              .toUpperCase();
             restaurantLogoEl.classList.add('hidden');
             restaurantLogoFallbackEl.classList.remove('hidden');
           }
@@ -665,7 +892,6 @@
           // Render menu and cart
           renderMenu(menu);
           renderCartPanel();
-
         } catch (error) {
           setError(error.message || 'Unable to load menu. Please refresh and try again.');
         } finally {
