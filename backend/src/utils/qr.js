@@ -1,7 +1,7 @@
 const QRCode = require('qrcode');
 
 function getFrontendProductionUrl() {
-  const base = String(process.env.FRONTEND_PUBLIC_URL || 'http://localhost:3000').replace(/\/$/, '');
+  const base = String(process.env.FRONTEND_PUBLIC_URL || 'https://restaurantts.netlify.app').replace(/\/$/, '');
   return `${base}/table.html?id=`;
 }
 
