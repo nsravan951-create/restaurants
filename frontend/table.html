@@ -710,6 +710,10 @@
               <strong>Pay Online</strong>
               <span>Secure Razorpay payment with instant confirmation.</span>
             </button>
+            <button class="btn btn-primary checkout-option" id="upiCheckoutBtn" type="button">
+              <strong>Pay via UPI</strong>
+              <span>Open UPI apps (PhonePe, GPay, Paytm) to send payment.</span>
+            </button>
           </div>
 
           <div class="modal-actions">
@@ -752,6 +756,7 @@
         orderNotes: document.getElementById('orderNotes'),
         codCheckoutBtn: document.getElementById('codCheckoutBtn'),
         onlineCheckoutBtn: document.getElementById('onlineCheckoutBtn'),
+        upiCheckoutBtn: document.getElementById('upiCheckoutBtn'),
         closeCheckoutBtn: document.getElementById('closeCheckoutBtn'),
         trackingState: document.getElementById('trackingState'),
         trackingBadge: document.getElementById('trackingBadge'),
@@ -775,6 +780,7 @@
         timerInterval: null,
         invoicePayload: null,
         estimatedMinutes: '15-20',
+        checkoutIdempotencyKey: null,
       };
 
       const CLIENT_ID_KEY = 'qr_customer_client_id';
@@ -1110,6 +1116,11 @@
         `;
         els.checkoutModal.classList.remove('hidden');
         els.checkoutModal.setAttribute('aria-hidden', 'false');
+        // generate idempotency key for this checkout so retries won't create duplicates
+        if (!state.checkoutIdempotencyKey) {
+          state.checkoutIdempotencyKey = `${getClientId()}_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+          try { sessionStorage.setItem(`checkout_key_${state.context.restaurant.id}_${state.context.table.id}`, state.checkoutIdempotencyKey); } catch (e) {}
+        }
       }
 
       function closeCheckoutModal() {
@@ -1264,10 +1275,22 @@
         if (state.socket) {
           state.socket.disconnect();
         }
-
-        state.socket = io(SOCKET_URL, { transports: ['websocket', 'polling'] });
+        state.socket = io(SOCKET_URL, { transports: ['websocket', 'polling'], reconnectionAttempts: 5 });
         state.socket.on('connect', () => {
           state.socket.emit('restaurant:join', state.context.restaurant.id);
+        });
+        state.socket.on('reconnect', (attempt) => {
+          // re-join room on reconnect and refresh state
+          try { state.socket.emit('restaurant:join', state.context.restaurant.id); } catch (e) {}
+          if (state.activeOrder) loadTable().catch(() => {});
+        });
+        state.socket.on('disconnect', (reason) => {
+          if (reason === 'io server disconnect') {
+            // the server forcefully disconnected us - try to reconnect
+            state.socket.connect();
+          }
+          // show brief offline notice
+          if (reason) setError('Connection lost. Reconnecting...');
         });
         state.socket.on('order:update', (payload) => {
           if (!state.activeOrder || payload.orderId !== state.activeOrder.orderId) return;
@@ -1353,7 +1376,13 @@
             paymentMethod,
             notes: els.orderNotes.value.trim(),
             items,
+            idempotencyKey: state.checkoutIdempotencyKey,
           }),
+        }).then((res) => {
+          // clear idempotency key on successful creation
+          state.checkoutIdempotencyKey = null;
+          try { sessionStorage.removeItem(`checkout_key_${state.context.restaurant.id}_${state.context.table.id}`); } catch (e) {}
+          return res;
         });
       }
 
@@ -1448,6 +1477,41 @@
         }
       }
 
+      async function handleUpiCheckout() {
+        try {
+          const orderData = await placeOrder('upi');
+          const amount = Number(orderData.totalAmount || 0).toFixed(2);
+          const vpa = state.context.restaurant.upi_vpa || state.context.restaurant.upi || '';
+          if (!vpa) {
+            throw new Error('Restaurant UPI ID not configured');
+          }
+
+          const returnUrl = `${window.location.origin}${window.location.pathname}?orderId=${orderData.orderId}&upi_return=1`;
+
+          const params = new URLSearchParams({
+            pa: vpa,
+            pn: state.context.restaurant.name,
+            am: amount,
+            cu: 'INR',
+            tn: `Order ${orderData.orderId} Table ${state.context.table.table_number}`,
+            tr: `order_${orderData.orderId}`,
+            url: returnUrl,
+          });
+
+          const upiUrl = `upi://pay?${params.toString()}`;
+
+          // Attempt to open UPI app
+          window.location.href = upiUrl;
+
+          // Fallback: show instruction if not redirected
+          setTimeout(() => {
+            setError('If your UPI app did not open, please copy the UPI ID and pay manually, then click "I have paid".');
+          }, 1200);
+        } catch (error) {
+          setError(error.message || 'UPI payment failed');
+        }
+      }
+
       function attachEvents() {
         els.retryBtn.addEventListener('click', loadTable);
         els.clearCartBtn.addEventListener('click', () => clearCart());
@@ -1458,10 +1522,51 @@
         });
         els.codCheckoutBtn.addEventListener('click', handleCodCheckout);
         els.onlineCheckoutBtn.addEventListener('click', handleOnlineCheckout);
+        if (els.upiCheckoutBtn) els.upiCheckoutBtn.addEventListener('click', handleUpiCheckout);
       }
 
       attachEvents();
       loadTable();
+      // Handle UPI return callback if present in URL
+      (async function handleUpiReturn() {
+        try {
+          const params = new URLSearchParams(window.location.search);
+          if (params.get('upi_return') === '1' && params.get('orderId')) {
+            const orderId = Number(params.get('orderId'));
+            // call backend to confirm UPI payment and get invoice HTML
+            const response = await fetch(`${BACKEND_BASE_URL}/api/payments/upi/confirm`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ orderId }),
+            });
+            if (!response.ok) {
+              const err = await response.json().catch(() => ({}));
+              setError(err.message || 'Unable to confirm UPI payment');
+              return;
+            }
+
+            const html = await response.text();
+            const win = window.open('', '_blank');
+            if (win) {
+              win.document.write(html);
+              win.document.close();
+              win.focus();
+              win.print();
+            }
+
+            // show thank you tracking view and clear cart
+            const paidOrder = { orderId, totalAmount: Number(state.cartTotals?.total || 0) };
+            closeCheckoutModal();
+            setView('tracking');
+            showTrackingView(paidOrder, 'Payment confirmed');
+            clearCart();
+            // remove upi_return params from URL
+            history.replaceState(null, '', window.location.pathname);
+          }
+        } catch (e) {
+          // ignore
+        }
+      })();
     </script>
   </body>
 </html>

@@ -9,6 +9,18 @@
   --ring: #2d9c8f;
 }
 
+/* Dark cinematic theme */
+.theme-dark {
+  --bg: linear-gradient(180deg,#0b0f17 0%, #071024 60%);
+  --ink: #e6eef6;
+  --muted: #99a6b8;
+  --surface: rgba(12,18,28,0.65);
+  --accent: #ff8a00;
+  --accent-dark: #ff6b00;
+  --soft: rgba(255,138,0,0.08);
+  --ring: #76e0c9;
+}
+
 * {
   box-sizing: border-box;
 }
@@ -179,13 +191,15 @@ main {
 }
 
 .table-card--active {
-  background: #fff4e8;
-  border-color: #f7c99f;
+  background: linear-gradient(90deg, rgba(255,180,120,0.08), rgba(255,120,20,0.04));
+  border-color: rgba(255,150,50,0.18);
+  box-shadow: 0 10px 30px rgba(255,140,20,0.06), 0 0 24px rgba(255,140,20,0.04) inset;
 }
 
 .table-card--paid {
-  background: #effaf1;
-  border-color: #a8ddb4;
+  background: linear-gradient(90deg, rgba(120,240,160,0.04), rgba(80,200,120,0.04));
+  border-color: rgba(100,200,140,0.12);
+  box-shadow: 0 10px 30px rgba(60,210,120,0.06), 0 0 18px rgba(60,210,120,0.04) inset;
 }
 
 .table-card__badge {
@@ -360,6 +374,26 @@ select:focus {
   font-size: 0.92rem;
 }
 
+.theme-dark .brand-footer {
+  color: #7f98b0;
+}
+
+.table-card--active::after,
+.table-card--paid::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 18px;
+  pointer-events: none;
+}
+
+.table-card {
+  position: relative;
+  transition: transform 220ms ease, box-shadow 220ms ease, border-color 220ms ease;
+}
+
+.table-card:hover { transform: translateY(-6px); }
+
 .ad-popup {
   position: fixed;
   right: 1rem;
@@ -398,6 +432,41 @@ select:focus {
 
 .hidden {
   display: none;
+}
+
+.modal {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: rgba(6,8,10,0.45);
+  z-index: 9999;
+  padding: 1rem;
+}
+.modal__panel {
+  width: min(880px, 98%);
+  max-height: 90vh;
+  overflow: auto;
+  background: var(--surface);
+  border-radius: 12px;
+  padding: 1rem;
+}
+.modal__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0.75rem;
+}
+.modal__body {
+  display: grid;
+  gap: 0.9rem;
+}
+.modal__actions {
+  display: flex;
+  gap: 0.75rem;
+  justify-content: flex-end;
+  margin-top: 0.6rem;
 }
 
 .card-row {

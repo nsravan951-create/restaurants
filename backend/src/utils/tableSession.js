@@ -1,5 +1,6 @@
 const crypto = require('crypto');
 const pool = require('../config/db');
+const { emitTableUpdate, emitOrderUpdate } = require('../services/socket');
 
 const SESSION_TIMEOUT_MINUTES = Number(process.env.TABLE_SESSION_TIMEOUT_MINUTES || 20);
 
@@ -89,6 +90,17 @@ async function endSessionByOrderId(orderId, reason) {
     );
 
     await conn.query('COMMIT');
+    try {
+      const { rows: tRows } = await pool.query('SELECT restaurant_id FROM restaurant_tables WHERE id = $1 LIMIT 1', [orderRows[0].table_id]);
+      const restaurantId = tRows && tRows[0] ? tRows[0].restaurant_id : null;
+      if (restaurantId) {
+        emitTableUpdate(restaurantId, { tableId: orderRows[0].table_id, status: getTableStatusAfterSessionEnd(reason) });
+        emitOrderUpdate(restaurantId, { type: 'session_ended', orderId: Number(orderId), status: reason });
+      }
+    } catch (e) {
+      // non-fatal
+    }
+
     return true;
   } catch (error) {
     await conn.query('ROLLBACK');

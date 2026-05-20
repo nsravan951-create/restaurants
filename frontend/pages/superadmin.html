@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Super Admin — QR Restaurants SaaS</title>
+  <link rel="stylesheet" href="../assets/css/styles.css" />
+  <link rel="stylesheet" href="../assets/css/superadmin.css" />
+  <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="../assets/js/config.js"></script>
+  <script src="../assets/js/common.js"></script>
+</head>
+<body class="theme-dark">
+  <div class="sa-shell">
+    <aside class="sa-sidebar">
+      <div class="sa-brand">QR SaaS — Super Admin</div>
+      <nav class="sa-nav">
+        <button data-sa-section="dashboard" class="sa-link active">Dashboard</button>
+        <button data-sa-section="analytics" class="sa-link">Analytics</button>
+        <button data-sa-section="restaurants" class="sa-link">Restaurants</button>
+        <button data-sa-section="live-orders" class="sa-link">Live Orders</button>
+        <button data-sa-section="live-tables" class="sa-link">Live Tables</button>
+        <button data-sa-section="promotions" class="sa-link">Promotions</button>
+        <button data-sa-section="payments" class="sa-link">Payments</button>
+        <button data-sa-section="subscriptions" class="sa-link">Subscriptions</button>
+        <button data-sa-section="qr" class="sa-link">QR Management</button>
+        <button data-sa-section="customers" class="sa-link">Customers</button>
+        <button data-sa-section="staff" class="sa-link">Staff & Roles</button>
+        <button data-sa-section="notifications" class="sa-link">Notifications</button>
+        <button data-sa-section="reports" class="sa-link">Reports</button>
+        <button data-sa-section="invoices" class="sa-link">Invoice Center</button>
+        <button data-sa-section="loyalty" class="sa-link">Loyalty System</button>
+        <button data-sa-section="marketing" class="sa-link">Marketing Campaigns</button>
+        <button data-sa-section="ai" class="sa-link">AI Insights</button>
+        <button data-sa-section="integrations" class="sa-link">Integrations</button>
+        <button data-sa-section="backup" class="sa-link">Backup & Security</button>
+        <button data-sa-section="settings" class="sa-link">Settings</button>
+        <button data-sa-section="logout" class="sa-link">Logout</button>
+      </nav>
+      <div class="sa-footer">v1.0 • Enterprise</div>
+    </aside>
+
+    <main class="sa-main">
+      <header class="sa-topbar">
+        <h1 id="saTitle">Dashboard</h1>
+        <div class="sa-controls">
+          <input id="saSearch" placeholder="Search restaurants, orders, customers..." />
+          <button id="saRefresh" class="btn btn-light">Refresh</button>
+        </div>
+      </header>
+
+      <section id="section-dashboard" class="sa-section">
+        <div class="sa-cards" id="saCards">
+          <!-- Cards injected by JS -->
+        </div>
+
+        <div class="sa-charts">
+          <div class="sa-chart-card">
+            <h3>Revenue (30 days)</h3>
+            <canvas id="revenueChart" height="140"></canvas>
+          </div>
+          <div class="sa-chart-card">
+            <h3>Active Orders Over Time</h3>
+            <canvas id="ordersChart" height="140"></canvas>
+          </div>
+        </div>
+      </section>
+
+      <section id="section-analytics" class="sa-section hidden">
+        <h2>Analytics</h2>
+        <p>Deep analytics coming here.</p>
+      </section>
+
+      <section id="section-restaurants" class="sa-section hidden">
+        <h2>Restaurants</h2>
+        <div id="saRestaurants" class="sa-list"></div>
+      </section>
+
+      <section id="section-live-orders" class="sa-section hidden">
+        <h2>Live Orders</h2>
+        <div id="saLiveOrders" class="sa-list"></div>
+      </section>
+
+      <section id="section-live-tables" class="sa-section hidden">
+        <h2>Live Tables</h2>
+        <div id="saLiveTables" class="sa-list"></div>
+      </section>
+
+    </main>
+  </div>
+
+  <script src="../assets/js/superadmin.js"></script>
+</body>
+</html>

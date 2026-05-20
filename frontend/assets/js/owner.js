@@ -78,6 +78,107 @@ function tableStatusClass(status) {
   return 'table-card--available';
 }
 
+function showModal() {
+  const m = document.getElementById('orderModal');
+  if (!m) return;
+  m.classList.remove('hidden');
+}
+
+function hideModal() {
+  const m = document.getElementById('orderModal');
+  if (!m) return;
+  m.classList.add('hidden');
+}
+
+async function openOrderModalForTable(tableId) {
+  try {
+    const res = await apiRequest(`/orders/table/${tableId}/active`, {}, true);
+    const order = res.order || null;
+    const info = document.getElementById('modalOrderInfo');
+    const itemsEl = document.getElementById('modalItems');
+    const addForm = document.getElementById('modalAddItemForm');
+    const completeBtn = document.getElementById('modalCompleteBtn');
+    const resetBtn = document.getElementById('modalResetTerminalBtn');
+
+    if (!order) {
+      info.innerHTML = `<p>No active order for this table.</p>`;
+      itemsEl.innerHTML = '';
+      addForm.classList.add('hidden');
+      completeBtn.classList.add('hidden');
+      resetBtn.classList.add('hidden');
+      showModal();
+      return;
+    }
+
+    info.innerHTML = `
+      <p><strong>Order #${order.id}</strong> • Table ${escapeHtml(order.table_number || '')}</p>
+      <p>Payment: ${escapeHtml(String(order.payment_method || 'cod'))} • Status: ${escapeHtml(order.status || '')}</p>
+      <p>Total: INR ${formatCurrency(order.total_amount || 0)}</p>
+    `;
+
+    const parsedItems = parseOrderItems(order.items);
+    itemsEl.innerHTML = parsedItems.length ? parsedItems.map((it) => `
+      <div class="card"><strong>${escapeHtml(it.item_name)}</strong><p>Qty: ${it.quantity} • ₹${formatCurrency(it.line_total)}</p></div>
+    `).join('') : '<p>No items listed.</p>';
+
+    addForm.classList.remove('hidden');
+    completeBtn.classList.remove('hidden');
+    resetBtn.classList.toggle('hidden', order.payment_status !== 'paid');
+
+    // remove previous submit handlers
+    addForm.onsubmit = async (e) => {
+      e.preventDefault();
+      const fd = new FormData(addForm);
+      const payload = [{ name: fd.get('name'), itemPrice: Number(fd.get('price')), quantity: Number(fd.get('quantity')) }];
+      try {
+        await apiRequest(`/orders/${order.id}/items`, { method: 'POST', body: JSON.stringify({ items: payload }) }, true);
+        setMessage('ownerMessage', 'Added extra item');
+        // refresh modal
+        await openOrderModalForTable(tableId);
+        await loadOrders();
+        await loadAnalytics();
+      } catch (err) {
+        setMessage('ownerMessage', err.message, true);
+      }
+    };
+
+    completeBtn.onclick = async () => {
+      try {
+        await apiRequest(`/orders/${order.id}/status`, { method: 'PATCH', body: JSON.stringify({ status: 'delivered' }) }, true);
+        // fetch invoice html and open print
+        const html = await fetchAuthorizedHtml(`/orders/${order.id}/invoice?format=html`);
+        const win = window.open('', '_blank');
+        win.document.write(html);
+        win.document.close();
+        win.focus();
+        win.print();
+        // refresh UI
+        await loadTables();
+        await loadInvoices();
+        await loadOrders();
+      } catch (err) {
+        setMessage('ownerMessage', err.message, true);
+      }
+    };
+
+    resetBtn.onclick = async () => {
+      try {
+        await apiRequest(`/restaurants/${restaurantId}/tables/${order.table_id}/terminal-reset`, { method: 'POST' }, true);
+        setMessage('ownerMessage', 'Terminal reset completed. Table is available now.');
+        await loadTables();
+        await loadInvoices();
+        hideModal();
+      } catch (err) {
+        setMessage('ownerMessage', err.message, true);
+      }
+    };
+
+    showModal();
+  } catch (error) {
+    setMessage('ownerMessage', error.message, true);
+  }
+}
+
 function setActiveSection(sectionName) {
   document.querySelectorAll('[data-owner-section-panel]').forEach((panel) => {
     panel.classList.toggle('hidden', panel.dataset.ownerSectionPanel !== sectionName);
@@ -220,6 +321,18 @@ async function loadTables() {
       } catch (error) {
         setMessage('ownerMessage', error.message, true);
       }
+    });
+  });
+
+  // make table cards clickable to view order details
+  tableList.querySelectorAll('.table-card').forEach((card, idx) => {
+    const table = tables[idx];
+    if (!table) return;
+    card.style.cursor = 'pointer';
+    card.addEventListener('click', (e) => {
+      // avoid triggering when clicking buttons inside the card
+      if (e.target.closest('button') || e.target.closest('a')) return;
+      openOrderModalForTable(table.id);
     });
   });
 }
@@ -417,10 +530,36 @@ async function loadInvoices() {
 
 function initSocket() {
   if (!ensureRestaurantId()) return;
-  const socket = io(window.APP_CONFIG.SOCKET_URL);
+  const socket = io(window.APP_CONFIG.SOCKET_URL, { transports: ['websocket', 'polling'] });
   socket.emit('restaurant:join', restaurantId);
-  socket.on('order:update', () => {
+
+  socket.on('order:update', (payload) => {
+    // reload orders and analytics when an order changes
     loadOrders().catch((error) => setMessage('ownerMessage', error.message, true));
+    loadAnalytics().catch(() => {});
+
+    // play notification sound for new orders
+    try {
+      if (payload && payload.type === 'created') {
+        try {
+          const ctx = new (window.AudioContext || window.webkitAudioContext)();
+          const o = ctx.createOscillator();
+          const g = ctx.createGain();
+          o.type = 'sine';
+          o.frequency.value = 880;
+          g.gain.value = 0.05;
+          o.connect(g);
+          g.connect(ctx.destination);
+          o.start();
+          setTimeout(() => { o.stop(); ctx.close().catch(() => {}); }, 120);
+        } catch (e) {}
+      }
+    } catch (e) {}
+  });
+
+  socket.on('table:update', (payload) => {
+    // refresh tables when table status changes
+    loadTables().catch((error) => setMessage('ownerMessage', error.message, true));
   });
 }
 
@@ -437,6 +576,17 @@ async function initOwner() {
     await loadOrders();
     setActiveSection('tables');
     initSocket();
+    // apply theme preference
+    try {
+      const theme = localStorage.getItem('owner_theme') || 'light';
+      if (theme === 'dark') document.documentElement.classList.add('theme-dark');
+      const btn = document.getElementById('themeToggleBtn');
+      if (btn) btn.addEventListener('click', () => {
+        const isDark = document.documentElement.classList.toggle('theme-dark');
+        localStorage.setItem('owner_theme', isDark ? 'dark' : 'light');
+        btn.textContent = isDark ? 'Light' : 'Dark';
+      });
+    } catch (e) {}
   } catch (error) {
     setMessage('ownerMessage', error.message, true);
   }
@@ -579,5 +729,10 @@ document.getElementById('logoutBtn').addEventListener('click', () => {
 document.getElementById('refreshInvoicesBtn').addEventListener('click', async () => {
   await loadInvoices();
 });
+
+// modal close handlers
+const modalCloseBtn = document.getElementById('modalCloseBtn');
+if (modalCloseBtn) modalCloseBtn.addEventListener('click', () => hideModal());
+document.addEventListener('keyup', (e) => { if (e.key === 'Escape') hideModal(); });
 
 initOwner();

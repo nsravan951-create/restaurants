@@ -10,6 +10,7 @@ const {
   getSessionExpiryDate,
   getTableStatusAfterSessionEnd,
 } = require('../utils/tableSession');
+const { emitTableUpdate } = require('../services/socket');
 
 const router = express.Router();
 
@@ -170,6 +171,17 @@ router.post('/start', asyncHandler(async (req, res) => {
 
     await conn.query('COMMIT');
 
+    // emit realtime table update so owner dashboard turns orange immediately
+    try {
+      emitTableUpdate(data.restaurantId, {
+        tableId: data.tableId,
+        status: 'active',
+        sessionId: result.rows[0].id,
+      });
+    } catch (e) {
+      // non-fatal
+    }
+
     return res.status(201).json({
       locked: false,
       joined: false,
@@ -256,6 +268,8 @@ router.post('/:sessionId/end', asyncHandler(async (req, res) => {
       return res.json({ message: 'Session already ended' });
     }
 
+    const newStatus = getTableStatusAfterSessionEnd(reason || 'manual_end');
+
     await conn.query(
       `UPDATE table_sessions
        SET status = 'completed', ended_at = NOW(), ended_reason = $1
@@ -265,10 +279,17 @@ router.post('/:sessionId/end', asyncHandler(async (req, res) => {
 
     await conn.query(
       'UPDATE restaurant_tables SET availability_status = $1 WHERE id = $2',
-      [getTableStatusAfterSessionEnd(reason || 'manual_end'), rows[0].table_id]
+      [newStatus, rows[0].table_id]
     );
 
+    // fetch restaurant id for socket emission
+    const { rows: tRows } = await conn.query('SELECT restaurant_id FROM restaurant_tables WHERE id = $1 LIMIT 1', [rows[0].table_id]);
+
     await conn.query('COMMIT');
+    try {
+      if (tRows && tRows[0]) emitTableUpdate(tRows[0].restaurant_id, { tableId: rows[0].table_id, status: newStatus });
+    } catch (e) {}
+
     return res.json({ message: 'Session ended' });
   } catch (error) {
     await conn.query('ROLLBACK');
@@ -307,6 +328,8 @@ router.post('/end', asyncHandler(async (req, res) => {
       return res.json({ message: 'Session already ended', sessionId });
     }
 
+    const newStatus = getTableStatusAfterSessionEnd(req.body.reason || 'payment_completed');
+
     await conn.query(
       `UPDATE table_sessions
        SET status = 'completed', ended_at = NOW(), ended_reason = $1
@@ -315,10 +338,16 @@ router.post('/end', asyncHandler(async (req, res) => {
     );
     await conn.query(
       'UPDATE restaurant_tables SET availability_status = $1 WHERE id = $2',
-      [getTableStatusAfterSessionEnd(req.body.reason || 'payment_completed'), rows[0].table_id]
+      [newStatus, rows[0].table_id]
     );
 
+    const { rows: tRows } = await conn.query('SELECT restaurant_id FROM restaurant_tables WHERE id = $1 LIMIT 1', [rows[0].table_id]);
+
     await conn.query('COMMIT');
+    try {
+      if (tRows && tRows[0]) emitTableUpdate(tRows[0].restaurant_id, { tableId: rows[0].table_id, status: newStatus });
+    } catch (e) {}
+
     return res.json({ message: 'Session ended', sessionId });
   } catch (error) {
     await conn.query('ROLLBACK');

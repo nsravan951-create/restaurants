@@ -158,6 +158,16 @@ router.post('/', asyncHandler(async (req, res) => {
       [data.restaurantId, ...menuItemIds]
     );
 
+
+      // idempotency key to prevent duplicate orders on retries
+      const idempotencyKey = (req.headers['idempotency-key'] || req.body.idempotencyKey || '').toString().trim() || null;
+
+      if (idempotencyKey) {
+        const { rows: existing } = await pool.query('SELECT id, total_amount FROM orders WHERE idempotency_key = $1 AND restaurant_id = $2 LIMIT 1', [idempotencyKey, data.restaurantId]);
+        if (existing.length) {
+          return res.status(200).json({ message: 'Order already created', orderId: existing[0].id, totalAmount: existing[0].total_amount });
+        }
+      }
     const menuMap = new Map(menuRows.map((row) => [row.id, row]));
 
     let total = 0;
@@ -245,6 +255,26 @@ router.get('/active', asyncHandler(async (req, res) => {
   return res.json({ orders: rows });
 }));
 
+router.get('/table/:tableId/active', asyncHandler(async (req, res) => {
+  const tableId = Number(req.params.tableId);
+  if (!tableId) return res.status(400).json({ message: 'tableId is required' });
+
+  const { rows } = await pool.query(
+    `SELECT o.id, o.restaurant_id, o.table_id, o.table_number, o.status, o.total_amount, o.payment_method, o.payment_status, o.created_at,
+      COALESCE(json_agg(json_build_object('id', oi.id, 'menu_item_id', oi.menu_item_id, 'item_name', oi.item_name, 'item_price', oi.item_price, 'quantity', oi.quantity, 'unit_price', oi.unit_price, 'line_total', oi.line_total) ORDER BY oi.id), '[]'::json) AS items
+     FROM orders o
+     JOIN order_items oi ON oi.order_id = o.id
+     WHERE o.table_id = $1 AND o.status IN ('pending', 'preparing', 'ready')
+     GROUP BY o.id
+     ORDER BY o.created_at DESC
+     LIMIT 1`,
+    [tableId]
+  );
+
+  if (!rows.length) return res.json({ order: null });
+  return res.json({ order: rows[0] });
+}));
+
 router.get('/restaurant/:restaurantId', requireAuth(['owner', 'super_admin', 'kitchen', 'staff']), asyncHandler(async (req, res) => {
   await expireInactiveSessions();
 
@@ -305,6 +335,57 @@ router.patch('/:orderId/status', requireAuth(['owner', 'super_admin', 'kitchen',
   });
 
   return res.json({ message: 'Order status updated' });
+}));
+
+router.post('/:orderId/items', requireAuth(['owner', 'super_admin', 'kitchen', 'staff']), asyncHandler(async (req, res) => {
+  const { orderId } = req.params;
+  const items = Array.isArray(req.body.items) ? req.body.items : [];
+
+  if (!items.length) return res.status(400).json({ message: 'items are required' });
+
+  const conn = await pool.connect();
+  try {
+    await conn.query('BEGIN');
+
+    const { rows: orderRows } = await conn.query('SELECT id, restaurant_id, total_amount FROM orders WHERE id = $1 LIMIT 1 FOR UPDATE', [orderId]);
+    if (!orderRows.length) {
+      await conn.query('ROLLBACK');
+      return res.status(404).json({ message: 'Order not found' });
+    }
+
+    await ensureRestaurantAccess(req.user, orderRows[0].restaurant_id);
+
+    let addedTotal = 0;
+    for (const it of items) {
+      const menuItemId = Number(it.menuItemId || 0) || null;
+      const name = String(it.name || it.item_name || 'Extra item');
+      const price = Number(it.itemPrice || it.price || 0) || 0;
+      const qty = Number(it.quantity || it.qty || 1) || 1;
+      const lineTotal = price * qty;
+
+      await conn.query(
+        `INSERT INTO order_items (order_id, menu_item_id, item_name, item_price, quantity, unit_price, line_total)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+        [orderId, menuItemId, name, price, qty, price, lineTotal]
+      );
+
+      addedTotal += lineTotal;
+    }
+
+    const newTotal = Number(orderRows[0].total_amount || 0) + addedTotal;
+    await conn.query('UPDATE orders SET total_amount = $1 WHERE id = $2', [newTotal, orderId]);
+
+    await conn.query('COMMIT');
+
+    emitOrderUpdate(orderRows[0].restaurant_id, { type: 'items_added', orderId: Number(orderId), addedTotal, totalAmount: newTotal });
+
+    return res.json({ message: 'Items added', orderId: Number(orderId), addedTotal, totalAmount: newTotal });
+  } catch (error) {
+    await conn.query('ROLLBACK');
+    throw error;
+  } finally {
+    conn.release();
+  }
 }));
 
 router.get('/:orderId/invoice', requireAuth(['owner', 'super_admin', 'kitchen', 'staff']), asyncHandler(async (req, res) => {
