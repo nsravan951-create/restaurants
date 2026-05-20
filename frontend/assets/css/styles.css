@@ -187,7 +187,8 @@ main {
 }
 
 .table-card--available {
-  background: #ffffff;
+  background: linear-gradient(180deg, #ffffff 0%, #fafcff 100%);
+  border-color: #e8edf5;
 }
 
 .table-card--active {
@@ -212,6 +213,21 @@ main {
   background: #f5f6fa;
   color: var(--ink);
   font-weight: 700;
+}
+
+.table-card__badge--available {
+  background: #eef2f8;
+  color: #47546a;
+}
+
+.table-card__badge--active {
+  background: rgba(255, 140, 20, 0.14);
+  color: #b55100;
+}
+
+.table-card__badge--paid {
+  background: rgba(50, 185, 110, 0.14);
+  color: #1f7a46;
 }
 
 .table-card__qr {

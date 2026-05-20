@@ -78,6 +78,12 @@ function tableStatusClass(status) {
   return 'table-card--available';
 }
 
+function tableBadgeClass(status) {
+  if (status === 'active') return 'table-card__badge table-card__badge--active';
+  if (status === 'paid') return 'table-card__badge table-card__badge--paid';
+  return 'table-card__badge table-card__badge--available';
+}
+
 function showModal() {
   const m = document.getElementById('orderModal');
   if (!m) return;
@@ -264,7 +270,7 @@ async function loadTables() {
     const status = String(table.availability_status || 'available');
     return `
       <div class="table-card ${tableStatusClass(status)}">
-        <div class="table-card__badge">${escapeHtml(table.table_number)}</div>
+        <div class="${tableBadgeClass(status)}">${escapeHtml(table.table_number)}</div>
         <p class="table-card__meta">Status: ${escapeHtml(tableStatusLabel(status))}</p>
         ${qrImage}
         <p class="table-card__meta">${table.qr_url ? 'QR ready' : 'QR not available yet'}</p>
@@ -324,17 +330,6 @@ async function loadTables() {
     });
   });
 
-  // make table cards clickable to view order details
-  tableList.querySelectorAll('.table-card').forEach((card, idx) => {
-    const table = tables[idx];
-    if (!table) return;
-    card.style.cursor = 'pointer';
-    card.addEventListener('click', (e) => {
-      // avoid triggering when clicking buttons inside the card
-      if (e.target.closest('button') || e.target.closest('a')) return;
-      openOrderModalForTable(table.id);
-    });
-  });
 }
 
 function renderAnalytics(orders) {
@@ -729,10 +724,5 @@ document.getElementById('logoutBtn').addEventListener('click', () => {
 document.getElementById('refreshInvoicesBtn').addEventListener('click', async () => {
   await loadInvoices();
 });
-
-// modal close handlers
-const modalCloseBtn = document.getElementById('modalCloseBtn');
-if (modalCloseBtn) modalCloseBtn.addEventListener('click', () => hideModal());
-document.addEventListener('keyup', (e) => { if (e.key === 'Escape') hideModal(); });
 
 initOwner();
