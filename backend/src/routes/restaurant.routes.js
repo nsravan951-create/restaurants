@@ -347,6 +347,27 @@ router.get('/:restaurantId/tables/:tableId/qr', requireAuth(['owner', 'super_adm
   });
 }));
 
+router.post('/:restaurantId/tables/:tableId/terminal-reset', requireAuth(['owner', 'super_admin']), asyncHandler(async (req, res) => {
+  const { restaurantId, tableId } = req.params;
+  await ensureRestaurantAccess(req.user, restaurantId);
+
+  const { rows } = await pool.query(
+    'SELECT id, availability_status FROM restaurant_tables WHERE id = $1 AND restaurant_id = $2 LIMIT 1',
+    [tableId, restaurantId]
+  );
+
+  if (!rows.length) {
+    return res.status(404).json({ message: 'Table not found' });
+  }
+
+  if (rows[0].availability_status !== 'paid') {
+    return res.status(409).json({ message: 'Terminal reset is only available for paid tables' });
+  }
+
+  await pool.query('UPDATE restaurant_tables SET availability_status = $1 WHERE id = $2', ['available', tableId]);
+  return res.json({ message: 'Table reset to available' });
+}));
+
 router.get('/:restaurantId/table/:tableId', asyncHandler(async (req, res) => {
   const { restaurantId, tableId } = req.params;
   await expireInactiveSessions();
@@ -398,8 +419,9 @@ router.get('/:restaurantId/table/:tableId', asyncHandler(async (req, res) => {
     restaurant: restaurantRows[0],
     table: tableRows[0],
     lock: {
-      isLocked: activeSessionRows.length > 0,
+      isLocked: activeSessionRows.length > 0 || tableRows[0].availability_status === 'paid',
       expiresAt: activeSessionRows[0]?.expires_at || null,
+      reason: tableRows[0].availability_status === 'paid' ? 'paid' : null,
     },
     menu: menuRows,
     ads: adsRows,

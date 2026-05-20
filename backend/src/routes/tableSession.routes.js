@@ -8,6 +8,7 @@ const {
   generateSessionToken,
   expireInactiveSessions,
   getSessionExpiryDate,
+  getTableStatusAfterSessionEnd,
 } = require('../utils/tableSession');
 
 const router = express.Router();
@@ -72,6 +73,19 @@ router.post('/start', asyncHandler(async (req, res) => {
     if (!tableRows.length) {
       await conn.query('ROLLBACK');
       return res.status(404).json({ message: 'Table not found' });
+    }
+
+    const { rows: statusRows } = await conn.query(
+      'SELECT availability_status FROM restaurant_tables WHERE id = $1 AND restaurant_id = $2 LIMIT 1 FOR UPDATE',
+      [data.tableId, data.restaurantId]
+    );
+
+    if (statusRows[0]?.availability_status === 'paid') {
+      await conn.query('ROLLBACK');
+      return res.status(409).json({
+        locked: true,
+        message: 'This table is marked as paid. Please wait for the owner to reset it from the terminal.',
+      });
     }
 
     const { rows: activeRows } = await conn.query(
@@ -250,8 +264,8 @@ router.post('/:sessionId/end', asyncHandler(async (req, res) => {
     );
 
     await conn.query(
-      "UPDATE restaurant_tables SET availability_status = 'available' WHERE id = $1",
-      [rows[0].table_id]
+      'UPDATE restaurant_tables SET availability_status = $1 WHERE id = $2',
+      [getTableStatusAfterSessionEnd(reason || 'manual_end'), rows[0].table_id]
     );
 
     await conn.query('COMMIT');
@@ -299,7 +313,10 @@ router.post('/end', asyncHandler(async (req, res) => {
        WHERE id = $2`,
       [req.body.reason || 'payment_completed', sessionId]
     );
-    await conn.query("UPDATE restaurant_tables SET availability_status = 'available' WHERE id = $1", [rows[0].table_id]);
+    await conn.query(
+      'UPDATE restaurant_tables SET availability_status = $1 WHERE id = $2',
+      [getTableStatusAfterSessionEnd(req.body.reason || 'payment_completed'), rows[0].table_id]
+    );
 
     await conn.query('COMMIT');
     return res.json({ message: 'Session ended', sessionId });

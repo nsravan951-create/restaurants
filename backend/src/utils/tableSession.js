@@ -52,6 +52,10 @@ function getSessionExpiryDate() {
   return new Date(Date.now() + SESSION_TIMEOUT_MINUTES * 60 * 1000);
 }
 
+function getTableStatusAfterSessionEnd(reason) {
+  return reason === 'payment_completed' || reason === 'order_delivered' ? 'paid' : 'available';
+}
+
 async function endSessionByOrderId(orderId, reason) {
   const conn = await pool.connect();
 
@@ -79,9 +83,9 @@ async function endSessionByOrderId(orderId, reason) {
 
     await conn.query(
       `UPDATE restaurant_tables
-       SET availability_status = 'available'
-       WHERE id = $1`,
-      [orderRows[0].table_id]
+       SET availability_status = $1
+       WHERE id = $2`,
+      [getTableStatusAfterSessionEnd(reason), orderRows[0].table_id]
     );
 
     await conn.query('COMMIT');
@@ -99,5 +103,6 @@ module.exports = {
   generateSessionToken,
   expireInactiveSessions,
   getSessionExpiryDate,
+  getTableStatusAfterSessionEnd,
   endSessionByOrderId,
 };

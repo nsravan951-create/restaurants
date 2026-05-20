@@ -25,6 +25,11 @@ const loginSchema = z.object({
   password: z.string().min(6),
 });
 
+const passwordChangeSchema = z.object({
+  currentPassword: z.string().min(6),
+  newPassword: z.string().min(6),
+});
+
 function signToken(user) {
   return jwt.sign(
     { userId: user.id, email: user.email, role: user.role },
@@ -198,6 +203,26 @@ router.get('/me', requireAuth(), asyncHandler(async (req, res) => {
   }
 
   return res.json({ user: rows[0] });
+}));
+
+router.post('/change-password', requireAuth(), asyncHandler(async (req, res) => {
+  const data = passwordChangeSchema.parse(req.body);
+
+  const { rows } = await pool.query('SELECT id, password_hash FROM users WHERE id = $1 LIMIT 1', [req.user.userId]);
+
+  if (!rows.length) {
+    return res.status(404).json({ message: 'User not found' });
+  }
+
+  const ok = await bcrypt.compare(data.currentPassword, rows[0].password_hash);
+  if (!ok) {
+    return res.status(400).json({ message: 'Current password is incorrect' });
+  }
+
+  const hash = await bcrypt.hash(data.newPassword, 10);
+  await pool.query('UPDATE users SET password_hash = $1 WHERE id = $2', [hash, req.user.userId]);
+
+  return res.json({ message: 'Password updated successfully' });
 }));
 
 module.exports = router;

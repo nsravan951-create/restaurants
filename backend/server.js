@@ -3,6 +3,7 @@ require('dotenv').config();
 const http = require('http');
 const { Server } = require('socket.io');
 const app = require('./app');
+const db = require('./db');
 const { initSocket } = require('./src/services/socket');
 const { expireInactiveSessions } = require('./src/utils/tableSession');
 
@@ -43,9 +44,15 @@ io.on('connection', (socket) => {
   });
 });
 
-server.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-});
+db.schemaReady
+  .catch((error) => {
+    console.warn('[db] schema readiness check failed:', error.message);
+  })
+  .finally(() => {
+    server.listen(PORT, () => {
+      console.log(`Server running on port ${PORT}`);
+    });
+  });
 
 setInterval(async () => {
   try {
