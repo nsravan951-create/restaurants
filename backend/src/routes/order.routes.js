@@ -18,7 +18,7 @@ const createOrderSchema = z.object({
   tableSessionId: z.number().int().positive(),
   sessionToken: z.string().min(10),
   customerName: z.string().optional().default(''),
-  paymentMethod: z.enum(['online', 'cod']),
+  paymentMethod: z.enum(['online', 'cod', 'cash', 'upi']),
   items: z.array(z.object({
     menuItemId: z.number(),
     itemPrice: z.number().positive(),

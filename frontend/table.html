@@ -501,24 +501,84 @@
         padding: 18px;
       }
 
-      .checkout-options {
-        display: grid;
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-        gap: 12px;
+      .checkout-pay-section {
+        margin-top: 1rem;
+        padding-top: 1rem;
+        border-top: 1px dashed var(--line);
       }
 
-      .checkout-option {
+      .checkout-pay-label {
+        margin: 0 0 0.65rem;
+        font-size: 0.82rem;
+        font-weight: 600;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        color: var(--muted);
+      }
+
+      .checkout-pay-grid {
         display: grid;
-        gap: 6px;
-        padding: 14px;
+        grid-template-columns: 1fr 1fr;
+        gap: 10px;
+      }
+
+      .checkout-pay-btn {
+        width: 100%;
+        border: 0;
         border-radius: 16px;
-        border: 1px solid rgba(191, 78, 34, 0.12);
-        background: linear-gradient(180deg, #ffffff, #fff8f0);
+        padding: 1rem;
         text-align: left;
+        color: #fff;
+        cursor: pointer;
       }
 
-      .checkout-option strong { font-size: 1rem; }
-      .checkout-option span { color: var(--muted); font-size: 0.9rem; }
+      .checkout-pay-btn strong { display: block; font-size: 1rem; }
+      .checkout-pay-btn small { display: block; margin-top: 0.2rem; opacity: 0.9; font-size: 0.82rem; }
+
+      .checkout-upi-panel {
+        margin-top: 0.85rem;
+        padding: 0.9rem;
+        border-radius: 16px;
+        background: rgba(255, 255, 255, 0.9);
+        border: 1px solid var(--line);
+      }
+
+      .checkout-upi-hint {
+        margin: 0 0 0.65rem;
+        font-size: 0.88rem;
+        color: var(--muted);
+      }
+
+      .checkout-upi-vpa {
+        margin: 0.5rem 0 0;
+        font-size: 0.85rem;
+        color: var(--ink);
+        word-break: break-all;
+      }
+
+      .checkout-upi-form {
+        display: grid;
+        gap: 8px;
+        margin-top: 0.65rem;
+      }
+
+      .checkout-upi-form input {
+        border-radius: 12px;
+        border: 1px solid var(--line);
+        padding: 10px 12px;
+      }
+
+      .checkout-confirm-paid {
+        width: 100%;
+        margin-top: 0.5rem;
+      }
+
+      .checkout-pay-message {
+        margin: 0.65rem 0 0;
+        font-size: 0.88rem;
+        color: var(--success);
+        min-height: 1.2em;
+      }
 
       .bill-upi-panel {
         margin-top: 12px;
@@ -733,33 +793,36 @@
             <textarea id="orderNotes" rows="3" placeholder="Spice level, allergies, or special instructions"></textarea>
           </div>
 
-          <div class="checkout-options">
-            <button class="btn btn-dark checkout-option" id="codCheckoutBtn" type="button">
-              <strong>Cash / Pay on Delivery</strong>
-              <span>Places the order instantly and tracks it live.</span>
-            </button>
-            <button class="btn btn-primary checkout-option" id="onlineCheckoutBtn" type="button">
-              <strong>Pay Online</strong>
-              <span>Secure Razorpay payment with instant confirmation.</span>
-            </button>
-            <button class="btn btn-primary checkout-option" id="upiCheckoutBtn" type="button">
-              <strong>Pay via UPI</strong>
-              <span>Open PhonePe, Google Pay, or Paytm with amount pre-filled.</span>
-            </button>
-            <div id="upiAppsPanel" class="bill-upi-panel hidden">
-              <p class="hero-copy" style="margin:0 0 8px;color:var(--muted);font-size:.9rem;">Tap an app to pay the restaurant UPI directly.</p>
+          <section class="checkout-pay-section">
+            <p class="checkout-pay-label">Choose how to pay</p>
+            <div class="pay-grid checkout-pay-grid">
+              <button class="pay-btn pay-btn--cash checkout-pay-btn" id="cashCheckoutBtn" type="button">
+                <span class="pay-btn__icon">₹</span>
+                <strong>Pay with Cash</strong>
+                <small>Book order &amp; pay at counter</small>
+              </button>
+              <button class="pay-btn pay-btn--upi checkout-pay-btn" id="upiCheckoutBtn" type="button">
+                <span class="pay-btn__icon">UPI</span>
+                <strong>Pay with UPI</strong>
+                <small>PhonePe · GPay · Paytm</small>
+              </button>
+            </div>
+            <div id="checkoutUpiPanel" class="checkout-upi-panel hidden">
+              <p class="checkout-upi-hint">Amount is pre-filled. Pay the restaurant UPI, then tap confirm.</p>
               <div class="upi-app-grid">
                 <a id="customerUpiPhonePe" class="upi-app-btn upi-app-btn--phonepe" href="#">PhonePe</a>
                 <a id="customerUpiGPay" class="upi-app-btn upi-app-btn--gpay" href="#">Google Pay</a>
                 <a id="customerUpiPaytm" class="upi-app-btn upi-app-btn--paytm" href="#">Paytm</a>
               </div>
-              <form id="customerUpiRequestForm" class="inline-form" style="margin-top:10px;">
-                <input id="customerUpiId" placeholder="Your UPI ID (for payment request)" />
-                <button class="btn btn-light" type="submit">Send Request to Pay</button>
+              <p id="checkoutUpiVpa" class="checkout-upi-vpa"></p>
+              <form id="customerUpiRequestForm" class="checkout-upi-form">
+                <input id="customerUpiId" type="text" placeholder="Your UPI ID (optional)" />
+                <button class="btn btn-light" type="submit">Send payment request</button>
               </form>
-              <button id="customerUpiPaidBtn" class="btn btn-primary full" type="button">I Have Paid</button>
+              <button id="customerUpiPaidBtn" class="btn btn-primary checkout-confirm-paid" type="button">I have paid — show receipt</button>
             </div>
-          </div>
+            <p id="checkoutPayMessage" class="checkout-pay-message"></p>
+          </section>
 
           <div class="modal-actions">
             <button class="btn btn-ghost" id="closeCheckoutBtn" type="button">Back to cart</button>
@@ -799,9 +862,11 @@
         checkoutSummary: document.getElementById('checkoutSummary'),
         customerName: document.getElementById('customerName'),
         orderNotes: document.getElementById('orderNotes'),
-        codCheckoutBtn: document.getElementById('codCheckoutBtn'),
-        onlineCheckoutBtn: document.getElementById('onlineCheckoutBtn'),
+        cashCheckoutBtn: document.getElementById('cashCheckoutBtn'),
         upiCheckoutBtn: document.getElementById('upiCheckoutBtn'),
+        checkoutUpiPanel: document.getElementById('checkoutUpiPanel'),
+        checkoutUpiVpa: document.getElementById('checkoutUpiVpa'),
+        checkoutPayMessage: document.getElementById('checkoutPayMessage'),
         closeCheckoutBtn: document.getElementById('closeCheckoutBtn'),
         trackingState: document.getElementById('trackingState'),
         trackingBadge: document.getElementById('trackingBadge'),
@@ -826,6 +891,8 @@
         invoicePayload: null,
         estimatedMinutes: '15-20',
         checkoutIdempotencyKey: null,
+        pendingUpiOrderId: null,
+        tableLocked: false,
       };
 
       const CLIENT_ID_KEY = 'qr_customer_client_id';
@@ -1154,19 +1221,47 @@
         });
       }
 
+      function setCheckoutPayMessage(text, isError = false) {
+        if (!els.checkoutPayMessage) return;
+        els.checkoutPayMessage.textContent = text || '';
+        els.checkoutPayMessage.style.color = isError ? 'var(--danger)' : 'var(--success)';
+      }
+
+      function hideCheckoutUpiPanel() {
+        els.checkoutUpiPanel?.classList.add('hidden');
+        state.pendingUpiOrderId = null;
+      }
+
+      function showCheckoutUpiPanel(orderId, amount) {
+        const vpa = state.context?.restaurant?.upi_vpa || '';
+        if (!vpa) {
+          setCheckoutPayMessage('Restaurant UPI is not set. Ask staff or pay with Cash.', true);
+          return false;
+        }
+        if (!bindCustomerUpiLinks(orderId, amount)) return false;
+        if (els.checkoutUpiVpa) {
+          els.checkoutUpiVpa.textContent = `Pay to: ${vpa}`;
+        }
+        els.checkoutUpiPanel?.classList.remove('hidden');
+        return true;
+      }
+
       function openCheckoutModal() {
         const { count, subtotal } = cartTotals();
         if (!count) return;
+        hideCheckoutUpiPanel();
+        setCheckoutPayMessage('');
         els.checkoutSummary.innerHTML = `
           <div class="invoice-box" style="padding:14px;">
             <div class="invoice-row"><span>Items</span><strong>${count}</strong></div>
             <div class="invoice-row"><span>Total Amount</span><strong>INR ${money(subtotal)}</strong></div>
             <div class="invoice-row"><span>Table</span><strong>${state.context.table.table_number}</strong></div>
+            <div class="invoice-row"><span>Restaurant</span><strong>${state.context.restaurant.name}</strong></div>
           </div>
         `;
         els.checkoutModal.classList.remove('hidden');
         els.checkoutModal.setAttribute('aria-hidden', 'false');
-        // generate idempotency key for this checkout so retries won't create duplicates
+        document.body.style.overflow = 'hidden';
         if (!state.checkoutIdempotencyKey) {
           state.checkoutIdempotencyKey = `${getClientId()}_${Date.now()}_${Math.random().toString(36).slice(2)}`;
           try { sessionStorage.setItem(`checkout_key_${state.context.restaurant.id}_${state.context.table.id}`, state.checkoutIdempotencyKey); } catch (e) {}
@@ -1176,6 +1271,22 @@
       function closeCheckoutModal() {
         els.checkoutModal.classList.add('hidden');
         els.checkoutModal.setAttribute('aria-hidden', 'true');
+        document.body.style.overflow = '';
+        hideCheckoutUpiPanel();
+        setCheckoutPayMessage('');
+      }
+
+      function buildOrderSnapshot(orderData) {
+        return {
+          orderId: orderData.orderId,
+          totalAmount: orderData.totalAmount,
+          customerName: els.customerName.value.trim() || 'Guest',
+          items: Array.from(state.cart.values()).map((item) => ({
+            name: item.name,
+            quantity: item.quantity,
+            lineTotal: Number(item.lockedPrice || item.price) * Number(item.quantity),
+          })),
+        };
       }
 
       function buildInvoicePayload(order, paymentStatus = 'paid') {
@@ -1449,99 +1560,23 @@
         setToast('menuToast', message || 'Bill sent to kitchen', 'success');
       }
 
-      async function handleCodCheckout() {
+      async function handleCashCheckout() {
         try {
-          const orderData = await placeOrder('cod');
-          const order = {
-            orderId: orderData.orderId,
-            totalAmount: orderData.totalAmount,
-            customerName: els.customerName.value.trim() || 'Guest',
-            items: Array.from(state.cart.values()).map((item) => ({
-              name: item.name,
-              quantity: item.quantity,
-              lineTotal: Number(item.lockedPrice || item.price) * Number(item.quantity),
-            })),
-          };
+          const orderData = await placeOrder('cash');
+          const order = buildOrderSnapshot(orderData);
           closeCheckoutModal();
+          lockTableAfterBooking('Order placed. Pay cash at the counter.');
           setView('tracking');
-          showTrackingView(order, 'Food booked — pay at counter');
+          showTrackingView(order, 'Pay cash at counter');
           state.activeOrder = order;
           clearCartStorage();
           state.cart.clear();
           renderCart();
-          lockTableAfterBooking('Food booked. Table locked for other scanners.');
-          setToast('trackingStatusPill', 'Waiting for kitchen', 'success');
+          setToast('trackingStatusPill', `Pay INR ${money(order.totalAmount)} at counter`, 'success');
         } catch (error) {
-          setError(error.message || 'Checkout failed');
+          setCheckoutPayMessage(error.message || 'Cash checkout failed', true);
         }
       }
-
-      async function ensureRazorpayScript() {
-        if (window.Razorpay) return true;
-        return new Promise((resolve, reject) => {
-          const script = document.createElement('script');
-          script.src = 'https://checkout.razorpay.com/v1/checkout.js';
-          script.onload = () => resolve(true);
-          script.onerror = () => reject(new Error('Unable to load payment gateway'));
-          document.head.appendChild(script);
-        });
-      }
-
-      async function handleOnlineCheckout() {
-        try {
-          const orderData = await placeOrder('online');
-          const paymentData = await apiRequest('/api/payments/create-order', {
-            method: 'POST',
-            body: JSON.stringify({ orderId: orderData.orderId }),
-          });
-
-          await ensureRazorpayScript();
-
-          const rzp = new Razorpay({
-            key: paymentData.keyId,
-            amount: paymentData.razorpayOrder.amount,
-            currency: 'INR',
-            name: state.context.restaurant.name,
-            description: `Table ${state.context.table.table_number} checkout`,
-            order_id: paymentData.razorpayOrder.id,
-            theme: { color: '#bf4e22' },
-            handler: async (response) => {
-              try {
-                await apiRequest('/api/payments/verify', {
-                  method: 'POST',
-                  body: JSON.stringify({
-                    orderId: orderData.orderId,
-                    razorpay_order_id: response.razorpay_order_id,
-                    razorpay_payment_id: response.razorpay_payment_id,
-                    razorpay_signature: response.razorpay_signature,
-                  }),
-                });
-
-                closeCheckoutModal();
-                const paidOrder = {
-                  orderId: orderData.orderId,
-                  totalAmount: orderData.totalAmount,
-                  customerName: els.customerName.value.trim() || 'Guest',
-                  items: Array.from(state.cart.values()).map((item) => ({
-                    name: item.name,
-                    quantity: item.quantity,
-                    lineTotal: Number(item.lockedPrice || item.price) * Number(item.quantity),
-                  })),
-                };
-                await finalizePaidReceipt(paidOrder, 'paid');
-              } catch (error) {
-                setError(error.message || 'Payment verification failed');
-              }
-            },
-          });
-
-          rzp.open();
-        } catch (error) {
-          setError(error.message || 'Online payment failed');
-        }
-      }
-
-      let pendingUpiOrderId = null;
 
       function bindCustomerUpiLinks(orderId, amount) {
         const vpa = state.context.restaurant.upi_vpa || '';
@@ -1562,36 +1597,21 @@
 
       async function handleUpiCheckout() {
         try {
+          hideCheckoutUpiPanel();
           const orderData = await placeOrder('upi');
-          pendingUpiOrderId = orderData.orderId;
-          const amount = orderData.totalAmount;
-          const vpa = state.context.restaurant.upi_vpa || '';
-          if (!vpa) {
-            throw new Error('Restaurant UPI is not configured. Ask staff to pay at counter.');
-          }
-
-          lockTableAfterBooking('Bill created. Complete UPI payment below.');
-          if (!bindCustomerUpiLinks(orderData.orderId, amount)) {
-            throw new Error('Unable to build UPI payment link');
-          }
-
-          document.getElementById('upiAppsPanel').classList.remove('hidden');
-          state.activeOrder = {
-            orderId: orderData.orderId,
-            totalAmount: amount,
-            customerName: els.customerName.value.trim() || 'Guest',
-            items: Array.from(state.cart.values()).map((item) => ({
-              name: item.name,
-              quantity: item.quantity,
-              lineTotal: Number(item.lockedPrice || item.price) * Number(item.quantity),
-            })),
-          };
+          state.pendingUpiOrderId = orderData.orderId;
+          state.activeOrder = buildOrderSnapshot(orderData);
+          lockTableAfterBooking('Complete UPI payment in this window.');
           clearCartStorage();
           state.cart.clear();
           renderCart();
-          setError('Choose PhonePe, GPay, or Paytm — amount is pre-filled for the restaurant.');
+
+          if (!showCheckoutUpiPanel(orderData.orderId, orderData.totalAmount)) {
+            throw new Error('Restaurant UPI is not configured. Use Cash or ask staff.');
+          }
+          setCheckoutPayMessage('Tap a UPI app, pay the amount, then tap “I have paid”.');
         } catch (error) {
-          setError(error.message || 'UPI payment failed');
+          setCheckoutPayMessage(error.message || 'UPI checkout failed', true);
         }
       }
 
@@ -1603,35 +1623,35 @@
         els.checkoutModal.addEventListener('click', (event) => {
           if (event.target === els.checkoutModal) closeCheckoutModal();
         });
-        els.codCheckoutBtn.addEventListener('click', handleCodCheckout);
-        els.onlineCheckoutBtn.addEventListener('click', handleOnlineCheckout);
-        if (els.upiCheckoutBtn) els.upiCheckoutBtn.addEventListener('click', handleUpiCheckout);
+        els.cashCheckoutBtn?.addEventListener('click', handleCashCheckout);
+        els.upiCheckoutBtn?.addEventListener('click', handleUpiCheckout);
 
         document.getElementById('customerUpiPaidBtn')?.addEventListener('click', async () => {
-          if (!pendingUpiOrderId) {
-            setError('Place your order first using Pay via UPI.');
+          if (!state.pendingUpiOrderId || !state.activeOrder) {
+            setCheckoutPayMessage('Tap Pay with UPI first to place your order.', true);
             return;
           }
           try {
             await apiRequest('/api/payments/upi/confirm', {
               method: 'POST',
-              body: JSON.stringify({ orderId: pendingUpiOrderId }),
+              body: JSON.stringify({ orderId: state.pendingUpiOrderId }),
             });
-            document.getElementById('upiAppsPanel').classList.add('hidden');
+            closeCheckoutModal();
             await finalizePaidReceipt(state.activeOrder, 'paid');
           } catch (error) {
-            setError(error.message || 'Could not confirm payment');
+            setCheckoutPayMessage(error.message || 'Could not confirm payment', true);
           }
         });
 
         document.getElementById('customerUpiRequestForm')?.addEventListener('submit', (event) => {
           event.preventDefault();
           const guestUpi = document.getElementById('customerUpiId').value.trim();
+          const vpa = state.context?.restaurant?.upi_vpa || '';
           if (!guestUpi) {
-            setError('Enter your UPI ID first.');
+            setCheckoutPayMessage('Enter your UPI ID or tap a UPI app above.', true);
             return;
           }
-          setError(`Payment request prepared for ${guestUpi}. Approve the request in your UPI app, then tap "I Have Paid".`);
+          setCheckoutPayMessage(`Open your UPI app and pay ${vpa || 'the restaurant'}. Then tap “I have paid”.`);
         });
       }
 

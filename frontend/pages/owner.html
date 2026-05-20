@@ -188,6 +188,7 @@
           </table>
           <section id="billAddSection" class="bill-add-section hidden">
             <h3>Add extra items to running bill</h3>
+            <p id="billPaymentNote" class="hero-copy">Guest pays with Cash or UPI in their Review &amp; Checkout screen.</p>
             <form id="billAddItemForm" class="inline-form" novalidate>
               <select id="billMenuSelect">
                 <option value="">Select menu item</option>
@@ -195,33 +196,8 @@
               <input id="billAddQty" type="number" min="1" value="1" required />
               <button class="btn btn-primary" type="submit">Add to Bill</button>
             </form>
-          </section>
-          <section id="billPaySection" class="bill-pay-section hidden">
-            <h3>Collect payment</h3>
-            <div class="pay-grid">
-              <button id="billPayCash" class="pay-btn pay-btn--cash" type="button">
-                <span class="pay-btn__icon">₹</span>
-                <strong>Cash</strong>
-                <small>Mark paid instantly</small>
-              </button>
-              <button id="billPayUpiOpen" class="pay-btn pay-btn--upi" type="button">
-                <span class="pay-btn__icon">UPI</span>
-                <strong>UPI Apps</strong>
-                <small>PhonePe · GPay · Paytm</small>
-              </button>
-            </div>
-            <div id="billUpiPanel" class="bill-upi-panel hidden">
-              <p class="hero-copy">Open a UPI app with the bill amount pre-filled for the guest.</p>
-              <div class="upi-app-grid">
-                <a id="upiLinkPhonePe" class="upi-app-btn upi-app-btn--phonepe" href="#" target="_blank" rel="noreferrer">PhonePe</a>
-                <a id="upiLinkGPay" class="upi-app-btn upi-app-btn--gpay" href="#" target="_blank" rel="noreferrer">Google Pay</a>
-                <a id="upiLinkPaytm" class="upi-app-btn upi-app-btn--paytm" href="#" target="_blank" rel="noreferrer">Paytm</a>
-              </div>
-              <form id="billUpiRequestForm" class="inline-form">
-                <input id="billCustomerUpi" placeholder="Guest UPI ID for payment request" />
-                <button class="btn btn-light" type="submit">Send Payment Request</button>
-              </form>
-              <button id="billMarkUpiPaid" class="btn btn-primary full" type="button">Confirm UPI Received</button>
+            <div id="billStaffConfirm" class="hidden" style="margin-top:0.75rem;">
+              <button id="billConfirmCounterPaid" class="btn btn-light" type="button">Confirm counter payment (Cash)</button>
             </div>
           </section>
           <div id="billPaidActions" class="bill-paid-actions hidden">

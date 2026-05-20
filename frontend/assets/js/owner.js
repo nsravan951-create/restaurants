@@ -160,9 +160,8 @@ function hideBillModal() {
   modal.classList.add('hidden');
   modal.setAttribute('aria-hidden', 'true');
   document.body.classList.remove('bill-modal-open');
-  document.getElementById('billUpiPanel')?.classList.add('hidden');
   document.getElementById('billAddSection')?.classList.add('hidden');
-  document.getElementById('billPaySection')?.classList.add('hidden');
+  document.getElementById('billStaffConfirm')?.classList.add('hidden');
   document.getElementById('billPaidActions')?.classList.add('hidden');
   activeBillOrder = null;
   activeBillTableId = null;
@@ -204,10 +203,12 @@ function renderBillModal(order, tableId) {
   const isPaid = String(order.payment_status || '').toLowerCase() === 'paid';
   const isRunning = !isPaid;
 
-  // Add extra items only for open running bills (after orange box click)
   document.getElementById('billAddSection').classList.toggle('hidden', !isRunning);
-  document.getElementById('billPaySection').classList.toggle('hidden', !isRunning);
   document.getElementById('billPaidActions').classList.toggle('hidden', !isPaid);
+
+  const method = String(order.payment_method || '').toLowerCase();
+  const showStaffCashConfirm = isRunning && (method === 'cash' || method === 'cod');
+  document.getElementById('billStaffConfirm')?.classList.toggle('hidden', !showStaffCashConfirm);
 
   const billTitle = document.getElementById('billModalEyebrow');
   if (billTitle) {
@@ -221,19 +222,6 @@ function renderBillModal(order, tableId) {
     ? `Payment received via ${String(order.payment_method || '').toUpperCase()}. Thank you — visit again!`
     : '';
 
-  const vpa = order.upi_vpa || restaurantProfile?.upi_vpa || '';
-  const amount = order.total_amount;
-  const upiQuery = new URLSearchParams({
-    pa: vpa || 'merchant@upi',
-    pn: restaurantName,
-    am: Number(amount || 0).toFixed(2),
-    cu: 'INR',
-    tn: `Order ${order.id} Table ${order.table_number}`,
-  }).toString();
-  const upiBase = `upi://pay?${upiQuery}`;
-  document.getElementById('upiLinkPhonePe').href = upiBase;
-  document.getElementById('upiLinkGPay').href = upiBase;
-  document.getElementById('upiLinkPaytm').href = upiBase;
 }
 
 async function openBillModalForTable(tableId, { allowPaid = false } = {}) {
@@ -955,37 +943,9 @@ document.getElementById('billAddItemForm')?.addEventListener('submit', async (ev
   }
 });
 
-document.getElementById('billPayCash')?.addEventListener('click', async () => {
+document.getElementById('billConfirmCounterPaid')?.addEventListener('click', async () => {
   try {
     await markBillPaid('cash');
-  } catch (error) {
-    setMessage('ownerMessage', error.message, true);
-  }
-});
-
-document.getElementById('billPayUpiOpen')?.addEventListener('click', () => {
-  const panel = document.getElementById('billUpiPanel');
-  panel?.classList.toggle('hidden');
-  const vpa = activeBillOrder?.upi_vpa || restaurantProfile?.upi_vpa;
-  if (!vpa) {
-    setMessage('ownerMessage', 'Save your restaurant UPI ID in payment settings first.', true);
-  }
-});
-
-document.getElementById('billUpiRequestForm')?.addEventListener('submit', async (event) => {
-  event.preventDefault();
-  const customerUpi = document.getElementById('billCustomerUpi').value.trim();
-  if (!customerUpi) {
-    setMessage('ownerMessage', 'Enter guest UPI ID to send a request.', true);
-    return;
-  }
-  setMessage('ownerMessage', `Payment request noted for ${customerUpi}. Guest should approve in their UPI app.`);
-});
-
-document.getElementById('billMarkUpiPaid')?.addEventListener('click', async () => {
-  try {
-    const customerUpi = document.getElementById('billCustomerUpi').value.trim();
-    await markBillPaid('upi', customerUpi);
   } catch (error) {
     setMessage('ownerMessage', error.message, true);
   }
