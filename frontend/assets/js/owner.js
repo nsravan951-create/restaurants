@@ -70,9 +70,16 @@ async function fetchAuthorizedHtml(path) {
   return response.text();
 }
 
-function tableStatusLabel(status) {
-  if (status === 'active') return 'Live — tap to view bill';
+function hasRunningBill(table) {
+  return Boolean(table.active_order_id)
+    && String(table.order_payment_status || '').toLowerCase() === 'pending';
+}
+
+function tableStatusLabel(table) {
+  const status = String(table.availability_status || 'available');
   if (status === 'paid') return 'Paid — tap for receipt';
+  if (hasRunningBill(table)) return 'Running bill — tap to add items';
+  if (status === 'active') return 'QR scanned — waiting for order';
   return 'Available';
 }
 
@@ -133,7 +140,7 @@ function applyTableCardStatus(tableId, status) {
 
   const statusMeta = card.querySelector('.table-card__meta');
   if (statusMeta) {
-    statusMeta.textContent = `Status: ${tableStatusLabel(normalized)}`;
+    statusMeta.textContent = `Status: ${tableStatusLabel({ availability_status: normalized, active_order_id: card.dataset.hasOrder === '1' ? 1 : null, order_payment_status: normalized === 'paid' ? 'paid' : (card.dataset.runningBill === '1' ? 'pending' : '') })}`;
   }
 }
 
@@ -150,6 +157,9 @@ function hideBillModal() {
   modal.classList.add('hidden');
   modal.setAttribute('aria-hidden', 'true');
   document.getElementById('billUpiPanel')?.classList.add('hidden');
+  document.getElementById('billAddSection')?.classList.add('hidden');
+  document.getElementById('billPaySection')?.classList.add('hidden');
+  document.getElementById('billPaidActions')?.classList.add('hidden');
 }
 
 function fillBillMenuSelect() {
@@ -186,9 +196,17 @@ function renderBillModal(order, tableId) {
   document.getElementById('billGrandTotal').textContent = `INR ${formatCurrency(order.total_amount)}`;
 
   const isPaid = String(order.payment_status || '').toLowerCase() === 'paid';
-  document.getElementById('billAddSection').classList.toggle('hidden', isPaid);
-  document.getElementById('billPaySection').classList.toggle('hidden', isPaid);
+  const isRunning = !isPaid;
+
+  // Add extra items only for open running bills (after orange box click)
+  document.getElementById('billAddSection').classList.toggle('hidden', !isRunning);
+  document.getElementById('billPaySection').classList.toggle('hidden', !isRunning);
   document.getElementById('billPaidActions').classList.toggle('hidden', !isPaid);
+
+  const billTitle = document.querySelector('#billModal .eyebrow');
+  if (billTitle) {
+    billTitle.textContent = isRunning ? 'Running bill' : 'Paid bill';
+  }
   document.getElementById('billPaidMessage').textContent = isPaid
     ? `Payment received via ${String(order.payment_method || '').toUpperCase()}. Thank you — visit again!`
     : '';
@@ -331,12 +349,13 @@ async function loadTables() {
   tableList.innerHTML = tables.length ? tables.map((table) => {
     const qrImage = table.qr_data_url ? `<img src="${table.qr_data_url}" alt="QR for ${escapeHtml(table.table_number)}" class="table-card__qr" />` : '';
     const status = String(table.availability_status || 'available');
+    const runningBill = hasRunningBill(table);
     const hasOrder = table.active_order_id ? '1' : '0';
-    const clickable = status === 'active' || status === 'paid' || hasOrder === '1';
+    const clickable = runningBill || status === 'paid';
     return `
-      <div class="table-card ${tableStatusClass(status)}${clickable ? ' table-card--clickable' : ''}" data-table-id="${table.id}" data-table-status="${escapeHtml(status)}" data-table-number="${escapeHtml(table.table_number)}" data-has-order="${hasOrder}">
+      <div class="table-card ${tableStatusClass(status)}${clickable ? ' table-card--clickable' : ''}" data-table-id="${table.id}" data-table-status="${escapeHtml(status)}" data-table-number="${escapeHtml(table.table_number)}" data-has-order="${hasOrder}" data-running-bill="${runningBill ? '1' : '0'}">
         <div class="${tableBadgeClass(status)}">${escapeHtml(table.table_number)}</div>
-        <p class="table-card__meta">Status: ${escapeHtml(tableStatusLabel(status))}</p>
+        <p class="table-card__meta">Status: ${escapeHtml(tableStatusLabel(table))}</p>
         ${tablePaymentPill(table)}
         ${qrImage}
         <p class="table-card__meta table-card__link">${table.qr_url
@@ -405,7 +424,14 @@ async function loadTables() {
   tableList.querySelectorAll('.table-card--clickable').forEach((card) => {
     card.addEventListener('click', (event) => {
       if (event.target.closest('button, a')) return;
-      openBillModalForTable(Number(card.dataset.tableId));
+      const tableId = Number(card.dataset.tableId);
+      if (card.dataset.runningBill === '1') {
+        openBillModalForTable(tableId);
+        return;
+      }
+      if (card.dataset.tableStatus === 'paid') {
+        openBillModalForTable(tableId);
+      }
     });
   });
 

@@ -42,10 +42,10 @@
             <div class="section-head">
               <div>
                 <h2>Tables & QR Codes</h2>
-                <p class="hero-copy">Enter how many QR codes you want. Tables update in realtime: white = available, orange = QR scanned / ordering, green = payment complete.</p>
+                <p class="hero-copy">White = available. Orange = running bill (tap the box to view bill and add extra items). Green = paid.</p>
             <div class="card-row" style="margin-top:0.75rem;">
               <div class="card"><strong>White</strong><p>Available</p></div>
-              <div class="card"><strong>Orange</strong><p>QR scanned</p></div>
+              <div class="card"><strong>Orange</strong><p>Running bill — tap box</p></div>
               <div class="card"><strong>Green</strong><p>Paid — reset terminal</p></div>
             </div>
               </div>
@@ -186,8 +186,8 @@
               <tr><td colspan="3"><strong>Total</strong></td><td><strong id="billGrandTotal">INR 0.00</strong></td></tr>
             </tfoot>
           </table>
-          <section id="billAddSection" class="bill-add-section">
-            <h3>Add items to bill</h3>
+          <section id="billAddSection" class="bill-add-section hidden">
+            <h3>Add extra items to running bill</h3>
             <form id="billAddItemForm" class="inline-form">
               <select id="billMenuSelect" required>
                 <option value="">Select menu item</option>
