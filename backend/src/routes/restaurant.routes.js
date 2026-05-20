@@ -4,7 +4,13 @@ const pool = require('../config/db');
 const asyncHandler = require('../utils/asyncHandler');
 const { requireAuth } = require('../middleware/auth');
 const { ensureRestaurantAccess } = require('../utils/access');
-const { buildQrPayload } = require('../utils/qr');
+const {
+  buildQrPayload,
+  buildTableQrUrl,
+  getFrontendOrigin,
+  isCanonicalTableQrUrl,
+  refreshQrForTable,
+} = require('../utils/qr');
 const { expireInactiveSessions } = require('../utils/tableSession');
 const { emitTableUpdate } = require('../services/socket');
 
@@ -31,10 +37,23 @@ router.get('/owner/me', requireAuth(['owner']), asyncHandler(async (req, res) =>
   return res.json({ restaurant: rows[0] });
 }));
 
-router.get('/:restaurantId/tables', requireAuth(['owner', 'super_admin', 'staff', 'kitchen']), asyncHandler(async (req, res) => {
-  const { restaurantId } = req.params;
-  await ensureRestaurantAccess(req.user, restaurantId);
-  await expireInactiveSessions();
+async function ensureCanonicalQrLinks(restaurantId, tables) {
+  const stale = tables.filter((row) => !isCanonicalTableQrUrl(row.qr_url));
+  if (!stale.length) return tables;
+
+  const conn = await pool.connect();
+  try {
+    await conn.query('BEGIN');
+    for (const row of stale) {
+      await refreshQrForTable(conn, { restaurantId, tableId: row.id });
+    }
+    await conn.query('COMMIT');
+  } catch (error) {
+    await conn.query('ROLLBACK');
+    throw error;
+  } finally {
+    conn.release();
+  }
 
   const { rows } = await pool.query(
     `SELECT t.id, t.table_number, t.availability_status, t.qr_token, q.qr_url, q.qr_data_url, t.created_at
@@ -44,6 +63,26 @@ router.get('/:restaurantId/tables', requireAuth(['owner', 'super_admin', 'staff'
      ORDER BY t.table_number ASC`,
     [restaurantId]
   );
+  return rows;
+}
+
+router.get('/:restaurantId/tables', requireAuth(['owner', 'super_admin', 'staff', 'kitchen']), asyncHandler(async (req, res) => {
+  const { restaurantId } = req.params;
+  await ensureRestaurantAccess(req.user, restaurantId);
+  await expireInactiveSessions();
+
+  let { rows } = await pool.query(
+    `SELECT t.id, t.table_number, t.availability_status, t.qr_token, q.qr_url, q.qr_data_url, t.created_at
+     FROM restaurant_tables t
+     LEFT JOIN qr_codes q ON q.table_id = t.id
+     WHERE t.restaurant_id = $1
+     ORDER BY t.table_number ASC`,
+    [restaurantId]
+  );
+
+  if (['owner', 'super_admin'].includes(req.user.role)) {
+    rows = await ensureCanonicalQrLinks(restaurantId, rows);
+  }
 
   return res.json({ tables: rows });
 }));
@@ -151,30 +190,33 @@ router.post('/:restaurantId/tables', requireAuth(['owner', 'super_admin']), asyn
   );
   const tableId = result.rows[0].id;
 
-  const { qrUrl, qrDataUrl } = await buildQrPayload({
-    restaurantId: Number(restaurantId),
-    tableId,
-    tableNumber: data.tableNumber,
-  });
+  const conn = await pool.connect();
+  try {
+    await conn.query('BEGIN');
+    const { qrUrl, qrDataUrl } = await refreshQrForTable(conn, {
+      restaurantId: Number(restaurantId),
+      tableId,
+    });
+    await conn.query('COMMIT');
 
-  await pool.query(
-    `INSERT INTO qr_codes (restaurant_id, table_id, qr_url, qr_data_url)
-     VALUES ($1, $2, $3, $4)`,
-    [restaurantId, tableId, qrUrl, qrDataUrl]
-  );
-
-  return res.status(201).json({
-    message: 'Table created',
-    table: {
-      id: tableId,
-      restaurant_id: Number(restaurantId),
-      table_number: data.tableNumber,
-      availability_status: 'available',
-      qr_token: token,
-      qr_url: qrUrl,
-      qr_data_url: qrDataUrl,
-    },
-  });
+    return res.status(201).json({
+      message: 'Table created',
+      table: {
+        id: tableId,
+        restaurant_id: Number(restaurantId),
+        table_number: data.tableNumber,
+        availability_status: 'available',
+        qr_token: token,
+        qr_url: qrUrl,
+        qr_data_url: qrDataUrl,
+      },
+    });
+  } catch (error) {
+    await conn.query('ROLLBACK');
+    throw error;
+  } finally {
+    conn.release();
+  }
 }));
 
 router.post('/:restaurantId/auto-generate-tables', requireAuth(['owner', 'super_admin']), asyncHandler(async (req, res) => {
@@ -281,14 +323,22 @@ router.post('/:restaurantId/generate-qrs', requireAuth(['owner', 'super_admin'])
       generated.push({ tableId, tableNumber, qrCodeUrl: qrUrl });
     }
 
+    const { rows: allTableRows } = await conn.query(
+      'SELECT id FROM restaurant_tables WHERE restaurant_id = $1 ORDER BY id ASC',
+      [restaurantId]
+    );
+
+    for (const tableRow of allTableRows) {
+      await refreshQrForTable(conn, { restaurantId, tableId: tableRow.id });
+    }
+
     const { rows: exactRows } = await conn.query(
       `SELECT rt.id, rt.table_number, COALESCE(q.qr_url, '') AS qr_url, COALESCE(q.qr_data_url, '') AS qr_data_url
        FROM restaurant_tables rt
        LEFT JOIN qr_codes q ON q.table_id = rt.id
        WHERE rt.restaurant_id = $1
-         AND rt.table_number = ANY($2::text[])
        ORDER BY rt.id ASC`,
-      [restaurantId, Array.from({ length: tableCount }, (_, index) => `Table ${index + 1}`)]
+      [restaurantId]
     );
 
     await conn.query('COMMIT');
@@ -296,6 +346,7 @@ router.post('/:restaurantId/generate-qrs', requireAuth(['owner', 'super_admin'])
       message: 'QR generation completed',
       restaurantId: Number(restaurantId),
       generatedCount: exactRows.length,
+      qrLinkFormat: `${getFrontendOrigin()}/table.html?id={tableId}`,
       tables: exactRows,
     });
   } catch (error) {
@@ -327,18 +378,22 @@ router.get('/:restaurantId/tables/:tableId/qr', requireAuth(['owner', 'super_adm
   );
   let qrRows = qrResult.rows;
 
-  if (!qrRows.length) {
-    const { qrUrl, qrDataUrl } = await buildQrPayload({
-      restaurantId: Number(restaurantId),
-      tableId: Number(tableId),
-      tableNumber: rows[0].table_number,
-    });
-    await pool.query(
-      `INSERT INTO qr_codes (restaurant_id, table_id, qr_url, qr_data_url)
-       VALUES ($1, $2, $3, $4)`,
-      [restaurantId, tableId, qrUrl, qrDataUrl]
-    );
-    qrRows = [{ qr_url: qrUrl, qr_data_url: qrDataUrl }];
+  if (!qrRows.length || !isCanonicalTableQrUrl(qrRows[0]?.qr_url)) {
+    const conn = await pool.connect();
+    try {
+      await conn.query('BEGIN');
+      const refreshed = await refreshQrForTable(conn, {
+        restaurantId: Number(restaurantId),
+        tableId: Number(tableId),
+      });
+      await conn.query('COMMIT');
+      qrRows = [{ qr_url: refreshed.qrUrl, qr_data_url: refreshed.qrDataUrl }];
+    } catch (error) {
+      await conn.query('ROLLBACK');
+      throw error;
+    } finally {
+      conn.release();
+    }
   }
 
   return res.json({
@@ -346,6 +401,46 @@ router.get('/:restaurantId/tables/:tableId/qr', requireAuth(['owner', 'super_adm
     qrDataUrl: qrRows[0].qr_data_url,
     downloadName: `restaurant-${restaurantId}-table-${tableId}.png`,
   });
+}));
+
+router.post('/:restaurantId/refresh-qr-links', requireAuth(['owner', 'super_admin']), asyncHandler(async (req, res) => {
+  const { restaurantId } = req.params;
+  await ensureRestaurantAccess(req.user, restaurantId);
+
+  const conn = await pool.connect();
+  try {
+    await conn.query('BEGIN');
+    const { rows: tableRows } = await conn.query(
+      'SELECT id FROM restaurant_tables WHERE restaurant_id = $1 ORDER BY id ASC',
+      [restaurantId]
+    );
+
+    for (const row of tableRows) {
+      await refreshQrForTable(conn, { restaurantId, tableId: row.id });
+    }
+
+    const { rows: refreshedRows } = await conn.query(
+      `SELECT rt.id, rt.table_number, q.qr_url, q.qr_data_url
+       FROM restaurant_tables rt
+       LEFT JOIN qr_codes q ON q.table_id = rt.id
+       WHERE rt.restaurant_id = $1
+       ORDER BY rt.id ASC`,
+      [restaurantId]
+    );
+
+    await conn.query('COMMIT');
+    return res.json({
+      message: 'QR links refreshed',
+      updatedCount: refreshedRows.length,
+      qrLinkFormat: `${getFrontendOrigin()}/table.html?id={tableId}`,
+      tables: refreshedRows,
+    });
+  } catch (error) {
+    await conn.query('ROLLBACK');
+    throw error;
+  } finally {
+    conn.release();
+  }
 }));
 
 router.post('/:restaurantId/tables/:tableId/terminal-reset', requireAuth(['owner', 'super_admin']), asyncHandler(async (req, res) => {

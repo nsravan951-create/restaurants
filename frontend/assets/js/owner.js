@@ -293,8 +293,11 @@ async function loadTables() {
         <div class="${tableBadgeClass(status)}">${escapeHtml(table.table_number)}</div>
         <p class="table-card__meta">Status: ${escapeHtml(tableStatusLabel(status))}</p>
         ${qrImage}
-        <p class="table-card__meta">${table.qr_url ? 'QR ready' : 'QR not available yet'}</p>
+        <p class="table-card__meta table-card__link">${table.qr_url
+          ? `<a href="${escapeHtml(table.qr_url)}" target="_blank" rel="noreferrer">${escapeHtml(table.qr_url)}</a>`
+          : 'QR not available yet'}</p>
         <div class="toolbar">
+          <button class="btn btn-light" data-copy-qr-url="${escapeHtml(table.qr_url || '')}" type="button">Copy Link</button>
           <a class="btn btn-light" href="${table.qr_data_url || '#'}" download="table-${escapeHtml(table.table_number)}.png">Download QR</a>
           <button class="btn btn-light" data-print-qr="${table.id}" type="button">Print QR</button>
           ${status === 'paid' ? `<button class="btn btn-primary" data-reset-terminal="${table.id}" type="button">Terminal Reset</button>` : ''}
@@ -311,6 +314,22 @@ async function loadTables() {
         await loadTables();
       } catch (error) {
         setMessage('ownerMessage', error.message, true);
+      }
+    });
+  });
+
+  tableList.querySelectorAll('button[data-copy-qr-url]').forEach((button) => {
+    button.addEventListener('click', async () => {
+      const url = button.dataset.copyQrUrl;
+      if (!url) {
+        setMessage('ownerMessage', 'QR link not ready yet.', true);
+        return;
+      }
+      try {
+        await navigator.clipboard.writeText(url);
+        setMessage('ownerMessage', 'QR link copied to clipboard.');
+      } catch (error) {
+        setMessage('ownerMessage', url, false);
       }
     });
   });

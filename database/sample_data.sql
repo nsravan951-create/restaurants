@@ -21,11 +21,12 @@ VALUES
 ((SELECT id FROM restaurants WHERE slug = 'sunrise-diner-demo'), 'T2', 'sunrise-diner-demo-T2'),
 ((SELECT id FROM restaurants WHERE slug = 'sunrise-diner-demo'), 'T3', 'sunrise-diner-demo-T3');
 
+-- QR URLs use table.html?id={table_id} (regenerate via npm run refresh:qrs after deploy)
 INSERT INTO qr_codes (restaurant_id, table_id, qr_url, qr_data_url)
 SELECT r.id,
-			 rt.id,
-			 'http://localhost:3000/restaurant/' || r.id || '/table/' || rt.id,
-			 'data:image/png;base64,'
+       rt.id,
+       'https://restaurantts.netlify.app/table.html?id=' || rt.id::text,
+       'data:image/png;base64,'
 FROM restaurant_tables rt
 JOIN restaurants r ON r.id = rt.restaurant_id
 WHERE r.slug = 'sunrise-diner-demo';

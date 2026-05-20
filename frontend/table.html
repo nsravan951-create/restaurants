@@ -797,7 +797,12 @@
       }
 
       function tableIdFromUrl() {
-        const params = new URLSearchParams(window.location.search);
+        const rawSearch = window.location.search || '';
+        // Legacy malformed QR links: table.html?=71
+        const legacyMatch = rawSearch.match(/^\?=(\d+)/);
+        if (legacyMatch) return Number(legacyMatch[1]);
+
+        const params = new URLSearchParams(rawSearch);
         const fromQuery = params.get('id') || params.get('tableId') || params.get('table');
         if (fromQuery) return Number(fromQuery);
         const parts = window.location.pathname.split('/').filter(Boolean);
