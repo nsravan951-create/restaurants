@@ -5,9 +5,10 @@ const pool = require('../config/db');
 const { requireAuth } = require('../middleware/auth');
 const asyncHandler = require('../utils/asyncHandler');
 const { ensureRestaurantAccess } = require('../utils/access');
-const { emitOrderUpdate } = require('../services/socket');
+const { emitOrderUpdate, emitTableUpdate } = require('../services/socket');
 const { expireInactiveSessions, getSessionExpiryDate, endSessionByOrderId } = require('../utils/tableSession');
 const { buildInvoiceModel, renderInvoiceHtml, buildInvoicePdf } = require('../utils/invoice');
+const { syncInvoiceForOrder } = require('../utils/invoiceSync');
 
 const router = express.Router();
 
@@ -276,17 +277,20 @@ router.get('/active', asyncHandler(async (req, res) => {
   return res.json({ orders: rows });
 }));
 
-router.get('/table/:tableId/active', asyncHandler(async (req, res) => {
+router.get('/table/:tableId/active', requireAuth(['owner', 'super_admin', 'kitchen', 'staff']), asyncHandler(async (req, res) => {
   const tableId = Number(req.params.tableId);
   if (!tableId) return res.status(400).json({ message: 'tableId is required' });
 
   const { rows } = await pool.query(
-    `SELECT o.id, o.restaurant_id, o.table_id, o.table_number, o.status, o.total_amount, o.payment_method, o.payment_status, o.created_at,
+    `SELECT o.id, o.restaurant_id, o.table_id, o.table_number, o.customer_name, o.status,
+            o.total_amount, o.payment_method, o.payment_status, o.created_at,
+            r.name AS restaurant_name, r.upi_vpa, r.bank_account_name, r.bank_name,
       COALESCE(json_agg(json_build_object('id', oi.id, 'menu_item_id', oi.menu_item_id, 'item_name', oi.item_name, 'item_price', oi.item_price, 'quantity', oi.quantity, 'unit_price', oi.unit_price, 'line_total', oi.line_total) ORDER BY oi.id), '[]'::json) AS items
      FROM orders o
+     JOIN restaurants r ON r.id = o.restaurant_id
      JOIN order_items oi ON oi.order_id = o.id
-     WHERE o.table_id = $1 AND o.status IN ('pending', 'preparing', 'ready')
-     GROUP BY o.id
+     WHERE o.table_id = $1
+     GROUP BY o.id, r.name, r.upi_vpa, r.bank_account_name, r.bank_name
      ORDER BY o.created_at DESC
      LIMIT 1`,
     [tableId]
@@ -294,6 +298,57 @@ router.get('/table/:tableId/active', asyncHandler(async (req, res) => {
 
   if (!rows.length) return res.json({ order: null });
   return res.json({ order: rows[0] });
+}));
+
+router.post('/:orderId/mark-paid', requireAuth(['owner', 'super_admin']), asyncHandler(async (req, res) => {
+  const orderId = Number(req.params.orderId);
+  const method = String(req.body?.method || 'cash').toLowerCase();
+
+  if (!['cash', 'upi'].includes(method)) {
+    return res.status(400).json({ message: 'method must be cash or upi' });
+  }
+
+  const { rows } = await pool.query(
+    'SELECT id, restaurant_id, table_id, payment_status FROM orders WHERE id = $1 LIMIT 1',
+    [orderId]
+  );
+  if (!rows.length) return res.status(404).json({ message: 'Order not found' });
+
+  await ensureRestaurantAccess(req.user, rows[0].restaurant_id);
+
+  if (rows[0].payment_status === 'paid') {
+    return res.json({ message: 'Order already paid', orderId });
+  }
+
+  const paymentMethod = method === 'cash' ? 'cash' : 'upi';
+  const customerUpi = String(req.body?.customerUpi || '').trim();
+
+  await pool.query(
+    `UPDATE orders
+     SET payment_status = 'paid', payment_method = $1, notes = COALESCE(notes, '') || $2
+     WHERE id = $3`,
+    [
+      paymentMethod,
+      customerUpi ? ` | Customer UPI: ${customerUpi}` : '',
+      orderId,
+    ]
+  );
+
+  await endSessionByOrderId(orderId, 'payment_completed');
+  await syncInvoiceForOrder(orderId);
+
+  emitOrderUpdate(rows[0].restaurant_id, { type: 'paid', orderId, method: paymentMethod });
+  emitTableUpdate(rows[0].restaurant_id, {
+    tableId: rows[0].table_id,
+    status: 'paid',
+    paymentMethod,
+  });
+
+  return res.json({
+    message: method === 'cash' ? 'Cash payment recorded' : 'UPI payment recorded',
+    orderId,
+    paymentMethod,
+  });
 }));
 
 router.get('/restaurant/:restaurantId', requireAuth(['owner', 'super_admin', 'kitchen', 'staff']), asyncHandler(async (req, res) => {

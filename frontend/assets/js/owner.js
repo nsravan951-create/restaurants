@@ -1,5 +1,9 @@
 let restaurantId = null;
 let latestOrders = [];
+let restaurantProfile = null;
+let menuItemsCache = [];
+let activeBillOrder = null;
+let activeBillTableId = null;
 
 function ensureRestaurantId() {
   if (!restaurantId) {
@@ -67,9 +71,38 @@ async function fetchAuthorizedHtml(path) {
 }
 
 function tableStatusLabel(status) {
-  if (status === 'active') return 'Scanner active';
-  if (status === 'paid') return 'Payment complete';
+  if (status === 'active') return 'Live — tap to view bill';
+  if (status === 'paid') return 'Paid — tap for receipt';
   return 'Available';
+}
+
+function tablePaymentPill(table) {
+  const method = String(table.order_payment_method || '').toLowerCase();
+  const payStatus = String(table.order_payment_status || '').toLowerCase();
+  if (table.availability_status === 'paid') {
+    if (method === 'cash' || method === 'cod') {
+      return '<span class="table-card__pay-pill table-card__pay-pill--cash">CASH</span>';
+    }
+    if (method === 'upi' || method === 'online') {
+      return '<span class="table-card__pay-pill table-card__pay-pill--upi">UPI</span>';
+    }
+    return '<span class="table-card__pay-pill table-card__pay-pill--upi">PAID</span>';
+  }
+  if (table.active_order_id && payStatus === 'pending') {
+    return '<span class="table-card__pay-pill table-card__pay-pill--bill">BILL OPEN</span>';
+  }
+  return '';
+}
+
+function buildUpiPayUrl({ vpa, name, amount, note }) {
+  const params = new URLSearchParams({
+    pa: vpa,
+    pn: name || 'Restaurant',
+    am: Number(amount || 0).toFixed(2),
+    cu: 'INR',
+    tn: note || 'Table bill',
+  });
+  return `upi://pay?${params.toString()}`;
 }
 
 function tableStatusClass(status) {
@@ -104,105 +137,106 @@ function applyTableCardStatus(tableId, status) {
   }
 }
 
-function showModal() {
-  const m = document.getElementById('orderModal');
-  if (!m) return;
-  m.classList.remove('hidden');
+function showBillModal() {
+  const modal = document.getElementById('billModal');
+  if (!modal) return;
+  modal.classList.remove('hidden');
+  modal.setAttribute('aria-hidden', 'false');
 }
 
-function hideModal() {
-  const m = document.getElementById('orderModal');
-  if (!m) return;
-  m.classList.add('hidden');
+function hideBillModal() {
+  const modal = document.getElementById('billModal');
+  if (!modal) return;
+  modal.classList.add('hidden');
+  modal.setAttribute('aria-hidden', 'true');
+  document.getElementById('billUpiPanel')?.classList.add('hidden');
 }
 
-async function openOrderModalForTable(tableId) {
+function fillBillMenuSelect() {
+  const select = document.getElementById('billMenuSelect');
+  if (!select) return;
+  select.innerHTML = '<option value="">Select menu item</option>' + menuItemsCache.map((item) => (
+    `<option value="${item.id}" data-price="${item.price}">${escapeHtml(item.name)} — INR ${formatCurrency(item.price)}</option>`
+  )).join('');
+}
+
+function renderBillModal(order, tableId) {
+  activeBillOrder = order;
+  activeBillTableId = tableId;
+  const items = parseOrderItems(order.items);
+  const restaurantName = order.restaurant_name || restaurantProfile?.name || 'Restaurant';
+
+  document.getElementById('billRestaurantName').textContent = restaurantName;
+  document.getElementById('billTableMeta').textContent = `Table ${order.table_number || ''} • Order #${order.id} • ${order.customer_name || 'Guest'}`;
+  document.getElementById('billOrderInfo').innerHTML = `
+    <p><strong>${escapeHtml(restaurantName)}</strong></p>
+    <p>${escapeHtml(order.bank_name || restaurantProfile?.bank_name || '')} ${escapeHtml(order.bank_account_name || restaurantProfile?.bank_account_name || '')}</p>
+    <p>UPI: ${escapeHtml(order.upi_vpa || restaurantProfile?.upi_vpa || 'Not set')}</p>
+  `;
+
+  document.getElementById('billItemsBody').innerHTML = items.length ? items.map((it) => `
+    <tr>
+      <td>${escapeHtml(it.item_name)}</td>
+      <td>${it.quantity}</td>
+      <td>INR ${formatCurrency(it.item_price || it.unit_price)}</td>
+      <td>INR ${formatCurrency(it.line_total)}</td>
+    </tr>
+  `).join('') : '<tr><td colspan="4">No items</td></tr>';
+
+  document.getElementById('billGrandTotal').textContent = `INR ${formatCurrency(order.total_amount)}`;
+
+  const isPaid = String(order.payment_status || '').toLowerCase() === 'paid';
+  document.getElementById('billAddSection').classList.toggle('hidden', isPaid);
+  document.getElementById('billPaySection').classList.toggle('hidden', isPaid);
+  document.getElementById('billPaidActions').classList.toggle('hidden', !isPaid);
+  document.getElementById('billPaidMessage').textContent = isPaid
+    ? `Payment received via ${String(order.payment_method || '').toUpperCase()}. Thank you — visit again!`
+    : '';
+
+  const vpa = order.upi_vpa || restaurantProfile?.upi_vpa || '';
+  const amount = order.total_amount;
+  const upiQuery = new URLSearchParams({
+    pa: vpa || 'merchant@upi',
+    pn: restaurantName,
+    am: Number(amount || 0).toFixed(2),
+    cu: 'INR',
+    tn: `Order ${order.id} Table ${order.table_number}`,
+  }).toString();
+  const upiBase = `upi://pay?${upiQuery}`;
+  document.getElementById('upiLinkPhonePe').href = upiBase;
+  document.getElementById('upiLinkGPay').href = upiBase;
+  document.getElementById('upiLinkPaytm').href = upiBase;
+
+  fillBillMenuSelect();
+}
+
+async function openBillModalForTable(tableId) {
   try {
     const res = await apiRequest(`/orders/table/${tableId}/active`, {}, true);
     const order = res.order || null;
-    const info = document.getElementById('modalOrderInfo');
-    const itemsEl = document.getElementById('modalItems');
-    const addForm = document.getElementById('modalAddItemForm');
-    const completeBtn = document.getElementById('modalCompleteBtn');
-    const resetBtn = document.getElementById('modalResetTerminalBtn');
 
     if (!order) {
-      info.innerHTML = `<p>No active order for this table.</p>`;
-      itemsEl.innerHTML = '';
-      addForm.classList.add('hidden');
-      completeBtn.classList.add('hidden');
-      resetBtn.classList.add('hidden');
-      showModal();
+      setMessage('ownerMessage', 'No running bill on this table yet. Waiting for guest to book food.', true);
       return;
     }
 
-    info.innerHTML = `
-      <p><strong>Order #${order.id}</strong> • Table ${escapeHtml(order.table_number || '')}</p>
-      <p>Payment: ${escapeHtml(String(order.payment_method || 'cod'))} • Status: ${escapeHtml(order.status || '')}</p>
-      <p>Total: INR ${formatCurrency(order.total_amount || 0)}</p>
-    `;
-
-    const parsedItems = parseOrderItems(order.items);
-    itemsEl.innerHTML = parsedItems.length ? parsedItems.map((it) => `
-      <div class="card"><strong>${escapeHtml(it.item_name)}</strong><p>Qty: ${it.quantity} • ₹${formatCurrency(it.line_total)}</p></div>
-    `).join('') : '<p>No items listed.</p>';
-
-    addForm.classList.remove('hidden');
-    completeBtn.classList.remove('hidden');
-    resetBtn.classList.toggle('hidden', order.payment_status !== 'paid');
-
-    // remove previous submit handlers
-    addForm.onsubmit = async (e) => {
-      e.preventDefault();
-      const fd = new FormData(addForm);
-      const payload = [{ name: fd.get('name'), itemPrice: Number(fd.get('price')), quantity: Number(fd.get('quantity')) }];
-      try {
-        await apiRequest(`/orders/${order.id}/items`, { method: 'POST', body: JSON.stringify({ items: payload }) }, true);
-        setMessage('ownerMessage', 'Added extra item');
-        // refresh modal
-        await openOrderModalForTable(tableId);
-        await loadOrders();
-        await loadAnalytics();
-      } catch (err) {
-        setMessage('ownerMessage', err.message, true);
-      }
-    };
-
-    completeBtn.onclick = async () => {
-      try {
-        await apiRequest(`/orders/${order.id}/status`, { method: 'PATCH', body: JSON.stringify({ status: 'delivered' }) }, true);
-        // fetch invoice html and open print
-        const html = await fetchAuthorizedHtml(`/orders/${order.id}/invoice?format=html`);
-        const win = window.open('', '_blank');
-        win.document.write(html);
-        win.document.close();
-        win.focus();
-        win.print();
-        // refresh UI
-        await loadTables();
-        await loadInvoices();
-        await loadOrders();
-      } catch (err) {
-        setMessage('ownerMessage', err.message, true);
-      }
-    };
-
-    resetBtn.onclick = async () => {
-      try {
-        await apiRequest(`/restaurants/${restaurantId}/tables/${order.table_id}/terminal-reset`, { method: 'POST' }, true);
-        setMessage('ownerMessage', 'Terminal reset completed. Table is available now.');
-        await loadTables();
-        await loadInvoices();
-        hideModal();
-      } catch (err) {
-        setMessage('ownerMessage', err.message, true);
-      }
-    };
-
-    showModal();
+    renderBillModal(order, tableId);
+    showBillModal();
   } catch (error) {
     setMessage('ownerMessage', error.message, true);
   }
+}
+
+async function markBillPaid(method, customerUpi = '') {
+  if (!activeBillOrder) return;
+  await apiRequest(`/orders/${activeBillOrder.id}/mark-paid`, {
+    method: 'POST',
+    body: JSON.stringify({ method, customerUpi }),
+  }, true);
+  setMessage('ownerMessage', method === 'cash' ? 'Cash recorded — table is green.' : 'UPI payment confirmed.');
+  await loadTables();
+  await loadInvoices();
+  await openBillModalForTable(activeBillTableId);
 }
 
 function setActiveSection(sectionName) {
@@ -232,8 +266,16 @@ async function activateSection(sectionName) {
 
 async function loadRestaurant() {
   const data = await apiRequest('/restaurants/owner/me', {}, true);
+  restaurantProfile = data.restaurant;
   restaurantId = data.restaurant.id;
   document.getElementById('ownerRestaurantName').textContent = `${data.restaurant.name} Dashboard`;
+
+  const payForm = document.getElementById('paymentSettingsForm');
+  if (payForm) {
+    payForm.upiVpa.value = data.restaurant.upi_vpa || '';
+    payForm.bankAccountName.value = data.restaurant.bank_account_name || '';
+    payForm.bankName.value = data.restaurant.bank_name || '';
+  }
 }
 
 async function loadMenu() {
@@ -241,6 +283,7 @@ async function loadMenu() {
   const data = await apiRequest(`/menu/${restaurantId}`, {}, true);
   const menuList = document.getElementById('menuList');
   const items = data.menu || [];
+  menuItemsCache = items;
 
   menuList.innerHTML = items.length ? items.map((item) => `
     <div class="card">
@@ -288,10 +331,13 @@ async function loadTables() {
   tableList.innerHTML = tables.length ? tables.map((table) => {
     const qrImage = table.qr_data_url ? `<img src="${table.qr_data_url}" alt="QR for ${escapeHtml(table.table_number)}" class="table-card__qr" />` : '';
     const status = String(table.availability_status || 'available');
+    const hasOrder = table.active_order_id ? '1' : '0';
+    const clickable = status === 'active' || status === 'paid' || hasOrder === '1';
     return `
-      <div class="table-card ${tableStatusClass(status)}" data-table-id="${table.id}" data-table-status="${escapeHtml(status)}" data-table-number="${escapeHtml(table.table_number)}">
+      <div class="table-card ${tableStatusClass(status)}${clickable ? ' table-card--clickable' : ''}" data-table-id="${table.id}" data-table-status="${escapeHtml(status)}" data-table-number="${escapeHtml(table.table_number)}" data-has-order="${hasOrder}">
         <div class="${tableBadgeClass(status)}">${escapeHtml(table.table_number)}</div>
         <p class="table-card__meta">Status: ${escapeHtml(tableStatusLabel(status))}</p>
+        ${tablePaymentPill(table)}
         ${qrImage}
         <p class="table-card__meta table-card__link">${table.qr_url
           ? `<a href="${escapeHtml(table.qr_url)}" target="_blank" rel="noreferrer">${escapeHtml(table.qr_url)}</a>`
@@ -353,6 +399,13 @@ async function loadTables() {
       } catch (error) {
         setMessage('ownerMessage', error.message, true);
       }
+    });
+  });
+
+  tableList.querySelectorAll('.table-card--clickable').forEach((card) => {
+    card.addEventListener('click', (event) => {
+      if (event.target.closest('button, a')) return;
+      openBillModalForTable(Number(card.dataset.tableId));
     });
   });
 
@@ -575,6 +628,7 @@ function initSocket() {
     // play notification sound for new orders
     try {
       if (payload && payload.type === 'created') {
+        loadTables().catch(() => {});
         try {
           const ctx = new (window.AudioContext || window.webkitAudioContext)();
           const o = ctx.createOscillator();
@@ -592,10 +646,10 @@ function initSocket() {
   });
 
   socket.on('table:update', (payload) => {
-    if (payload?.tableId && payload?.status) {
-      applyTableCardStatus(payload.tableId, payload.status);
-    }
     loadTables().catch((error) => setMessage('ownerMessage', error.message, true));
+    if (payload?.status === 'paid' && activeBillTableId === payload.tableId) {
+      openBillModalForTable(activeBillTableId).catch(() => {});
+    }
   });
 
   socket.on('invoice:created', () => {
@@ -768,6 +822,123 @@ document.getElementById('logoutBtn').addEventListener('click', () => {
 
 document.getElementById('refreshInvoicesBtn').addEventListener('click', async () => {
   await loadInvoices();
+});
+
+const paymentSettingsForm = document.getElementById('paymentSettingsForm');
+if (paymentSettingsForm) {
+  paymentSettingsForm.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const fd = new FormData(paymentSettingsForm);
+    try {
+      await apiRequest('/restaurants/owner/payment-settings', {
+        method: 'PATCH',
+        body: JSON.stringify({
+          upiVpa: fd.get('upiVpa'),
+          bankAccountName: fd.get('bankAccountName'),
+          bankName: fd.get('bankName'),
+        }),
+      }, true);
+      await loadRestaurant();
+      setMessage('ownerMessage', 'Payment details saved for UPI checkout.');
+    } catch (error) {
+      setMessage('ownerMessage', error.message, true);
+    }
+  });
+}
+
+document.getElementById('billModalClose')?.addEventListener('click', hideBillModal);
+document.getElementById('billModal')?.addEventListener('click', (event) => {
+  if (event.target.id === 'billModal') hideBillModal();
+});
+
+document.getElementById('billAddItemForm')?.addEventListener('submit', async (event) => {
+  event.preventDefault();
+  if (!activeBillOrder) return;
+  const select = document.getElementById('billMenuSelect');
+  const option = select.options[select.selectedIndex];
+  const menuItemId = Number(select.value);
+  const qty = Number(document.getElementById('billAddQty').value || 1);
+  if (!menuItemId) return;
+
+  try {
+    await apiRequest(`/orders/${activeBillOrder.id}/items`, {
+      method: 'POST',
+      body: JSON.stringify({
+        items: [{
+          menuItemId,
+          itemPrice: Number(option.dataset.price),
+          quantity: qty,
+        }],
+      }),
+    }, true);
+    setMessage('ownerMessage', 'Item added to running bill.');
+    await openBillModalForTable(activeBillTableId);
+    await loadTables();
+  } catch (error) {
+    setMessage('ownerMessage', error.message, true);
+  }
+});
+
+document.getElementById('billPayCash')?.addEventListener('click', async () => {
+  try {
+    await markBillPaid('cash');
+  } catch (error) {
+    setMessage('ownerMessage', error.message, true);
+  }
+});
+
+document.getElementById('billPayUpiOpen')?.addEventListener('click', () => {
+  const panel = document.getElementById('billUpiPanel');
+  panel?.classList.toggle('hidden');
+  const vpa = activeBillOrder?.upi_vpa || restaurantProfile?.upi_vpa;
+  if (!vpa) {
+    setMessage('ownerMessage', 'Save your restaurant UPI ID in payment settings first.', true);
+  }
+});
+
+document.getElementById('billUpiRequestForm')?.addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const customerUpi = document.getElementById('billCustomerUpi').value.trim();
+  if (!customerUpi) {
+    setMessage('ownerMessage', 'Enter guest UPI ID to send a request.', true);
+    return;
+  }
+  setMessage('ownerMessage', `Payment request noted for ${customerUpi}. Guest should approve in their UPI app.`);
+});
+
+document.getElementById('billMarkUpiPaid')?.addEventListener('click', async () => {
+  try {
+    const customerUpi = document.getElementById('billCustomerUpi').value.trim();
+    await markBillPaid('upi', customerUpi);
+  } catch (error) {
+    setMessage('ownerMessage', error.message, true);
+  }
+});
+
+document.getElementById('billTerminalReset')?.addEventListener('click', async () => {
+  if (!activeBillTableId) return;
+  try {
+    await apiRequest(`/restaurants/${restaurantId}/tables/${activeBillTableId}/terminal-reset`, { method: 'POST' }, true);
+    setMessage('ownerMessage', 'Table cleared for the next guest.');
+    hideBillModal();
+    await loadTables();
+  } catch (error) {
+    setMessage('ownerMessage', error.message, true);
+  }
+});
+
+document.getElementById('billPrintInvoice')?.addEventListener('click', async () => {
+  if (!activeBillOrder) return;
+  try {
+    const html = await fetchAuthorizedHtml(`/orders/${activeBillOrder.id}/invoice?format=html`);
+    const win = window.open('', '_blank');
+    win.document.write(html);
+    win.document.close();
+    win.focus();
+    win.print();
+  } catch (error) {
+    setMessage('ownerMessage', error.message, true);
+  }
 });
 
 initOwner();

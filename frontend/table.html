@@ -520,6 +520,38 @@
       .checkout-option strong { font-size: 1rem; }
       .checkout-option span { color: var(--muted); font-size: 0.9rem; }
 
+      .bill-upi-panel {
+        margin-top: 12px;
+        padding: 12px;
+        border-radius: 16px;
+        background: rgba(255,255,255,0.85);
+        border: 1px dashed var(--line);
+      }
+
+      .upi-app-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 8px;
+      }
+
+      .upi-app-btn {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 2.5rem;
+        border-radius: 12px;
+        font-weight: 600;
+        text-decoration: none;
+        color: #fff;
+        font-size: 0.82rem;
+      }
+
+      .upi-app-btn--phonepe { background: #5f259f; }
+      .upi-app-btn--gpay { background: #1a73e8; }
+      .upi-app-btn--paytm { background: #00baf2; color: #003a4d; }
+
+      .btn.full { width: 100%; margin-top: 8px; }
+
       .field { display: grid; gap: 6px; }
       .field label { font-size: 0.9rem; color: var(--muted); }
       .field input, .field textarea {
@@ -680,7 +712,7 @@
         <small id="stickyCount">0 items</small>
         <strong id="stickyTotal">INR 0.00</strong>
       </div>
-      <button class="btn btn-primary" id="proceedBtn" type="button">Proceed to Checkout</button>
+      <button class="btn btn-primary" id="proceedBtn" type="button">Book Food</button>
     </footer>
 
     <div id="checkoutModal" class="checkout-modal hidden" aria-hidden="true">
@@ -712,8 +744,21 @@
             </button>
             <button class="btn btn-primary checkout-option" id="upiCheckoutBtn" type="button">
               <strong>Pay via UPI</strong>
-              <span>Open UPI apps (PhonePe, GPay, Paytm) to send payment.</span>
+              <span>Open PhonePe, Google Pay, or Paytm with amount pre-filled.</span>
             </button>
+            <div id="upiAppsPanel" class="bill-upi-panel hidden">
+              <p class="hero-copy" style="margin:0 0 8px;color:var(--muted);font-size:.9rem;">Tap an app to pay the restaurant UPI directly.</p>
+              <div class="upi-app-grid">
+                <a id="customerUpiPhonePe" class="upi-app-btn upi-app-btn--phonepe" href="#">PhonePe</a>
+                <a id="customerUpiGPay" class="upi-app-btn upi-app-btn--gpay" href="#">Google Pay</a>
+                <a id="customerUpiPaytm" class="upi-app-btn upi-app-btn--paytm" href="#">Paytm</a>
+              </div>
+              <form id="customerUpiRequestForm" class="inline-form" style="margin-top:10px;">
+                <input id="customerUpiId" placeholder="Your UPI ID (for payment request)" />
+                <button class="btn btn-light" type="submit">Send Request to Pay</button>
+              </form>
+              <button id="customerUpiPaidBtn" class="btn btn-primary full" type="button">I Have Paid</button>
+            </div>
           </div>
 
           <div class="modal-actions">
@@ -1195,7 +1240,7 @@
       function showReceiptView(invoicePayload) {
         state.invoicePayload = invoicePayload;
         setView('receipt');
-        els.receiptMessage.textContent = 'Your order is confirmed. Thank you.';
+        els.receiptMessage.textContent = 'Thank you! Payment received. Please visit again.';
         els.receiptBox.innerHTML = `
           <div class="invoice-row"><span>Order ID</span><strong>#${invoicePayload.orderId}</strong></div>
           <div class="invoice-row"><span>Table ID</span><strong>${invoicePayload.tableId}</strong></div>
@@ -1247,7 +1292,9 @@
           startSessionPing();
         } catch (error) {
           if (error.status === 409 && error.data?.locked) {
-            setError(error.message || 'Table is currently in an active session.');
+            setError(error.message || (error.data?.orderPlaced
+              ? 'This table already has a running bill. Another scanner is locked.'
+              : 'Table is currently in an active session.'));
             return;
           }
           throw error;
@@ -1333,8 +1380,12 @@
           }
 
           if (!state.session) {
+            if (data.lock?.orderPlaced) {
+              setError('This table already has an active bill. Another guest cannot order until the restaurant clears the table.');
+              return;
+            }
             if (data.lock?.isLocked) {
-              setError('This table is already in use. Please scan the QR on the active table session.');
+              setError('This table is currently in use by another guest. Please wait or ask staff for help.');
               return;
             }
             await startOrJoinSession(false);
@@ -1391,6 +1442,13 @@
         });
       }
 
+      function lockTableAfterBooking(message) {
+        state.tableLocked = true;
+        els.proceedBtn.disabled = true;
+        els.stickyBar.classList.add('hidden');
+        setToast('menuToast', message || 'Bill sent to kitchen', 'success');
+      }
+
       async function handleCodCheckout() {
         try {
           const orderData = await placeOrder('cod');
@@ -1406,12 +1464,13 @@
           };
           closeCheckoutModal();
           setView('tracking');
-          showTrackingView(order, 'Order confirmed');
+          showTrackingView(order, 'Food booked — pay at counter');
           state.activeOrder = order;
           clearCartStorage();
           state.cart.clear();
           renderCart();
-          setToast('trackingStatusPill', 'Waiting for kitchen update', 'success');
+          lockTableAfterBooking('Food booked. Table locked for other scanners.');
+          setToast('trackingStatusPill', 'Waiting for kitchen', 'success');
         } catch (error) {
           setError(error.message || 'Checkout failed');
         }
@@ -1482,36 +1541,55 @@
         }
       }
 
+      let pendingUpiOrderId = null;
+
+      function bindCustomerUpiLinks(orderId, amount) {
+        const vpa = state.context.restaurant.upi_vpa || '';
+        if (!vpa) return false;
+        const params = new URLSearchParams({
+          pa: vpa,
+          pn: state.context.restaurant.name,
+          am: Number(amount || 0).toFixed(2),
+          cu: 'INR',
+          tn: `Order ${orderId} Table ${state.context.table.table_number}`,
+        });
+        const upiUrl = `upi://pay?${params.toString()}`;
+        document.getElementById('customerUpiPhonePe').href = upiUrl;
+        document.getElementById('customerUpiGPay').href = upiUrl;
+        document.getElementById('customerUpiPaytm').href = upiUrl;
+        return true;
+      }
+
       async function handleUpiCheckout() {
         try {
           const orderData = await placeOrder('upi');
-          const amount = Number(orderData.totalAmount || 0).toFixed(2);
-          const vpa = state.context.restaurant.upi_vpa || state.context.restaurant.upi || '';
+          pendingUpiOrderId = orderData.orderId;
+          const amount = orderData.totalAmount;
+          const vpa = state.context.restaurant.upi_vpa || '';
           if (!vpa) {
-            throw new Error('Restaurant UPI ID not configured');
+            throw new Error('Restaurant UPI is not configured. Ask staff to pay at counter.');
           }
 
-          const returnUrl = `${window.location.origin}${window.location.pathname}?orderId=${orderData.orderId}&upi_return=1`;
+          lockTableAfterBooking('Bill created. Complete UPI payment below.');
+          if (!bindCustomerUpiLinks(orderData.orderId, amount)) {
+            throw new Error('Unable to build UPI payment link');
+          }
 
-          const params = new URLSearchParams({
-            pa: vpa,
-            pn: state.context.restaurant.name,
-            am: amount,
-            cu: 'INR',
-            tn: `Order ${orderData.orderId} Table ${state.context.table.table_number}`,
-            tr: `order_${orderData.orderId}`,
-            url: returnUrl,
-          });
-
-          const upiUrl = `upi://pay?${params.toString()}`;
-
-          // Attempt to open UPI app
-          window.location.href = upiUrl;
-
-          // Fallback: show instruction if not redirected
-          setTimeout(() => {
-            setError('If your UPI app did not open, please copy the UPI ID and pay manually, then click "I have paid".');
-          }, 1200);
+          document.getElementById('upiAppsPanel').classList.remove('hidden');
+          state.activeOrder = {
+            orderId: orderData.orderId,
+            totalAmount: amount,
+            customerName: els.customerName.value.trim() || 'Guest',
+            items: Array.from(state.cart.values()).map((item) => ({
+              name: item.name,
+              quantity: item.quantity,
+              lineTotal: Number(item.lockedPrice || item.price) * Number(item.quantity),
+            })),
+          };
+          clearCartStorage();
+          state.cart.clear();
+          renderCart();
+          setError('Choose PhonePe, GPay, or Paytm — amount is pre-filled for the restaurant.');
         } catch (error) {
           setError(error.message || 'UPI payment failed');
         }
@@ -1528,6 +1606,33 @@
         els.codCheckoutBtn.addEventListener('click', handleCodCheckout);
         els.onlineCheckoutBtn.addEventListener('click', handleOnlineCheckout);
         if (els.upiCheckoutBtn) els.upiCheckoutBtn.addEventListener('click', handleUpiCheckout);
+
+        document.getElementById('customerUpiPaidBtn')?.addEventListener('click', async () => {
+          if (!pendingUpiOrderId) {
+            setError('Place your order first using Pay via UPI.');
+            return;
+          }
+          try {
+            await apiRequest('/api/payments/upi/confirm', {
+              method: 'POST',
+              body: JSON.stringify({ orderId: pendingUpiOrderId }),
+            });
+            document.getElementById('upiAppsPanel').classList.add('hidden');
+            await finalizePaidReceipt(state.activeOrder, 'paid');
+          } catch (error) {
+            setError(error.message || 'Could not confirm payment');
+          }
+        });
+
+        document.getElementById('customerUpiRequestForm')?.addEventListener('submit', (event) => {
+          event.preventDefault();
+          const guestUpi = document.getElementById('customerUpiId').value.trim();
+          if (!guestUpi) {
+            setError('Enter your UPI ID first.');
+            return;
+          }
+          setError(`Payment request prepared for ${guestUpi}. Approve the request in your UPI app, then tap "I Have Paid".`);
+        });
       }
 
       attachEvents();

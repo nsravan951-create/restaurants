@@ -101,6 +101,23 @@ router.post('/start', asyncHandler(async (req, res) => {
     const existing = activeRows[0];
 
     if (existing) {
+      const { rows: sessionOrderRows } = await conn.query(
+        `SELECT id FROM orders
+         WHERE table_session_id = $1 AND payment_status = 'pending'
+         LIMIT 1`,
+        [existing.id]
+      );
+      const orderLocked = sessionOrderRows.length > 0;
+
+      if (orderLocked && data.sessionToken !== existing.session_token) {
+        await conn.query('ROLLBACK');
+        return res.status(409).json({
+          locked: true,
+          orderPlaced: true,
+          message: 'This table already has an active bill. Another guest cannot scan this QR until payment is complete.',
+        });
+      }
+
       if (data.sessionToken && data.sessionToken === existing.session_token) {
         const nextExpiry = getSessionExpiryDate();
         await conn.query(
@@ -122,7 +139,7 @@ router.post('/start', asyncHandler(async (req, res) => {
         });
       }
 
-      if (data.joinExisting) {
+      if (data.joinExisting && !orderLocked) {
         const nextExpiry = getSessionExpiryDate();
         await conn.query(
           'UPDATE table_sessions SET last_activity_at = NOW(), expires_at = $1 WHERE id = $2',

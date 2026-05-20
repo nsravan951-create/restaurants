@@ -511,6 +511,167 @@ select:focus {
   }
 }
 
+.table-card--clickable {
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.table-card--clickable:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 14px 28px rgba(16, 17, 27, 0.1);
+}
+
+.table-card__pay-pill {
+  display: inline-flex;
+  margin-top: 0.45rem;
+  padding: 0.2rem 0.65rem;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.table-card__pay-pill--cash {
+  background: rgba(50, 120, 220, 0.14);
+  color: #1f4f9c;
+}
+
+.table-card__pay-pill--upi {
+  background: rgba(110, 70, 220, 0.14);
+  color: #4f2ca8;
+}
+
+.table-card__pay-pill--bill {
+  background: rgba(255, 140, 20, 0.14);
+  color: #b55100;
+}
+
+.owner-payment-form {
+  margin-bottom: 1rem;
+}
+
+.bill-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding: 1rem;
+  background: rgba(12, 16, 28, 0.55);
+  backdrop-filter: blur(4px);
+}
+
+.bill-modal__sheet {
+  width: min(720px, 100%);
+  max-height: 92vh;
+  overflow: auto;
+  background: #fff;
+  border-radius: 22px 22px 16px 16px;
+  box-shadow: 0 24px 60px rgba(10, 14, 30, 0.22);
+}
+
+.bill-modal__head {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1.25rem 1.35rem 0.5rem;
+  border-bottom: 1px solid #eef1f6;
+}
+
+.bill-modal__body {
+  padding: 1rem 1.35rem 1.35rem;
+}
+
+.bill-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 1rem 0;
+  font-size: 0.92rem;
+}
+
+.bill-table th,
+.bill-table td {
+  padding: 0.55rem 0.35rem;
+  border-bottom: 1px solid #eef1f6;
+  text-align: left;
+}
+
+.bill-table tfoot td {
+  border-bottom: 0;
+  font-size: 1.05rem;
+}
+
+.bill-add-section,
+.bill-pay-section {
+  margin-top: 1.25rem;
+  padding-top: 1rem;
+  border-top: 1px dashed #e5e9f0;
+}
+
+.pay-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+}
+
+.pay-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.2rem;
+  padding: 1rem;
+  border: 0;
+  border-radius: 16px;
+  cursor: pointer;
+  text-align: left;
+  color: #fff;
+}
+
+.pay-btn__icon {
+  font-size: 1.35rem;
+  font-weight: 700;
+}
+
+.pay-btn--cash {
+  background: linear-gradient(135deg, #2f6fed, #1f4f9c);
+}
+
+.pay-btn--upi {
+  background: linear-gradient(135deg, #6a4ce8, #4f2ca8);
+}
+
+.bill-upi-panel {
+  margin-top: 0.85rem;
+  padding: 0.85rem;
+  border-radius: 14px;
+  background: #f7f8fc;
+}
+
+.upi-app-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.55rem;
+  margin: 0.65rem 0;
+}
+
+.upi-app-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 2.6rem;
+  border-radius: 12px;
+  font-weight: 600;
+  text-decoration: none;
+  color: #fff;
+}
+
+.upi-app-btn--phonepe { background: #5f259f; }
+.upi-app-btn--gpay { background: #1a73e8; }
+.upi-app-btn--paytm { background: #00baf2; color: #003a4d; }
+
+.btn.full { width: 100%; margin-top: 0.5rem; }
+
 @media (max-width: 900px) {
   .owner-grid,
   .analytics-grid {

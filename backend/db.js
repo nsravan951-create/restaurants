@@ -43,6 +43,28 @@ const schemaReady = (async () => {
         ) THEN
           ALTER TABLE orders ADD COLUMN upi_txn_ref VARCHAR(120);
         END IF;
+
+        IF NOT EXISTS (
+          SELECT 1 FROM information_schema.columns WHERE table_name = 'restaurants' AND column_name = 'upi_vpa'
+        ) THEN
+          ALTER TABLE restaurants ADD COLUMN upi_vpa VARCHAR(120);
+        END IF;
+
+        IF NOT EXISTS (
+          SELECT 1 FROM information_schema.columns WHERE table_name = 'restaurants' AND column_name = 'bank_account_name'
+        ) THEN
+          ALTER TABLE restaurants ADD COLUMN bank_account_name VARCHAR(120);
+        END IF;
+
+        IF NOT EXISTS (
+          SELECT 1 FROM information_schema.columns WHERE table_name = 'restaurants' AND column_name = 'bank_name'
+        ) THEN
+          ALTER TABLE restaurants ADD COLUMN bank_name VARCHAR(120);
+        END IF;
+
+        ALTER TABLE orders DROP CONSTRAINT IF EXISTS chk_orders_payment_method;
+        ALTER TABLE orders ADD CONSTRAINT chk_orders_payment_method
+          CHECK (payment_method IN ('online', 'cod', 'upi', 'cash'));
       END $$;
     `);
   } catch (error) {

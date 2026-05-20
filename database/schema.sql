@@ -19,6 +19,9 @@ CREATE TABLE IF NOT EXISTS restaurants (
   slug VARCHAR(180) NOT NULL UNIQUE,
   phone VARCHAR(30) NULL,
   address VARCHAR(255) NULL,
+  upi_vpa VARCHAR(120) NULL,
+  bank_account_name VARCHAR(120) NULL,
+  bank_name VARCHAR(120) NULL,
   is_active BOOLEAN DEFAULT TRUE,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   CONSTRAINT fk_restaurants_owner FOREIGN KEY (owner_user_id) REFERENCES users(id) ON DELETE CASCADE
@@ -104,7 +107,7 @@ CREATE TABLE IF NOT EXISTS orders (
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   CONSTRAINT uniq_order_per_session UNIQUE (table_session_id),
   CONSTRAINT chk_orders_status CHECK (status IN ('pending', 'preparing', 'ready', 'delivered')),
-  CONSTRAINT chk_orders_payment_method CHECK (payment_method IN ('online', 'cod')),
+  CONSTRAINT chk_orders_payment_method CHECK (payment_method IN ('online', 'cod', 'upi', 'cash')),
   CONSTRAINT chk_orders_payment_status CHECK (payment_status IN ('pending', 'paid', 'failed')),
   CONSTRAINT fk_orders_restaurant FOREIGN KEY (restaurant_id) REFERENCES restaurants(id) ON DELETE CASCADE,
   CONSTRAINT fk_orders_table FOREIGN KEY (table_id) REFERENCES restaurant_tables(id) ON DELETE CASCADE,

@@ -32,9 +32,37 @@ router.param('restaurantId', (req, res, next, restaurantId) => {
 });
 
 router.get('/owner/me', requireAuth(['owner']), asyncHandler(async (req, res) => {
-  const { rows } = await pool.query('SELECT id, name, slug, phone, address, is_active FROM restaurants WHERE owner_user_id = $1 LIMIT 1', [req.user.userId]);
+  const { rows } = await pool.query(
+    `SELECT id, name, slug, phone, address, is_active, upi_vpa, bank_account_name, bank_name
+     FROM restaurants WHERE owner_user_id = $1 LIMIT 1`,
+    [req.user.userId]
+  );
   if (!rows.length) return res.status(404).json({ message: 'Restaurant not found' });
   return res.json({ restaurant: rows[0] });
+}));
+
+router.patch('/owner/payment-settings', requireAuth(['owner']), asyncHandler(async (req, res) => {
+  const { upiVpa, bankAccountName, bankName } = req.body || {};
+  const { rows } = await pool.query('SELECT id FROM restaurants WHERE owner_user_id = $1 LIMIT 1', [req.user.userId]);
+  if (!rows.length) return res.status(404).json({ message: 'Restaurant not found' });
+
+  await pool.query(
+    `UPDATE restaurants
+     SET upi_vpa = $1, bank_account_name = $2, bank_name = $3
+     WHERE id = $4`,
+    [
+      String(upiVpa || '').trim() || null,
+      String(bankAccountName || '').trim() || null,
+      String(bankName || '').trim() || null,
+      rows[0].id,
+    ]
+  );
+
+  const { rows: updated } = await pool.query(
+    'SELECT id, name, upi_vpa, bank_account_name, bank_name FROM restaurants WHERE id = $1',
+    [rows[0].id]
+  );
+  return res.json({ message: 'Payment settings saved', restaurant: updated[0] });
 }));
 
 async function ensureCanonicalQrLinks(restaurantId, tables) {
@@ -72,9 +100,18 @@ router.get('/:restaurantId/tables', requireAuth(['owner', 'super_admin', 'staff'
   await expireInactiveSessions();
 
   let { rows } = await pool.query(
-    `SELECT t.id, t.table_number, t.availability_status, t.qr_token, q.qr_url, q.qr_data_url, t.created_at
+    `SELECT t.id, t.table_number, t.availability_status, t.qr_token, q.qr_url, q.qr_data_url, t.created_at,
+            lo.active_order_id, lo.total_amount AS order_total, lo.payment_method AS order_payment_method,
+            lo.payment_status AS order_payment_status
      FROM restaurant_tables t
      LEFT JOIN qr_codes q ON q.table_id = t.id
+     LEFT JOIN LATERAL (
+       SELECT o.id AS active_order_id, o.total_amount, o.payment_method, o.payment_status
+       FROM orders o
+       WHERE o.table_id = t.id
+       ORDER BY o.id DESC
+       LIMIT 1
+     ) lo ON TRUE
      WHERE t.restaurant_id = $1
      ORDER BY t.table_number ASC`,
     [restaurantId]
@@ -131,6 +168,9 @@ router.get('/table/:tableId', asyncHandler(async (req, res) => {
        r.name as restaurant_name,
        r.phone as restaurant_phone,
        r.address as restaurant_address,
+       r.upi_vpa,
+       r.bank_account_name,
+       r.bank_name,
        NULL as restaurant_logo
      FROM restaurant_tables t
      INNER JOIN restaurants r ON r.id = t.restaurant_id
@@ -161,6 +201,25 @@ router.get('/table/:tableId', asyncHandler(async (req, res) => {
     [tableData.restaurant_id]
   );
 
+  const { rows: activeSessionRows } = await pool.query(
+    `SELECT id, expires_at, session_token
+     FROM table_sessions
+     WHERE restaurant_id = $1 AND table_id = $2 AND status = 'active'
+     ORDER BY id DESC LIMIT 1`,
+    [tableData.restaurant_id, tableId]
+  );
+
+  const { rows: activeOrderRows } = await pool.query(
+    `SELECT id, payment_status
+     FROM orders
+     WHERE table_id = $1 AND payment_status = 'pending'
+     ORDER BY id DESC LIMIT 1`,
+    [tableId]
+  );
+
+  const orderPlaced = activeOrderRows.length > 0;
+  const session = activeSessionRows[0] || null;
+
   return res.json({
     table: {
       id: tableData.id,
@@ -171,7 +230,16 @@ router.get('/table/:tableId', asyncHandler(async (req, res) => {
       name: tableData.restaurant_name,
       phone: tableData.restaurant_phone,
       address: tableData.restaurant_address,
+      upi_vpa: tableData.upi_vpa,
+      bank_account_name: tableData.bank_account_name,
+      bank_name: tableData.bank_name,
       logo: tableData.restaurant_logo,
+    },
+    lock: {
+      isLocked: orderPlaced || Boolean(session),
+      orderPlaced,
+      expiresAt: session?.expires_at || null,
+      reason: orderPlaced ? 'order_placed' : (session ? 'session_active' : null),
     },
     menu: menuRows,
   });
