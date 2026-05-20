@@ -147,19 +147,25 @@ function applyTableCardStatus(tableId, status) {
 function showBillModal() {
   const modal = document.getElementById('billModal');
   if (!modal) return;
+  modal.classList.add('is-open');
   modal.classList.remove('hidden');
   modal.setAttribute('aria-hidden', 'false');
+  document.body.classList.add('bill-modal-open');
 }
 
 function hideBillModal() {
   const modal = document.getElementById('billModal');
   if (!modal) return;
+  modal.classList.remove('is-open');
   modal.classList.add('hidden');
   modal.setAttribute('aria-hidden', 'true');
+  document.body.classList.remove('bill-modal-open');
   document.getElementById('billUpiPanel')?.classList.add('hidden');
   document.getElementById('billAddSection')?.classList.add('hidden');
   document.getElementById('billPaySection')?.classList.add('hidden');
   document.getElementById('billPaidActions')?.classList.add('hidden');
+  activeBillOrder = null;
+  activeBillTableId = null;
 }
 
 function fillBillMenuSelect() {
@@ -203,9 +209,13 @@ function renderBillModal(order, tableId) {
   document.getElementById('billPaySection').classList.toggle('hidden', !isRunning);
   document.getElementById('billPaidActions').classList.toggle('hidden', !isPaid);
 
-  const billTitle = document.querySelector('#billModal .eyebrow');
+  const billTitle = document.getElementById('billModalEyebrow');
   if (billTitle) {
     billTitle.textContent = isRunning ? 'Running bill' : 'Paid bill';
+  }
+
+  if (isRunning) {
+    fillBillMenuSelect();
   }
   document.getElementById('billPaidMessage').textContent = isPaid
     ? `Payment received via ${String(order.payment_method || '').toUpperCase()}. Thank you — visit again!`
@@ -224,18 +234,30 @@ function renderBillModal(order, tableId) {
   document.getElementById('upiLinkPhonePe').href = upiBase;
   document.getElementById('upiLinkGPay').href = upiBase;
   document.getElementById('upiLinkPaytm').href = upiBase;
-
-  fillBillMenuSelect();
 }
 
-async function openBillModalForTable(tableId) {
+async function openBillModalForTable(tableId, { allowPaid = false } = {}) {
   try {
-    const res = await apiRequest(`/orders/table/${tableId}/active`, {}, true);
+    const pendingQuery = allowPaid ? '' : '?pendingOnly=true';
+    const res = await apiRequest(`/orders/table/${tableId}/active${pendingQuery}`, {}, true);
     const order = res.order || null;
 
     if (!order) {
-      setMessage('ownerMessage', 'No running bill on this table yet. Waiting for guest to book food.', true);
+      setMessage('ownerMessage', 'No running bill on this table yet. Wait until a guest taps Book Food.', true);
       return;
+    }
+
+    const isPaid = String(order.payment_status || '').toLowerCase() === 'paid';
+    if (isPaid && !allowPaid) {
+      setMessage('ownerMessage', 'This bill is already paid. Tap a green table for receipt.', false);
+      return;
+    }
+
+    if (!isPaid && !allowPaid) {
+      const items = parseOrderItems(order.items);
+      if (!items.length) {
+        setMessage('ownerMessage', 'Bill has no items yet. Add items after the guest books food.', true);
+      }
     }
 
     renderBillModal(order, tableId);
@@ -251,10 +273,10 @@ async function markBillPaid(method, customerUpi = '') {
     method: 'POST',
     body: JSON.stringify({ method, customerUpi }),
   }, true);
+  hideBillModal();
   setMessage('ownerMessage', method === 'cash' ? 'Cash recorded — table is green.' : 'UPI payment confirmed.');
   await loadTables();
   await loadInvoices();
-  await openBillModalForTable(activeBillTableId);
 }
 
 function setActiveSection(sectionName) {
@@ -426,11 +448,11 @@ async function loadTables() {
       if (event.target.closest('button, a')) return;
       const tableId = Number(card.dataset.tableId);
       if (card.dataset.runningBill === '1') {
-        openBillModalForTable(tableId);
+        openBillModalForTable(tableId, { allowPaid: false });
         return;
       }
       if (card.dataset.tableStatus === 'paid') {
-        openBillModalForTable(tableId);
+        openBillModalForTable(tableId, { allowPaid: true });
       }
     });
   });
@@ -671,11 +693,8 @@ function initSocket() {
     } catch (e) {}
   });
 
-  socket.on('table:update', (payload) => {
+  socket.on('table:update', () => {
     loadTables().catch((error) => setMessage('ownerMessage', error.message, true));
-    if (payload?.status === 'paid' && activeBillTableId === payload.tableId) {
-      openBillModalForTable(activeBillTableId).catch(() => {});
-    }
   });
 
   socket.on('invoice:created', () => {
@@ -685,6 +704,8 @@ function initSocket() {
 
 async function initOwner() {
   if (!mustOwnerAuth()) return;
+
+  hideBillModal();
 
   try {
     await loadRestaurant();
@@ -872,19 +893,48 @@ if (paymentSettingsForm) {
   });
 }
 
-document.getElementById('billModalClose')?.addEventListener('click', hideBillModal);
-document.getElementById('billModal')?.addEventListener('click', (event) => {
-  if (event.target.id === 'billModal') hideBillModal();
-});
+function initBillModalEvents() {
+  const modal = document.getElementById('billModal');
+  const sheet = modal?.querySelector('.bill-modal__sheet');
+  const closeBtn = document.getElementById('billModalClose');
+
+  closeBtn?.addEventListener('click', (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    hideBillModal();
+  });
+
+  modal?.addEventListener('click', (event) => {
+    if (event.target === modal) hideBillModal();
+  });
+
+  sheet?.addEventListener('click', (event) => {
+    event.stopPropagation();
+  });
+
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape' && modal?.classList.contains('is-open')) {
+      hideBillModal();
+    }
+  });
+}
+
+initBillModalEvents();
 
 document.getElementById('billAddItemForm')?.addEventListener('submit', async (event) => {
   event.preventDefault();
-  if (!activeBillOrder) return;
+  if (!activeBillOrder || !activeBillTableId) {
+    setMessage('ownerMessage', 'Open a running bill from an orange table first.', true);
+    return;
+  }
   const select = document.getElementById('billMenuSelect');
   const option = select.options[select.selectedIndex];
   const menuItemId = Number(select.value);
   const qty = Number(document.getElementById('billAddQty').value || 1);
-  if (!menuItemId) return;
+  if (!menuItemId) {
+    setMessage('ownerMessage', 'Select a menu item to add.', true);
+    return;
+  }
 
   try {
     await apiRequest(`/orders/${activeBillOrder.id}/items`, {

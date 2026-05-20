@@ -281,6 +281,11 @@ router.get('/table/:tableId/active', requireAuth(['owner', 'super_admin', 'kitch
   const tableId = Number(req.params.tableId);
   if (!tableId) return res.status(400).json({ message: 'tableId is required' });
 
+  const pendingOnly = String(req.query.pendingOnly || '').toLowerCase() === 'true';
+  const statusFilter = pendingOnly
+    ? "AND o.payment_status = 'pending'"
+    : '';
+
   const { rows } = await pool.query(
     `SELECT o.id, o.restaurant_id, o.table_id, o.table_number, o.customer_name, o.status,
             o.total_amount, o.payment_method, o.payment_status, o.created_at,
@@ -288,8 +293,8 @@ router.get('/table/:tableId/active', requireAuth(['owner', 'super_admin', 'kitch
       COALESCE(json_agg(json_build_object('id', oi.id, 'menu_item_id', oi.menu_item_id, 'item_name', oi.item_name, 'item_price', oi.item_price, 'quantity', oi.quantity, 'unit_price', oi.unit_price, 'line_total', oi.line_total) ORDER BY oi.id), '[]'::json) AS items
      FROM orders o
      JOIN restaurants r ON r.id = o.restaurant_id
-     JOIN order_items oi ON oi.order_id = o.id
-     WHERE o.table_id = $1
+     LEFT JOIN order_items oi ON oi.order_id = o.id
+     WHERE o.table_id = $1 ${statusFilter}
      GROUP BY o.id, r.name, r.upi_vpa, r.bank_account_name, r.bank_name
      ORDER BY o.created_at DESC
      LIMIT 1`,

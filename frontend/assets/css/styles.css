@@ -550,16 +550,28 @@ select:focus {
   margin-bottom: 1rem;
 }
 
+body.bill-modal-open {
+  overflow: hidden;
+}
+
 .bill-modal {
   position: fixed;
   inset: 0;
   z-index: 1200;
-  display: flex;
+  display: none;
   align-items: flex-end;
   justify-content: center;
   padding: 1rem;
   background: rgba(12, 16, 28, 0.55);
   backdrop-filter: blur(4px);
+}
+
+.bill-modal.is-open {
+  display: flex;
+}
+
+.bill-modal.hidden {
+  display: none !important;
 }
 
 .bill-modal__sheet {
@@ -574,9 +586,19 @@ select:focus {
 .bill-modal__head {
   display: flex;
   justify-content: space-between;
+  align-items: flex-start;
   gap: 1rem;
   padding: 1.25rem 1.35rem 0.5rem;
   border-bottom: 1px solid #eef1f6;
+  position: sticky;
+  top: 0;
+  background: #fff;
+  z-index: 2;
+}
+
+.bill-modal__close {
+  flex-shrink: 0;
+  min-width: 5.5rem;
 }
 
 .bill-modal__body {
