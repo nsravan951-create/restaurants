@@ -84,6 +84,26 @@ function tableBadgeClass(status) {
   return 'table-card__badge table-card__badge--available';
 }
 
+function applyTableCardStatus(tableId, status) {
+  const card = document.querySelector(`[data-table-id="${tableId}"]`);
+  if (!card) return;
+
+  const normalized = String(status || 'available');
+  card.className = `table-card ${tableStatusClass(normalized)}`;
+  card.dataset.tableStatus = normalized;
+
+  const badge = card.querySelector('.table-card__badge');
+  if (badge) {
+    badge.className = tableBadgeClass(normalized);
+    if (card.dataset.tableNumber) badge.textContent = card.dataset.tableNumber;
+  }
+
+  const statusMeta = card.querySelector('.table-card__meta');
+  if (statusMeta) {
+    statusMeta.textContent = `Status: ${tableStatusLabel(normalized)}`;
+  }
+}
+
 function showModal() {
   const m = document.getElementById('orderModal');
   if (!m) return;
@@ -269,7 +289,7 @@ async function loadTables() {
     const qrImage = table.qr_data_url ? `<img src="${table.qr_data_url}" alt="QR for ${escapeHtml(table.table_number)}" class="table-card__qr" />` : '';
     const status = String(table.availability_status || 'available');
     return `
-      <div class="table-card ${tableStatusClass(status)}">
+      <div class="table-card ${tableStatusClass(status)}" data-table-id="${table.id}" data-table-status="${escapeHtml(status)}" data-table-number="${escapeHtml(table.table_number)}">
         <div class="${tableBadgeClass(status)}">${escapeHtml(table.table_number)}</div>
         <p class="table-card__meta">Status: ${escapeHtml(tableStatusLabel(status))}</p>
         ${qrImage}
@@ -553,8 +573,14 @@ function initSocket() {
   });
 
   socket.on('table:update', (payload) => {
-    // refresh tables when table status changes
+    if (payload?.tableId && payload?.status) {
+      applyTableCardStatus(payload.tableId, payload.status);
+    }
     loadTables().catch((error) => setMessage('ownerMessage', error.message, true));
+  });
+
+  socket.on('invoice:created', () => {
+    loadInvoices().catch(() => {});
   });
 }
 

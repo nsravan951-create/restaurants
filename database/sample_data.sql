@@ -1,9 +1,9 @@
 -- PostgreSQL seed data for qr_restaurant.
 
--- Replace password_hash with a bcrypt hash generated for your preferred demo password.
+-- Demo password: password123
 WITH new_user AS (
 	INSERT INTO users (name, email, password_hash, role)
-	VALUES ('Demo Owner', 'owner@demo.com', '$2b$10$e0NRMxr5W4P4MlbVxQz1E.7a4fXn7Y4XQXJo4PQ4vYQ0c5hV0s5ri', 'owner')
+	VALUES ('Demo Owner', 'owner@demo.com', '$2a$10$EwzQevGZmGaNpWRrmhd3TOdQh0iRsKDj7iFY//Apwy0rndcEeH6vi', 'owner')
 	RETURNING id
 ), new_restaurant AS (
 	INSERT INTO restaurants (owner_user_id, name, slug, phone, address)

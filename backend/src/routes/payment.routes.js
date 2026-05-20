@@ -5,8 +5,9 @@ const Razorpay = require('razorpay');
 const pool = require('../config/db');
 const asyncHandler = require('../utils/asyncHandler');
 const { endSessionByOrderId } = require('../utils/tableSession');
-const { emitOrderUpdate, emitTableUpdate } = require('../services/socket');
+const { emitOrderUpdate } = require('../services/socket');
 const { buildInvoiceModel, renderInvoiceHtml } = require('../utils/invoice');
+const { syncInvoiceForOrder } = require('../utils/invoiceSync');
 
 const router = express.Router();
 
@@ -73,6 +74,7 @@ router.post('/verify', asyncHandler(async (req, res) => {
   );
 
   await endSessionByOrderId(orderId, 'payment_completed');
+  await syncInvoiceForOrder(orderId);
 
   return res.json({ message: 'Payment verified successfully' });
 }));
@@ -86,12 +88,18 @@ router.post('/upi/confirm', asyncHandler(async (req, res) => {
   await pool.query('UPDATE orders SET payment_status = $1 WHERE id = $2', ['paid', orderId]);
 
   await endSessionByOrderId(orderId, 'payment_completed');
+  await syncInvoiceForOrder(orderId);
 
-  // fetch order, restaurant and items to render invoice
-  const { rows: orderRows } = await pool.query('SELECT id, restaurant_id, table_number, customer_name, total_amount, status, payment_method, payment_status, created_at FROM orders WHERE id = $1 LIMIT 1', [orderId]);
+  const { rows: orderRows } = await pool.query(
+    'SELECT id, restaurant_id, table_number, customer_name, total_amount, status, payment_method, payment_status, created_at FROM orders WHERE id = $1 LIMIT 1',
+    [orderId]
+  );
   if (!orderRows.length) return res.status(404).json({ message: 'Order not found' });
 
-  const { rows: restaurantRows } = await pool.query('SELECT id, name FROM restaurants WHERE id = $1 LIMIT 1', [orderRows[0].restaurant_id]);
+  const { rows: restaurantRows } = await pool.query(
+    'SELECT id, name FROM restaurants WHERE id = $1 LIMIT 1',
+    [orderRows[0].restaurant_id]
+  );
 
   const { rows: itemRows } = await pool.query(
     `SELECT item_name, item_price, quantity, line_total
@@ -101,11 +109,11 @@ router.post('/upi/confirm', asyncHandler(async (req, res) => {
     [orderId]
   );
 
-  // emit realtime notifications
   try {
     emitOrderUpdate(orderRows[0].restaurant_id, { type: 'paid', orderId: Number(orderId) });
-    emitTableUpdate(orderRows[0].restaurant_id, { tableId: orderRows[0].table_number, status: 'paid' });
-  } catch (e) {}
+  } catch (error) {
+    // non-fatal
+  }
 
   const model = buildInvoiceModel(orderRows[0], restaurantRows[0], itemRows);
   return res.send(renderInvoiceHtml(model));
@@ -131,14 +139,15 @@ router.post('/upi/webhook', asyncHandler(async (req, res) => {
 
   await pool.query('UPDATE orders SET payment_status = $1, upi_txn_ref = $2 WHERE id = $3', ['paid', txnRef || null, orderId]);
   await endSessionByOrderId(orderId, 'payment_completed');
+  await syncInvoiceForOrder(orderId);
 
-  // emit realtime update
   const { rows: orderRows2 } = await pool.query('SELECT restaurant_id FROM orders WHERE id = $1 LIMIT 1', [orderId]);
   if (orderRows2.length) {
     try {
       emitOrderUpdate(orderRows2[0].restaurant_id, { type: 'paid', orderId: Number(orderId) });
-      emitTableUpdate(orderRows2[0].restaurant_id, { tableId: orderRows2[0].table_id, status: 'paid' });
-    } catch (e) {}
+    } catch (error) {
+      // non-fatal
+    }
   }
 
   return res.json({ message: 'ok' });

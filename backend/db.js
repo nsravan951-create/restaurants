@@ -1,10 +1,11 @@
 const { Pool } = require('pg');
 
+const useSsl = process.env.DATABASE_SSL === 'true'
+  || (process.env.NODE_ENV === 'production' && process.env.DATABASE_SSL !== 'false');
+
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  ssl: {
-    rejectUnauthorized: false,
-  },
+  ssl: useSsl ? { rejectUnauthorized: false } : false,
 });
 
 const schemaReady = (async () => {
@@ -35,6 +36,12 @@ const schemaReady = (async () => {
           SELECT 1 FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace WHERE c.relname = 'uniq_orders_idempotency_key'
         ) THEN
           CREATE UNIQUE INDEX uniq_orders_idempotency_key ON orders (idempotency_key) WHERE idempotency_key IS NOT NULL;
+        END IF;
+
+        IF NOT EXISTS (
+          SELECT 1 FROM information_schema.columns WHERE table_name = 'orders' AND column_name = 'upi_txn_ref'
+        ) THEN
+          ALTER TABLE orders ADD COLUMN upi_txn_ref VARCHAR(120);
         END IF;
       END $$;
     `);

@@ -8,7 +8,7 @@ function ensureAdminAuth() {
 }
 
 async function loadSummary() {
-  const data = await apiRequest('/admin/summary', {}, true);
+  const data = await apiRequest('/api/admin/summary', {}, true);
   document.getElementById('summaryCards').innerHTML = `
     <div class="card"><h3>${data.totalOrders}</h3><p>Total Orders</p></div>
     <div class="card"><h3>${data.totalRestaurants}</h3><p>Total Restaurants</p></div>
@@ -17,7 +17,7 @@ async function loadSummary() {
 }
 
 async function loadRestaurants() {
-  const data = await apiRequest('/admin/restaurants', {}, true);
+  const data = await apiRequest('/api/admin/restaurants', {}, true);
   const root = document.getElementById('restaurantsTable');
 
   root.innerHTML = data.restaurants.map((restaurant) => `
@@ -32,7 +32,7 @@ async function loadRestaurants() {
   root.querySelectorAll('button[data-toggle-restaurant]').forEach((button) => {
     button.addEventListener('click', async () => {
       try {
-        await apiRequest(`/admin/restaurants/${button.dataset.toggleRestaurant}/toggle`, { method: 'PATCH' }, true);
+        await apiRequest(`/api/admin/restaurants/${button.dataset.toggleRestaurant}/toggle`, { method: 'PATCH' }, true);
         await loadRestaurants();
       } catch (error) {
         setMessage('adminMessage', error.message, true);
@@ -42,7 +42,7 @@ async function loadRestaurants() {
 }
 
 async function loadAds() {
-  const data = await apiRequest('/ads', {}, true);
+  const data = await apiRequest('/api/ads', {}, true);
   const root = document.getElementById('adsList');
 
   root.innerHTML = data.ads.map((ad) => `
@@ -57,7 +57,7 @@ async function loadAds() {
   root.querySelectorAll('button[data-delete-ad]').forEach((button) => {
     button.addEventListener('click', async () => {
       try {
-        await apiRequest(`/ads/${button.dataset.deleteAd}`, { method: 'DELETE' }, true);
+        await apiRequest(`/api/ads/${button.dataset.deleteAd}`, { method: 'DELETE' }, true);
         await loadAds();
       } catch (error) {
         setMessage('adminMessage', error.message, true);
@@ -71,7 +71,7 @@ document.getElementById('adForm').addEventListener('submit', async (event) => {
   const formData = new FormData(event.target);
 
   try {
-    await apiRequest('/ads', {
+    await apiRequest('/api/ads', {
       method: 'POST',
       body: JSON.stringify({
         title: formData.get('title'),

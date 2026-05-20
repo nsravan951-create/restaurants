@@ -149,6 +149,22 @@ router.post('/', asyncHandler(async (req, res) => {
       });
     }
 
+    const idempotencyKey = (req.headers['idempotency-key'] || req.body.idempotencyKey || '').toString().trim() || null;
+
+    if (idempotencyKey) {
+      const { rows: existing } = await conn.query(
+        'SELECT id, total_amount FROM orders WHERE idempotency_key = $1 AND restaurant_id = $2 LIMIT 1',
+        [idempotencyKey, data.restaurantId]
+      );
+      if (existing.length) {
+        await conn.query('ROLLBACK');
+        return res.status(200).json({
+          message: 'Order already created',
+          orderId: existing[0].id,
+          totalAmount: existing[0].total_amount,
+        });
+      }
+    }
 
     const menuItemIds = [...new Set(data.items.map((item) => item.menuItemId))];
     const { rows: menuRows } = await conn.query(
@@ -159,15 +175,6 @@ router.post('/', asyncHandler(async (req, res) => {
     );
 
 
-      // idempotency key to prevent duplicate orders on retries
-      const idempotencyKey = (req.headers['idempotency-key'] || req.body.idempotencyKey || '').toString().trim() || null;
-
-      if (idempotencyKey) {
-        const { rows: existing } = await pool.query('SELECT id, total_amount FROM orders WHERE idempotency_key = $1 AND restaurant_id = $2 LIMIT 1', [idempotencyKey, data.restaurantId]);
-        if (existing.length) {
-          return res.status(200).json({ message: 'Order already created', orderId: existing[0].id, totalAmount: existing[0].total_amount });
-        }
-      }
     const menuMap = new Map(menuRows.map((row) => [row.id, row]));
 
     let total = 0;
@@ -192,9 +199,23 @@ router.post('/', asyncHandler(async (req, res) => {
     });
 
     const orderResult = await conn.query(
-      `INSERT INTO orders (restaurant_id, table_id, table_session_id, table_number, customer_name, total_amount, status, payment_method, payment_status, notes)
-       VALUES ($1, $2, $3, $4, $5, $6, 'pending', $7, 'pending', $8) RETURNING id` ,
-      [data.restaurantId, data.tableId, data.tableSessionId, tableRows[0].table_number, data.customerName, total, data.paymentMethod, data.notes]
+      `INSERT INTO orders (
+         restaurant_id, table_id, table_session_id, table_number, customer_name,
+         total_amount, status, payment_method, payment_status, notes, idempotency_key
+       )
+       VALUES ($1, $2, $3, $4, $5, $6, 'pending', $7, 'pending', $8, $9)
+       RETURNING id`,
+      [
+        data.restaurantId,
+        data.tableId,
+        data.tableSessionId,
+        tableRows[0].table_number,
+        data.customerName,
+        total,
+        data.paymentMethod,
+        data.notes,
+        idempotencyKey,
+      ]
     );
     const orderId = orderResult.rows[0].id;
 

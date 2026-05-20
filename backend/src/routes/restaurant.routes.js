@@ -6,6 +6,7 @@ const { requireAuth } = require('../middleware/auth');
 const { ensureRestaurantAccess } = require('../utils/access');
 const { buildQrPayload } = require('../utils/qr');
 const { expireInactiveSessions } = require('../utils/tableSession');
+const { emitTableUpdate } = require('../services/socket');
 
 const router = express.Router();
 
@@ -365,6 +366,13 @@ router.post('/:restaurantId/tables/:tableId/terminal-reset', requireAuth(['owner
   }
 
   await pool.query('UPDATE restaurant_tables SET availability_status = $1 WHERE id = $2', ['available', tableId]);
+
+  try {
+    emitTableUpdate(Number(restaurantId), { tableId: Number(tableId), status: 'available' });
+  } catch (error) {
+    // non-fatal
+  }
+
   return res.json({ message: 'Table reset to available' });
 }));
 

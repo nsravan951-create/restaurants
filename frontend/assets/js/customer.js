@@ -87,7 +87,7 @@ function startSessionPing() {
 
   pingInterval = setInterval(async () => {
     try {
-      const data = await apiRequest(`/table-sessions/${activeSession.id}/ping`, {
+      const data = await apiRequest(`/api/table-sessions/${activeSession.id}/ping`, {
         method: 'POST',
         body: JSON.stringify({ sessionToken: activeSession.sessionToken }),
       });
@@ -112,7 +112,7 @@ async function startOrJoinSession(joinExisting = false) {
   const stored = loadStoredSession(routeState.restaurantId, routeState.tableId);
 
   try {
-    const data = await apiRequest('/table-sessions/start', {
+    const data = await apiRequest('/api/table-sessions/start', {
       method: 'POST',
       body: JSON.stringify({
         restaurantId: routeState.restaurantId,
@@ -250,7 +250,7 @@ async function placeOrder(paymentMethod) {
     })),
   };
 
-  const data = await apiRequest('/orders', {
+  const data = await apiRequest('/api/orders', {
     method: 'POST',
     body: JSON.stringify(payload),
   });
@@ -273,7 +273,7 @@ async function handleCod() {
 async function handleOnline() {
   try {
     const orderData = await placeOrder('online');
-    const paymentData = await apiRequest('/payments/create-order', {
+    const paymentData = await apiRequest('/api/payments/create-order', {
       method: 'POST',
       body: JSON.stringify({ orderId: orderData.orderId }),
     });
@@ -287,7 +287,7 @@ async function handleOnline() {
       order_id: paymentData.razorpayOrder.id,
       handler: async function (response) {
         try {
-          await apiRequest('/payments/verify', {
+          await apiRequest('/api/payments/verify', {
             method: 'POST',
             body: JSON.stringify({
               orderId: orderData.orderId,
@@ -337,7 +337,7 @@ function setupAdPopup(ads) {
 
   adLink.addEventListener('click', async () => {
     try {
-      await apiRequest(`/ads/click/${ad.id}`, { method: 'POST' });
+      await apiRequest(`/api/ads/click/${ad.id}`, { method: 'POST' });
     } catch (error) {
       console.error(error.message);
     }
@@ -357,7 +357,7 @@ async function initCustomerPage() {
     }
 
     if (!routeState.tableId && routeState.tableNumber) {
-      const resolved = await apiRequest(`/restaurants/${routeState.restaurantId}/tables/resolve?table=${encodeURIComponent(routeState.tableNumber)}`);
+      const resolved = await apiRequest(`/api/restaurants/${routeState.restaurantId}/tables/resolve?table=${encodeURIComponent(routeState.tableNumber)}`);
       routeState.tableId = Number(resolved.table.id);
     }
 
@@ -366,7 +366,7 @@ async function initCustomerPage() {
       return;
     }
 
-    const data = await apiRequest(`/restaurants/${routeState.restaurantId}/table/${routeState.tableId}`);
+    const data = await apiRequest(`/api/restaurants/${routeState.restaurantId}/table/${routeState.tableId}`);
     context = data;
 
     document.getElementById('restaurantTitle').textContent = data.restaurant.name;
