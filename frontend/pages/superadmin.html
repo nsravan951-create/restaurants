@@ -3,90 +3,155 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Super Admin — QR Restaurants SaaS</title>
+  <title>Admin Dashboard — QR Restaurants</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@600;700&family=Sora:wght@400;500;600&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="../assets/css/styles.css" />
   <link rel="stylesheet" href="../assets/css/superadmin.css" />
-  <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script src="../assets/js/config.js"></script>
   <script src="../assets/js/common.js"></script>
 </head>
 <body class="theme-dark">
-  <div class="sa-shell">
-    <aside class="sa-sidebar">
-      <div class="sa-brand">QR SaaS — Super Admin</div>
-      <nav class="sa-nav">
-        <button data-sa-section="dashboard" class="sa-link active">Dashboard</button>
-        <button data-sa-section="analytics" class="sa-link">Analytics</button>
-        <button data-sa-section="restaurants" class="sa-link">Restaurants</button>
-        <button data-sa-section="live-orders" class="sa-link">Live Orders</button>
-        <button data-sa-section="live-tables" class="sa-link">Live Tables</button>
-        <button data-sa-section="promotions" class="sa-link">Promotions</button>
-        <button data-sa-section="payments" class="sa-link">Payments</button>
-        <button data-sa-section="subscriptions" class="sa-link">Subscriptions</button>
-        <button data-sa-section="qr" class="sa-link">QR Management</button>
-        <button data-sa-section="customers" class="sa-link">Customers</button>
-        <button data-sa-section="staff" class="sa-link">Staff & Roles</button>
-        <button data-sa-section="notifications" class="sa-link">Notifications</button>
-        <button data-sa-section="reports" class="sa-link">Reports</button>
-        <button data-sa-section="invoices" class="sa-link">Invoice Center</button>
-        <button data-sa-section="loyalty" class="sa-link">Loyalty System</button>
-        <button data-sa-section="marketing" class="sa-link">Marketing Campaigns</button>
-        <button data-sa-section="ai" class="sa-link">AI Insights</button>
-        <button data-sa-section="integrations" class="sa-link">Integrations</button>
-        <button data-sa-section="backup" class="sa-link">Backup & Security</button>
-        <button data-sa-section="settings" class="sa-link">Settings</button>
-        <button data-sa-section="logout" class="sa-link">Logout</button>
+  <div class="admin-shell">
+    <aside class="admin-sidebar panel">
+      <div>
+        <p class="eyebrow admin-eyebrow">Super Admin</p>
+        <h1>Restaurant Control Center</h1>
+        <p class="admin-intro">Manage restaurants, ads, and revenue from one clean dashboard.</p>
+      </div>
+
+      <nav class="admin-nav">
+        <button data-section="overview" class="admin-link active">Overview</button>
+        <button data-section="restaurants" class="admin-link">Restaurants</button>
+        <button data-section="ads" class="admin-link">Ads</button>
+        <button data-section="analytics" class="admin-link">Analytics</button>
+        <button id="logoutButton" class="admin-link admin-link--danger">Logout</button>
       </nav>
-      <div class="sa-footer">v1.0 • Enterprise</div>
+
+      <div class="admin-sidebar__footer">
+        <div id="sessionSummary" class="admin-sidebar__note">Ready to manage the platform.</div>
+        <button id="sidebarRefresh" class="btn btn-light" type="button">Refresh</button>
+      </div>
     </aside>
 
-    <main class="sa-main">
-      <header class="sa-topbar">
-        <h1 id="saTitle">Dashboard</h1>
-        <div class="sa-controls">
-          <input id="saSearch" placeholder="Search restaurants, orders, customers..." />
-          <button id="saRefresh" class="btn btn-light">Refresh</button>
+    <main class="admin-main">
+      <header class="panel admin-topbar">
+        <div>
+          <p class="eyebrow">Operations</p>
+          <h2>Clean admin view with live restaurant and ad controls.</h2>
+        </div>
+        <div class="admin-toolbar">
+          <input id="dashboardSearch" class="admin-search" placeholder="Search restaurants or ads" />
+          <button id="refreshDashboard" class="btn btn-light" type="button">Refresh</button>
         </div>
       </header>
 
-      <section id="section-dashboard" class="sa-section">
-        <div class="sa-cards" id="saCards">
-          <!-- Cards injected by JS -->
+      <section id="section-overview" class="admin-section">
+        <div id="summaryCards" class="summary-grid"></div>
+
+        <div class="admin-grid-2">
+          <article class="panel">
+            <div class="section-head">
+              <div>
+                <h3>Revenue trend</h3>
+                <p>Last 14 days across all restaurants.</p>
+              </div>
+            </div>
+            <div id="revenueTrend" class="trend-list"></div>
+          </article>
+
+          <article class="panel">
+            <div class="section-head">
+              <div>
+                <h3>Top restaurants</h3>
+                <p>Ranked by monthly revenue.</p>
+              </div>
+            </div>
+            <div id="topRestaurants" class="stack"></div>
+          </article>
+        </div>
+      </section>
+
+      <section id="section-restaurants" class="admin-section hidden">
+        <div class="section-head">
+          <div>
+            <h3>Restaurant management</h3>
+            <p>Create owners, toggle activation, and manage subscriptions.</p>
+          </div>
         </div>
 
-        <div class="sa-charts">
-          <div class="sa-chart-card">
-            <h3>Revenue (30 days)</h3>
-            <canvas id="revenueChart" height="140"></canvas>
+        <article class="panel">
+          <div class="section-head">
+            <div>
+              <h4>Create restaurant</h4>
+              <p>Creates the owner account and the restaurant in one action.</p>
+            </div>
           </div>
-          <div class="sa-chart-card">
-            <h3>Active Orders Over Time</h3>
-            <canvas id="ordersChart" height="140"></canvas>
+          <form id="restaurantForm" class="admin-form">
+            <input name="name" placeholder="Owner name" required />
+            <input name="email" type="email" placeholder="Owner email" required />
+            <input name="password" type="password" placeholder="Owner password" required />
+            <input name="restaurantName" placeholder="Restaurant name" required />
+            <input name="totalTables" type="number" min="1" max="500" placeholder="Tables" required />
+            <input name="phone" placeholder="Phone" />
+            <input name="address" placeholder="Address" />
+            <button class="btn btn-primary admin-form__submit" type="submit">Create restaurant</button>
+          </form>
+        </article>
+
+        <div id="restaurantList" class="admin-list"></div>
+      </section>
+
+      <section id="section-ads" class="admin-section hidden">
+        <div class="section-head">
+          <div>
+            <h3>Ad management</h3>
+            <p>Create, edit, activate, and delete promotional ads.</p>
           </div>
         </div>
+
+        <article class="panel">
+          <form id="adForm" class="admin-form">
+            <input name="title" placeholder="Ad title" required />
+            <input name="imageUrl" placeholder="Image URL" required />
+            <input name="targetLink" placeholder="Target link" required />
+            <select name="restaurantId" id="adRestaurantSelect">
+              <option value="">Global ad</option>
+            </select>
+            <input name="startsAt" type="datetime-local" />
+            <input name="endsAt" type="datetime-local" />
+            <label class="admin-check">
+              <input name="isActive" type="checkbox" checked />
+              <span>Active now</span>
+            </label>
+            <div class="admin-form__actions">
+              <input type="hidden" name="adId" value="" />
+              <button id="adSubmitButton" class="btn btn-primary admin-form__submit" type="submit">Create ad</button>
+              <button id="adCancelButton" class="btn btn-light" type="button">Cancel edit</button>
+            </div>
+          </form>
+        </article>
+
+        <div id="adsList" class="admin-list"></div>
       </section>
 
-      <section id="section-analytics" class="sa-section hidden">
-        <h2>Analytics</h2>
-        <p>Deep analytics coming here.</p>
+      <section id="section-analytics" class="admin-section hidden">
+        <div class="section-head">
+          <div>
+            <h3>All restaurants analytics</h3>
+            <p>Revenue, order volume, tables, and ad performance for every restaurant.</p>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div id="analyticsCards" class="summary-grid summary-grid--compact"></div>
+        </div>
+
+        <div id="analyticsList" class="admin-list"></div>
       </section>
 
-      <section id="section-restaurants" class="sa-section hidden">
-        <h2>Restaurants</h2>
-        <div id="saRestaurants" class="sa-list"></div>
-      </section>
-
-      <section id="section-live-orders" class="sa-section hidden">
-        <h2>Live Orders</h2>
-        <div id="saLiveOrders" class="sa-list"></div>
-      </section>
-
-      <section id="section-live-tables" class="sa-section hidden">
-        <h2>Live Tables</h2>
-        <div id="saLiveTables" class="sa-list"></div>
-      </section>
-
+      <p id="adminMessage" class="message"></p>
     </main>
   </div>
 

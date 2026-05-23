@@ -8,6 +8,143 @@ const router = express.Router();
 // Require super_admin for all admin routes
 router.use(requireAuth(['super_admin']));
 
+async function fetchDashboardSummary() {
+  const { rows } = await pool.query(`
+    SELECT
+      (SELECT COUNT(*)::int FROM restaurants) AS "totalRestaurants",
+      (SELECT COUNT(*)::int FROM restaurants WHERE is_active = TRUE) AS "activeRestaurants",
+      (SELECT COUNT(*)::int FROM orders) AS "totalOrders",
+      (SELECT COUNT(*)::int FROM orders WHERE status IN ('pending', 'preparing', 'ready')) AS "activeOrders",
+      (SELECT COUNT(*)::int FROM restaurant_tables WHERE availability_status = 'active') AS "activeTables",
+      (SELECT COUNT(*)::int FROM ads) AS "totalAds",
+      (SELECT COUNT(*)::int FROM ads WHERE is_active = TRUE) AS "activeAds",
+      (SELECT COALESCE(SUM(total_amount), 0)::numeric FROM orders WHERE payment_status = 'paid' AND created_at >= date_trunc('day', now())) AS "todayRevenue",
+      (SELECT COALESCE(SUM(total_amount), 0)::numeric FROM orders WHERE payment_status = 'paid' AND created_at >= date_trunc('month', now())) AS "monthlyRevenue",
+      (SELECT COALESCE(SUM(total_amount), 0)::numeric FROM orders WHERE payment_status = 'paid') AS "totalRevenue",
+      (SELECT COALESCE(SUM(impressions), 0)::int FROM ads) AS "totalImpressions",
+      (SELECT COALESCE(SUM(clicks), 0)::int FROM ads) AS "totalClicks"
+  `);
+
+  return rows[0] || {};
+}
+
+async function fetchRestaurantAnalytics() {
+  const { rows } = await pool.query(`
+    WITH order_stats AS (
+      SELECT
+        restaurant_id,
+        COUNT(*)::int AS total_orders,
+        COUNT(*) FILTER (WHERE created_at >= date_trunc('month', now()))::int AS monthly_orders,
+        COUNT(*) FILTER (WHERE created_at >= date_trunc('day', now()))::int AS today_orders,
+        COALESCE(SUM(total_amount), 0)::numeric AS total_revenue,
+        COALESCE(SUM(total_amount) FILTER (WHERE created_at >= date_trunc('month', now())), 0)::numeric AS monthly_revenue,
+        COALESCE(SUM(total_amount) FILTER (WHERE created_at >= date_trunc('day', now())), 0)::numeric AS today_revenue
+      FROM orders
+      WHERE payment_status = 'paid'
+      GROUP BY restaurant_id
+    ),
+    table_stats AS (
+      SELECT
+        restaurant_id,
+        COUNT(*)::int AS total_tables,
+        COUNT(*) FILTER (WHERE availability_status = 'active')::int AS active_tables
+      FROM restaurant_tables
+      GROUP BY restaurant_id
+    ),
+    ad_stats AS (
+      SELECT
+        restaurant_id,
+        COUNT(*)::int AS total_ads,
+        COUNT(*) FILTER (WHERE is_active = TRUE)::int AS active_ads,
+        COALESCE(SUM(impressions), 0)::int AS impressions,
+        COALESCE(SUM(clicks), 0)::int AS clicks
+      FROM ads
+      WHERE restaurant_id IS NOT NULL
+      GROUP BY restaurant_id
+    )
+    SELECT
+      r.id,
+      r.name,
+      r.slug,
+      r.phone,
+      r.address,
+      r.is_active,
+      r.subscription_plan,
+      r.subscription_status,
+      r.subscription_expires_at,
+      u.name AS owner_name,
+      u.email AS owner_email,
+      COALESCE(os.total_orders, 0) AS total_orders,
+      COALESCE(os.monthly_orders, 0) AS monthly_orders,
+      COALESCE(os.today_orders, 0) AS today_orders,
+      COALESCE(os.total_revenue, 0) AS total_revenue,
+      COALESCE(os.monthly_revenue, 0) AS monthly_revenue,
+      COALESCE(os.today_revenue, 0) AS today_revenue,
+      COALESCE(ts.total_tables, 0) AS total_tables,
+      COALESCE(ts.active_tables, 0) AS active_tables,
+      COALESCE(ad.total_ads, 0) AS total_ads,
+      COALESCE(ad.active_ads, 0) AS active_ads,
+      COALESCE(ad.impressions, 0) AS impressions,
+      COALESCE(ad.clicks, 0) AS clicks
+    FROM restaurants r
+    LEFT JOIN users u ON u.id = r.owner_user_id
+    LEFT JOIN order_stats os ON os.restaurant_id = r.id
+    LEFT JOIN table_stats ts ON ts.restaurant_id = r.id
+    LEFT JOIN ad_stats ad ON ad.restaurant_id = r.id
+    ORDER BY COALESCE(os.monthly_revenue, 0) DESC, r.name ASC
+  `);
+
+  return rows;
+}
+
+async function fetchAdsOverview() {
+  const { rows } = await pool.query(`
+    SELECT
+      a.id,
+      a.title,
+      a.image_url AS "imageUrl",
+      a.target_link AS "targetLink",
+      a.restaurant_id AS "restaurantId",
+      COALESCE(r.name, 'Global') AS "restaurantName",
+      a.is_active AS "isActive",
+      a.starts_at AS "startsAt",
+      a.ends_at AS "endsAt",
+      a.impressions,
+      a.clicks,
+      a.created_at AS "createdAt",
+      CASE
+        WHEN a.impressions > 0 THEN ROUND((a.clicks::numeric / a.impressions) * 100, 2)
+        ELSE 0
+      END AS ctr
+    FROM ads a
+    LEFT JOIN restaurants r ON r.id = a.restaurant_id
+    ORDER BY a.id DESC
+  `);
+
+  return rows;
+}
+
+async function fetchRevenueSeries() {
+  const { rows } = await pool.query(`
+    SELECT
+      TO_CHAR(day, 'YYYY-MM-DD') AS day,
+      COALESCE(SUM(o.total_amount), 0)::numeric AS revenue
+    FROM generate_series(
+      date_trunc('day', now()) - interval '13 days',
+      date_trunc('day', now()),
+      interval '1 day'
+    ) AS day
+    LEFT JOIN orders o
+      ON o.payment_status = 'paid'
+     AND o.created_at >= day
+     AND o.created_at < day + interval '1 day'
+    GROUP BY day
+    ORDER BY day
+  `);
+
+  return rows;
+}
+
 // GET /api/admin/stats
 router.get('/stats', asyncHandler(async (req, res) => {
   const stats = {};
@@ -48,6 +185,24 @@ router.get('/stats', asyncHandler(async (req, res) => {
   stats.activePromotions = promoRows[0] ? promoRows[0].total : 0;
 
   return res.json(stats);
+}));
+
+// GET /api/admin/dashboard
+router.get('/dashboard', asyncHandler(async (req, res) => {
+  const [summary, restaurants, ads, revenueSeries] = await Promise.all([
+    fetchDashboardSummary(),
+    fetchRestaurantAnalytics(),
+    fetchAdsOverview(),
+    fetchRevenueSeries(),
+  ]);
+
+  return res.json({
+    summary,
+    restaurants,
+    ads,
+    revenueSeries,
+    topRestaurants: restaurants.slice(0, 5),
+  });
 }));
 
 // GET /api/admin/restaurants
