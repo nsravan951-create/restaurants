@@ -46,7 +46,7 @@
             <div class="card-row" style="margin-top:0.75rem;">
               <div class="card"><strong>White</strong><p>Available</p></div>
               <div class="card"><strong>Orange</strong><p>Running bill — tap box</p></div>
-              <div class="card"><strong>Green</strong><p>Paid — reset terminal</p></div>
+              <div class="card"><strong>Green</strong><p>Paid — terminate session</p></div>
             </div>
               </div>
             </div>
@@ -198,11 +198,12 @@
             </form>
             <div id="billStaffConfirm" class="hidden" style="margin-top:0.75rem;">
               <button id="billConfirmCounterPaid" class="btn btn-light" type="button">Confirm counter payment (Cash)</button>
+              <button id="billVerifyUpiPayment" class="btn btn-light" type="button">Verify UPI Payment</button>
             </div>
           </section>
           <div id="billPaidActions" class="bill-paid-actions hidden">
             <p id="billPaidMessage" class="message"></p>
-            <button id="billTerminalReset" class="btn btn-primary" type="button">Terminal Reset (New Guest)</button>
+            <button id="billTerminalReset" class="btn btn-primary" type="button">Terminate Session (New Guest)</button>
             <button id="billPrintInvoice" class="btn btn-light" type="button">Print Bill</button>
           </div>
         </div>

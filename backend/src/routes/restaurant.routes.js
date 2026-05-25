@@ -515,28 +515,64 @@ router.post('/:restaurantId/tables/:tableId/terminal-reset', requireAuth(['owner
   const { restaurantId, tableId } = req.params;
   await ensureRestaurantAccess(req.user, restaurantId);
 
-  const { rows } = await pool.query(
-    'SELECT id, availability_status FROM restaurant_tables WHERE id = $1 AND restaurant_id = $2 LIMIT 1',
-    [tableId, restaurantId]
-  );
-
-  if (!rows.length) {
-    return res.status(404).json({ message: 'Table not found' });
-  }
-
-  if (rows[0].availability_status !== 'paid') {
-    return res.status(409).json({ message: 'Terminal reset is only available for paid tables' });
-  }
-
-  await pool.query('UPDATE restaurant_tables SET availability_status = $1 WHERE id = $2', ['available', tableId]);
+  const conn = await pool.connect();
 
   try {
-    emitTableUpdate(Number(restaurantId), { tableId: Number(tableId), status: 'available' });
-  } catch (error) {
-    // non-fatal
-  }
+    await conn.query('BEGIN');
 
-  return res.json({ message: 'Table reset to available' });
+    const { rows: tableRows } = await conn.query(
+      'SELECT id, availability_status FROM restaurant_tables WHERE id = $1 AND restaurant_id = $2 LIMIT 1 FOR UPDATE',
+      [tableId, restaurantId]
+    );
+
+    if (!tableRows.length) {
+      await conn.query('ROLLBACK');
+      return res.status(404).json({ message: 'Table not found' });
+    }
+
+    const { rows: sessionRows } = await conn.query(
+      `SELECT id, status
+       FROM table_sessions
+       WHERE restaurant_id = $1 AND table_id = $2 AND status = 'active'
+       ORDER BY id DESC
+       LIMIT 1
+       FOR UPDATE`,
+      [restaurantId, tableId]
+    );
+
+    const activeSession = sessionRows[0] || null;
+
+    if (activeSession) {
+      await conn.query(
+        `UPDATE table_sessions
+         SET status = 'completed', ended_at = NOW(), ended_reason = $1
+         WHERE id = $2`,
+        ['manual_terminate', activeSession.id]
+      );
+    }
+
+    if (tableRows[0].availability_status !== 'available') {
+      await conn.query('UPDATE restaurant_tables SET availability_status = $1 WHERE id = $2', ['available', tableId]);
+    }
+
+    await conn.query('COMMIT');
+
+    try {
+      emitTableUpdate(Number(restaurantId), { tableId: Number(tableId), status: 'available' });
+    } catch (error) {
+      // non-fatal
+    }
+
+    return res.json({
+      message: activeSession ? 'Session terminated and table reset' : 'Table reset to available',
+      sessionTerminated: Boolean(activeSession),
+    });
+  } catch (error) {
+    await conn.query('ROLLBACK');
+    throw error;
+  } finally {
+    conn.release();
+  }
 }));
 
 router.get('/:restaurantId/table/:tableId', asyncHandler(async (req, res) => {
