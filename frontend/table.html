@@ -1582,21 +1582,10 @@
           document.title = `${data.restaurant.name} | Table ${data.table.table_number}`;
 
           loadCart();
-          if (data.session) {
-            state.session = data.session;
-            saveSession();
-            startSessionPing();
-          }
-
           const storedSession = loadSession();
-          if (!state.session && storedSession) {
+          if (storedSession) {
             state.session = storedSession;
             startSessionPing();
-          }
-
-          if (state.session && storedSession && storedSession.sessionToken !== state.session.sessionToken) {
-            state.session = data.session || storedSession;
-            saveSession();
           }
 
           if (!state.session) {
@@ -1605,10 +1594,10 @@
               return;
             }
             if (data.lock?.isLocked) {
-              await startOrJoinSession(true);
-            } else {
-              await startOrJoinSession(false);
+              setError('This table is currently in use by another guest. Please wait or ask staff for help.');
+              return;
             }
+            await startOrJoinSession(false);
           }
 
           renderMenu(data.menu || []);

@@ -132,18 +132,6 @@ async function startOrJoinSession(joinExisting = false) {
   } catch (error) {
     const isLocked = error.status === 409 && error.data && error.data.locked;
     if (isLocked) {
-      if (error.data.session && !error.data.orderPlaced) {
-        activeSession = error.data.session;
-        saveStoredSession(routeState.restaurantId, routeState.tableId, activeSession);
-        setOrderingLocked(false, 'Table session active. You can place your order.');
-        joinSessionBtn.classList.add('hidden');
-        if (activeSession.expiresAt) {
-          startCountdown(activeSession.expiresAt);
-        }
-        startSessionPing();
-        return;
-      }
-
       setOrderingLocked(true, error.message);
       joinSessionBtn.classList.remove('hidden');
       if (error.data.session?.expiresAt) {
@@ -387,17 +375,7 @@ async function initCustomerPage() {
     renderMenu(data.menu);
     renderCart();
     setupAdPopup(data.ads);
-
-    if (data.session) {
-      activeSession = data.session;
-      saveStoredSession(routeState.restaurantId, routeState.tableId, activeSession);
-      setOrderingLocked(false, 'Table session active. You can place your order.');
-      joinSessionBtn.classList.add('hidden');
-      startCountdown(activeSession.expiresAt);
-      startSessionPing();
-    } else {
-      await startOrJoinSession(true);
-    }
+    await startOrJoinSession(false);
   } catch (error) {
     setMessage('orderMessage', error.message, true);
   }
