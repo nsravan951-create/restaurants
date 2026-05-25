@@ -132,9 +132,9 @@ router.post('/', asyncHandler(async (req, res) => {
       return res.status(404).json({ message: 'Table session not found' });
     }
 
-    if (sessionRows[0].status !== 'active' || sessionRows[0].session_token !== data.sessionToken) {
+    if (sessionRows[0].status !== 'active') {
       await conn.query('ROLLBACK');
-      return res.status(409).json({ message: 'This table is currently in ordering session with a different lock' });
+      return res.status(409).json({ message: 'This table session is no longer active' });
     }
 
     const { rows: existingOrderRows } = await conn.query(

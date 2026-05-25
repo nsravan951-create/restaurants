@@ -1605,10 +1605,10 @@
               return;
             }
             if (data.lock?.isLocked) {
-              setError('This table is currently in use by another guest. Please wait or ask staff for help.');
-              return;
+              await startOrJoinSession(true);
+            } else {
+              await startOrJoinSession(false);
             }
-            await startOrJoinSession(false);
           }
 
           renderMenu(data.menu || []);

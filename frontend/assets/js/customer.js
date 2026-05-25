@@ -396,7 +396,7 @@ async function initCustomerPage() {
       startCountdown(activeSession.expiresAt);
       startSessionPing();
     } else {
-      await startOrJoinSession(false);
+      await startOrJoinSession(true);
     }
   } catch (error) {
     setMessage('orderMessage', error.message, true);
