@@ -744,45 +744,6 @@
             <div id="trackingItems" class="order-items"></div>
           </div>
         </section>
-
-        <section class="panel">
-          <div class="panel-head">
-            <div>
-              <h2>Bill</h2>
-              <p>Review the items below, then settle with cash or UPI.</p>
-            </div>
-            <span class="toast success">Bill</span>
-          </div>
-          <div class="section-body">
-            <div id="billItems" class="order-items"></div>
-            <div class="invoice-box" style="margin-top:12px;">
-              <div class="invoice-row"><span>Total Amount</span><strong id="billTotalAmount">INR 0.00</strong></div>
-            </div>
-            <div class="checkout-pay-grid" style="margin-top:14px;">
-              <button class="pay-btn pay-btn--cash checkout-pay-btn" id="billCashBtn" type="button">
-                <span class="pay-btn__icon">₹</span>
-                <strong>Pay with Cash</strong>
-                <small>Ask the owner to verify</small>
-              </button>
-              <button class="pay-btn pay-btn--upi checkout-pay-btn" id="billUpiBtn" type="button">
-                <span class="pay-btn__icon">UPI</span>
-                <strong>Pay with UPI</strong>
-                <small>Open a UPI app</small>
-              </button>
-            </div>
-            <div id="billUpiPanel" class="checkout-upi-panel hidden" style="margin-top:14px;">
-              <p class="checkout-upi-hint">Pay the amount to the restaurant UPI and tell the owner to verify it.</p>
-              <div class="upi-app-grid">
-                <a id="billUpiPhonePe" class="upi-app-btn upi-app-btn--phonepe" href="#">PhonePe</a>
-                <a id="billUpiGPay" class="upi-app-btn upi-app-btn--gpay" href="#">Google Pay</a>
-                <a id="billUpiPaytm" class="upi-app-btn upi-app-btn--paytm" href="#">Paytm</a>
-              </div>
-              <p id="billUpiVpa" class="checkout-upi-vpa"></p>
-              <button id="billUpiPaidBtn" class="btn btn-primary checkout-confirm-paid" type="button">I have paid</button>
-            </div>
-            <p id="billPayMessage" class="checkout-pay-message"></p>
-          </div>
-        </section>
       </section>
 
       <section id="receiptState" class="screen hidden">
@@ -913,17 +874,6 @@
         trackingText: document.getElementById('trackingText'),
         trackingItems: document.getElementById('trackingItems'),
         trackingStatusPill: document.getElementById('trackingStatusPill'),
-        billItems: document.getElementById('billItems'),
-        billTotalAmount: document.getElementById('billTotalAmount'),
-        billCashBtn: document.getElementById('billCashBtn'),
-        billUpiBtn: document.getElementById('billUpiBtn'),
-        billUpiPanel: document.getElementById('billUpiPanel'),
-        billUpiPhonePe: document.getElementById('billUpiPhonePe'),
-        billUpiGPay: document.getElementById('billUpiGPay'),
-        billUpiPaytm: document.getElementById('billUpiPaytm'),
-        billUpiVpa: document.getElementById('billUpiVpa'),
-        billUpiPaidBtn: document.getElementById('billUpiPaidBtn'),
-        billPayMessage: document.getElementById('billPayMessage'),
         receiptState: document.getElementById('receiptState'),
         receiptMessage: document.getElementById('receiptMessage'),
         receiptBox: document.getElementById('receiptBox'),
@@ -1396,54 +1346,6 @@
             <strong>INR ${money(item.lineTotal)}</strong>
           </div>
         `).join('');
-        renderBillSection(order);
-      }
-
-      function renderBillSection(order) {
-        if (!order || !Array.isArray(order.items)) return;
-
-        if (els.billItems) {
-          els.billItems.innerHTML = order.items.map((item) => `
-            <div class="order-item-row">
-              <div>
-                <strong>${item.name}</strong>
-                <div style="color:var(--muted);font-size:.9rem;">Qty ${item.quantity}</div>
-              </div>
-              <strong>INR ${money(item.lineTotal)}</strong>
-            </div>
-          `).join('');
-        }
-
-        if (els.billTotalAmount) {
-          els.billTotalAmount.textContent = `INR ${money(order.totalAmount)}`;
-        }
-
-        if (els.billPayMessage) {
-          els.billPayMessage.textContent = '';
-          els.billPayMessage.style.color = 'var(--success)';
-        }
-
-        const vpa = state.context?.restaurant?.upi_vpa || '';
-        const upiAvailable = Boolean(vpa);
-        if (els.billUpiPanel) {
-          els.billUpiPanel.classList.add('hidden');
-        }
-        if (els.billUpiVpa) {
-          els.billUpiVpa.textContent = upiAvailable ? `Pay to: ${vpa}` : 'Restaurant UPI is not set yet.';
-        }
-        if (upiAvailable) {
-          const params = new URLSearchParams({
-            pa: vpa,
-            pn: state.context.restaurant.name,
-            am: Number(order.totalAmount || 0).toFixed(2),
-            cu: 'INR',
-            tn: `Bill for Table ${state.context.table.table_number}`,
-          });
-          const upiUrl = `upi://pay?${params.toString()}`;
-          els.billUpiPhonePe.href = upiUrl;
-          els.billUpiGPay.href = upiUrl;
-          els.billUpiPaytm.href = upiUrl;
-        }
       }
 
       function showReceiptView(invoicePayload) {
@@ -1707,7 +1609,7 @@
           if (!showCheckoutUpiPanel(orderData.orderId, orderData.totalAmount)) {
             throw new Error('Restaurant UPI is not configured. Use Cash or ask staff.');
           }
-          setCheckoutPayMessage('Tap a UPI app, pay the amount, then tell the owner to verify the bill.');
+          setCheckoutPayMessage('Tap a UPI app, pay the amount, then tap “I have paid”.');
         } catch (error) {
           setCheckoutPayMessage(error.message || 'UPI checkout failed', true);
         }
@@ -1724,38 +1626,21 @@
         els.cashCheckoutBtn?.addEventListener('click', handleCashCheckout);
         els.upiCheckoutBtn?.addEventListener('click', handleUpiCheckout);
 
-        document.getElementById('customerUpiPaidBtn')?.addEventListener('click', () => {
+        document.getElementById('customerUpiPaidBtn')?.addEventListener('click', async () => {
           if (!state.pendingUpiOrderId || !state.activeOrder) {
             setCheckoutPayMessage('Tap Pay with UPI first to place your order.', true);
             return;
           }
-          closeCheckoutModal();
-          showTrackingView(state.activeOrder, 'UPI sent');
-          setToast('trackingStatusPill', 'Payment sent. Owner will verify and print the bill.', 'success');
-        });
-
-        els.billCashBtn?.addEventListener('click', () => {
-          if (!state.activeOrder) return;
-          if (els.billUpiPanel) els.billUpiPanel.classList.add('hidden');
-          if (els.billPayMessage) {
-            els.billPayMessage.textContent = 'Pay cash to the owner, then ask them to verify and print the bill.';
+          try {
+            await apiRequest('/api/payments/upi/confirm', {
+              method: 'POST',
+              body: JSON.stringify({ orderId: state.pendingUpiOrderId }),
+            });
+            closeCheckoutModal();
+            await finalizePaidReceipt(state.activeOrder, 'paid');
+          } catch (error) {
+            setCheckoutPayMessage(error.message || 'Could not confirm payment', true);
           }
-        });
-
-        els.billUpiBtn?.addEventListener('click', () => {
-          if (!state.activeOrder) return;
-          if (els.billUpiPanel) els.billUpiPanel.classList.toggle('hidden');
-          if (els.billPayMessage) {
-            els.billPayMessage.textContent = 'Pay with UPI, then tell the owner to verify the bill.';
-          }
-        });
-
-        els.billUpiPaidBtn?.addEventListener('click', () => {
-          if (!state.activeOrder) return;
-          if (els.billPayMessage) {
-            els.billPayMessage.textContent = 'Payment sent. The owner will verify it and print the bill.';
-          }
-          if (els.billUpiPanel) els.billUpiPanel.classList.add('hidden');
         });
 
         document.getElementById('customerUpiRequestForm')?.addEventListener('submit', (event) => {

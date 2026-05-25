@@ -77,10 +77,7 @@ function hasRunningBill(table) {
 
 function tableStatusLabel(table) {
   const status = String(table.availability_status || 'available');
-  const payStatus = String(table.order_payment_status || '').toLowerCase();
-  const method = String(table.order_payment_method || '').toLowerCase();
   if (status === 'paid') return 'Paid — tap for receipt';
-  if (status === 'active' && payStatus === 'paid' && (method === 'upi' || method === 'online')) return 'UPI verified — print and terminate';
   if (hasRunningBill(table)) return 'Running bill — tap to add items';
   if (status === 'active') return 'QR scanned — waiting for order';
   return 'Available';
@@ -98,9 +95,6 @@ function tablePaymentPill(table) {
     }
     return '<span class="table-card__pay-pill table-card__pay-pill--upi">PAID</span>';
   }
-  if (table.availability_status === 'active' && payStatus === 'paid' && (method === 'upi' || method === 'online')) {
-    return '<span class="table-card__pay-pill table-card__pay-pill--upi">UPI VERIFIED</span>';
-  }
   if (table.active_order_id && payStatus === 'pending') {
     return '<span class="table-card__pay-pill table-card__pay-pill--bill">BILL OPEN</span>';
   }
@@ -116,10 +110,6 @@ function buildUpiPayUrl({ vpa, name, amount, note }) {
     tn: note || 'Table bill',
   });
   return `upi://pay?${params.toString()}`;
-}
-
-async function terminateTableSession(tableId) {
-  await apiRequest(`/restaurants/${restaurantId}/tables/${tableId}/terminal-reset`, { method: 'POST' }, true);
 }
 
 function tableStatusClass(status) {
@@ -218,10 +208,7 @@ function renderBillModal(order, tableId) {
 
   const method = String(order.payment_method || '').toLowerCase();
   const showStaffCashConfirm = isRunning && (method === 'cash' || method === 'cod');
-  const showStaffUpiVerify = isRunning;
-  document.getElementById('billStaffConfirm')?.classList.toggle('hidden', !(showStaffCashConfirm || showStaffUpiVerify));
-  document.getElementById('billConfirmCounterPaid')?.classList.toggle('hidden', !showStaffCashConfirm);
-  document.getElementById('billVerifyUpiPayment')?.classList.toggle('hidden', !showStaffUpiVerify);
+  document.getElementById('billStaffConfirm')?.classList.toggle('hidden', !showStaffCashConfirm);
 
   const billTitle = document.getElementById('billModalEyebrow');
   if (billTitle) {
@@ -232,9 +219,7 @@ function renderBillModal(order, tableId) {
     fillBillMenuSelect();
   }
   document.getElementById('billPaidMessage').textContent = isPaid
-    ? (String(order.payment_method || '').toLowerCase() === 'upi'
-      ? 'UPI payment verified. Print the bill, then terminate the session when ready.'
-      : `Payment received via ${String(order.payment_method || '').toUpperCase()}. Thank you — visit again!`)
+    ? `Payment received via ${String(order.payment_method || '').toUpperCase()}. Thank you — visit again!`
     : '';
 
 }
@@ -272,20 +257,12 @@ async function openBillModalForTable(tableId, { allowPaid = false } = {}) {
 
 async function markBillPaid(method, customerUpi = '') {
   if (!activeBillOrder) return;
-  const response = await apiRequest(`/orders/${activeBillOrder.id}/mark-paid`, {
+  await apiRequest(`/orders/${activeBillOrder.id}/mark-paid`, {
     method: 'POST',
     body: JSON.stringify({ method, customerUpi }),
   }, true);
-  if (method === 'upi') {
-    setMessage('ownerMessage', response.message || 'UPI payment verified. Print the bill, then terminate the session when ready.');
-    await openBillModalForTable(activeBillTableId, { allowPaid: true });
-    await loadTables();
-    await loadInvoices();
-    return;
-  }
-
   hideBillModal();
-  setMessage('ownerMessage', response.message || 'Cash recorded — table is green.');
+  setMessage('ownerMessage', method === 'cash' ? 'Cash recorded — table is green.' : 'UPI payment confirmed.');
   await loadTables();
   await loadInvoices();
 }
@@ -384,21 +361,21 @@ async function loadTables() {
     const status = String(table.availability_status || 'available');
     const runningBill = hasRunningBill(table);
     const hasOrder = table.active_order_id ? '1' : '0';
-    const paidButOpen = status === 'active' && String(table.order_payment_status || '').toLowerCase() === 'paid' && (String(table.order_payment_method || '').toLowerCase() === 'upi' || String(table.order_payment_method || '').toLowerCase() === 'online');
-    const clickable = runningBill || status === 'paid' || paidButOpen;
-    const canTerminate = status !== 'available';
-    const terminateLabel = 'Terminate Session';
+    const clickable = runningBill || status === 'paid';
     return `
-      <div class="table-card ${tableStatusClass(status)}${clickable ? ' table-card--clickable' : ''}" data-table-id="${table.id}" data-table-status="${escapeHtml(status)}" data-table-number="${escapeHtml(table.table_number)}" data-has-order="${hasOrder}" data-running-bill="${runningBill ? '1' : '0'}" data-payment-status="${escapeHtml(table.order_payment_status || '')}" data-payment-method="${escapeHtml(table.order_payment_method || '')}">
+      <div class="table-card ${tableStatusClass(status)}${clickable ? ' table-card--clickable' : ''}" data-table-id="${table.id}" data-table-status="${escapeHtml(status)}" data-table-number="${escapeHtml(table.table_number)}" data-has-order="${hasOrder}" data-running-bill="${runningBill ? '1' : '0'}">
         <div class="${tableBadgeClass(status)}">${escapeHtml(table.table_number)}</div>
         <p class="table-card__meta">Status: ${escapeHtml(tableStatusLabel(table))}</p>
         ${tablePaymentPill(table)}
         ${qrImage}
+        <p class="table-card__meta table-card__link">${table.qr_url
+          ? `<a href="${escapeHtml(table.qr_url)}" target="_blank" rel="noreferrer">${escapeHtml(table.qr_url)}</a>`
+          : 'QR not available yet'}</p>
         <div class="toolbar">
           <button class="btn btn-light" data-copy-qr-url="${escapeHtml(table.qr_url || '')}" type="button">Copy Link</button>
           <a class="btn btn-light" href="${table.qr_data_url || '#'}" download="table-${escapeHtml(table.table_number)}.png">Download QR</a>
           <button class="btn btn-light" data-print-qr="${table.id}" type="button">Print QR</button>
-          ${canTerminate ? `<button class="btn btn-primary" data-reset-terminal="${table.id}" type="button">${terminateLabel}</button>` : ''}
+          ${status === 'paid' ? `<button class="btn btn-primary" data-reset-terminal="${table.id}" type="button">Terminal Reset</button>` : ''}
           <button class="btn btn-dark" data-delete-table="${table.id}" type="button">Delete</button>
         </div>
       </div>
@@ -458,13 +435,11 @@ async function loadTables() {
     card.addEventListener('click', (event) => {
       if (event.target.closest('button, a')) return;
       const tableId = Number(card.dataset.tableId);
-      const paymentStatus = String(card.dataset.paymentStatus || '').toLowerCase();
-      const paymentMethod = String(card.dataset.paymentMethod || '').toLowerCase();
       if (card.dataset.runningBill === '1') {
         openBillModalForTable(tableId, { allowPaid: false });
         return;
       }
-      if (card.dataset.tableStatus === 'paid' || (card.dataset.tableStatus === 'active' && paymentStatus === 'paid' && (paymentMethod === 'upi' || paymentMethod === 'online'))) {
+      if (card.dataset.tableStatus === 'paid') {
         openBillModalForTable(tableId, { allowPaid: true });
       }
     });
@@ -473,8 +448,8 @@ async function loadTables() {
   tableList.querySelectorAll('button[data-reset-terminal]').forEach((button) => {
     button.addEventListener('click', async () => {
       try {
-        await terminateTableSession(button.dataset.resetTerminal);
-        setMessage('ownerMessage', 'Table cleared for the next guest.');
+        await apiRequest(`/restaurants/${restaurantId}/tables/${button.dataset.resetTerminal}/terminal-reset`, { method: 'POST' }, true);
+        setMessage('ownerMessage', 'Terminal reset complete. The table is back to white.');
         await loadTables();
         await loadInvoices();
       } catch (error) {
@@ -976,18 +951,10 @@ document.getElementById('billConfirmCounterPaid')?.addEventListener('click', asy
   }
 });
 
-document.getElementById('billVerifyUpiPayment')?.addEventListener('click', async () => {
-  try {
-    await markBillPaid('upi');
-  } catch (error) {
-    setMessage('ownerMessage', error.message, true);
-  }
-});
-
 document.getElementById('billTerminalReset')?.addEventListener('click', async () => {
   if (!activeBillTableId) return;
   try {
-    await terminateTableSession(activeBillTableId);
+    await apiRequest(`/restaurants/${restaurantId}/tables/${activeBillTableId}/terminal-reset`, { method: 'POST' }, true);
     setMessage('ownerMessage', 'Table cleared for the next guest.');
     hideBillModal();
     await loadTables();
