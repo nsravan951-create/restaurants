@@ -1582,10 +1582,21 @@
           document.title = `${data.restaurant.name} | Table ${data.table.table_number}`;
 
           loadCart();
+          if (data.session) {
+            state.session = data.session;
+            saveSession();
+            startSessionPing();
+          }
+
           const storedSession = loadSession();
-          if (storedSession) {
+          if (!state.session && storedSession) {
             state.session = storedSession;
             startSessionPing();
+          }
+
+          if (state.session && storedSession && storedSession.sessionToken !== state.session.sessionToken) {
+            state.session = data.session || storedSession;
+            saveSession();
           }
 
           if (!state.session) {

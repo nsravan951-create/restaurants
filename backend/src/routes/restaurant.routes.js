@@ -630,6 +630,13 @@ router.get('/:restaurantId/table/:tableId', asyncHandler(async (req, res) => {
       expiresAt: activeSessionRows[0]?.expires_at || null,
       reason: tableRows[0].availability_status === 'paid' ? 'paid' : null,
     },
+    session: activeSessionRows[0]
+      ? {
+          id: activeSessionRows[0].id,
+          expiresAt: activeSessionRows[0].expires_at,
+          sessionToken: activeSessionRows[0].session_token,
+        }
+      : null,
     menu: menuRows,
     ads: adsRows,
   });
