@@ -12,7 +12,7 @@ const {
   refreshQrForTable,
 } = require('../utils/qr');
 const { expireInactiveSessions } = require('../utils/tableSession');
-const { emitTableUpdate } = require('../services/socket');
+const { emitTableUpdate, emitOrderUpdate } = require('../services/socket');
 
 const router = express.Router();
 
@@ -542,12 +542,33 @@ router.post('/:restaurantId/tables/:tableId/terminal-reset', requireAuth(['owner
 
     const activeSession = sessionRows[0] || null;
 
+    const { rows: orderRows } = await conn.query(
+      `SELECT id
+       FROM orders
+       WHERE restaurant_id = $1 AND table_id = $2 AND payment_status = 'pending'
+       ORDER BY id DESC
+       LIMIT 1
+       FOR UPDATE`,
+      [restaurantId, tableId]
+    );
+
+    const pendingOrder = orderRows[0] || null;
+
     if (activeSession) {
       await conn.query(
         `UPDATE table_sessions
          SET status = 'completed', ended_at = NOW(), ended_reason = $1
          WHERE id = $2`,
         ['manual_terminate', activeSession.id]
+      );
+    }
+
+    if (pendingOrder) {
+      await conn.query(
+        `UPDATE orders
+         SET payment_status = 'failed', notes = COALESCE(notes, '') || $1
+         WHERE id = $2`,
+        [' | Terminated by owner', pendingOrder.id]
       );
     }
 
@@ -559,13 +580,21 @@ router.post('/:restaurantId/tables/:tableId/terminal-reset', requireAuth(['owner
 
     try {
       emitTableUpdate(Number(restaurantId), { tableId: Number(tableId), status: 'available' });
+      if (pendingOrder) {
+        emitOrderUpdate(Number(restaurantId), {
+          type: 'status_changed',
+          orderId: Number(pendingOrder.id),
+          status: 'failed',
+        });
+      }
     } catch (error) {
       // non-fatal
     }
 
     return res.json({
-      message: activeSession ? 'Session terminated and table reset' : 'Table reset to available',
+      message: activeSession || pendingOrder ? 'Table terminated and reset' : 'Table reset to available',
       sessionTerminated: Boolean(activeSession),
+      orderTerminated: Boolean(pendingOrder),
     });
   } catch (error) {
     await conn.query('ROLLBACK');

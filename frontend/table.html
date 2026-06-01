@@ -1491,15 +1491,19 @@
           }
 
           if (!state.session) {
-            if (data.lock?.orderPlaced) {
+            if (data.lock?.orderPlaced || data.lock?.reason === 'order_placed') {
               setError('This table already has an active bill. Another guest cannot order until the restaurant clears the table.');
               return;
             }
-            if (data.lock?.isLocked) {
+
+            if (data.lock?.reason === 'session_active') {
+              await startOrJoinSession(true);
+            } else if (data.lock?.isLocked) {
               setError('This table is currently in use by another guest. Please wait or ask staff for help.');
               return;
+            } else {
+              await startOrJoinSession(false);
             }
-            await startOrJoinSession(false);
           }
 
           renderMenu(data.menu || []);

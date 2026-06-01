@@ -368,14 +368,10 @@ async function loadTables() {
         <p class="table-card__meta">Status: ${escapeHtml(tableStatusLabel(table))}</p>
         ${tablePaymentPill(table)}
         ${qrImage}
-        <p class="table-card__meta table-card__link">${table.qr_url
-          ? `<a href="${escapeHtml(table.qr_url)}" target="_blank" rel="noreferrer">${escapeHtml(table.qr_url)}</a>`
-          : 'QR not available yet'}</p>
+        <p class="table-card__meta table-card__link">${table.qr_url ? escapeHtml(table.qr_url) : 'QR not available yet'}</p>
         <div class="toolbar">
-          <button class="btn btn-light" data-copy-qr-url="${escapeHtml(table.qr_url || '')}" type="button">Copy Link</button>
-          <a class="btn btn-light" href="${table.qr_data_url || '#'}" download="table-${escapeHtml(table.table_number)}.png">Download QR</a>
           <button class="btn btn-light" data-print-qr="${table.id}" type="button">Print QR</button>
-          ${status === 'paid' ? `<button class="btn btn-primary" data-reset-terminal="${table.id}" type="button">Terminal Reset</button>` : ''}
+          <button class="btn btn-primary" data-reset-terminal="${table.id}" type="button">Terminate Box</button>
           <button class="btn btn-dark" data-delete-table="${table.id}" type="button">Delete</button>
         </div>
       </div>
@@ -389,22 +385,6 @@ async function loadTables() {
         await loadTables();
       } catch (error) {
         setMessage('ownerMessage', error.message, true);
-      }
-    });
-  });
-
-  tableList.querySelectorAll('button[data-copy-qr-url]').forEach((button) => {
-    button.addEventListener('click', async () => {
-      const url = button.dataset.copyQrUrl;
-      if (!url) {
-        setMessage('ownerMessage', 'QR link not ready yet.', true);
-        return;
-      }
-      try {
-        await navigator.clipboard.writeText(url);
-        setMessage('ownerMessage', 'QR link copied to clipboard.');
-      } catch (error) {
-        setMessage('ownerMessage', url, false);
       }
     });
   });
@@ -449,7 +429,7 @@ async function loadTables() {
     button.addEventListener('click', async () => {
       try {
         await apiRequest(`/restaurants/${restaurantId}/tables/${button.dataset.resetTerminal}/terminal-reset`, { method: 'POST' }, true);
-        setMessage('ownerMessage', 'Terminal reset complete. The table is back to white.');
+        setMessage('ownerMessage', 'Table terminated and reset to available.');
         await loadTables();
         await loadInvoices();
       } catch (error) {
