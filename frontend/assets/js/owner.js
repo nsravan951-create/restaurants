@@ -358,9 +358,12 @@ async function loadTables() {
 
   tableList.innerHTML = tables.length ? tables.map((table) => {
     const qrImage = table.qr_data_url ? `<img src="${table.qr_data_url}" alt="QR for ${escapeHtml(table.table_number)}" class="table-card__qr" />` : '';
-    const status = String(table.availability_status || 'available');
+    const hasActiveSession = Boolean(table.active_session_id) || String(table.active_session_status || '').toLowerCase() === 'active';
     const runningBill = hasRunningBill(table);
     const hasOrder = table.active_order_id ? '1' : '0';
+    const status = String(table.availability_status || 'available') === 'paid'
+      ? 'paid'
+      : (runningBill || hasActiveSession ? 'active' : 'available');
     const clickable = runningBill || status === 'active' || status === 'paid';
     const showTerminate = status !== 'available';
     const showBillAction = runningBill || status === 'active' || status === 'paid';

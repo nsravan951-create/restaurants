@@ -101,10 +101,19 @@ router.get('/:restaurantId/tables', requireAuth(['owner', 'super_admin', 'staff'
 
   let { rows } = await pool.query(
     `SELECT t.id, t.table_number, t.availability_status, t.qr_token, q.qr_url, q.qr_data_url, t.created_at,
+            act.id AS active_session_id,
+            act.status AS active_session_status,
             lo.active_order_id, lo.total_amount AS order_total, lo.payment_method AS order_payment_method,
             lo.payment_status AS order_payment_status
      FROM restaurant_tables t
      LEFT JOIN qr_codes q ON q.table_id = t.id
+     LEFT JOIN LATERAL (
+       SELECT s.id, s.status
+       FROM table_sessions s
+       WHERE s.table_id = t.id AND s.restaurant_id = t.restaurant_id AND s.status = 'active'
+       ORDER BY s.id DESC
+       LIMIT 1
+     ) act ON TRUE
      LEFT JOIN LATERAL (
        SELECT o.id AS active_order_id, o.total_amount, o.payment_method, o.payment_status
        FROM orders o
