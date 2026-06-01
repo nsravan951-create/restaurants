@@ -361,17 +361,19 @@ async function loadTables() {
     const status = String(table.availability_status || 'available');
     const runningBill = hasRunningBill(table);
     const hasOrder = table.active_order_id ? '1' : '0';
-    const clickable = runningBill || status === 'paid';
+    const clickable = runningBill || status === 'active' || status === 'paid';
+    const showTerminate = status !== 'available';
+    const showBillAction = runningBill || status === 'active' || status === 'paid';
     return `
       <div class="table-card ${tableStatusClass(status)}${clickable ? ' table-card--clickable' : ''}" data-table-id="${table.id}" data-table-status="${escapeHtml(status)}" data-table-number="${escapeHtml(table.table_number)}" data-has-order="${hasOrder}" data-running-bill="${runningBill ? '1' : '0'}">
         <div class="${tableBadgeClass(status)}">${escapeHtml(table.table_number)}</div>
         <p class="table-card__meta">Status: ${escapeHtml(tableStatusLabel(table))}</p>
         ${tablePaymentPill(table)}
         ${qrImage}
-        <p class="table-card__meta table-card__link">${table.qr_url ? escapeHtml(table.qr_url) : 'QR not available yet'}</p>
         <div class="toolbar">
           <button class="btn btn-light" data-print-qr="${table.id}" type="button">Print QR</button>
-          <button class="btn btn-primary" data-reset-terminal="${table.id}" type="button">Terminate Box</button>
+          ${showBillAction ? `<button class="btn btn-primary" data-open-bill="${table.id}" type="button">Open Bill</button>` : ''}
+          ${showTerminate ? `<button class="btn btn-primary" data-reset-terminal="${table.id}" type="button">Terminate Box</button>` : ''}
           <button class="btn btn-dark" data-delete-table="${table.id}" type="button">Delete</button>
         </div>
       </div>
@@ -408,6 +410,23 @@ async function loadTables() {
       } catch (error) {
         setMessage('ownerMessage', error.message, true);
       }
+    });
+  });
+
+  tableList.querySelectorAll('button[data-open-bill]').forEach((button) => {
+    button.addEventListener('click', async (event) => {
+      event.stopPropagation();
+      const tableId = Number(button.dataset.openBill);
+      const card = button.closest('.table-card');
+      if (card?.dataset.runningBill === '1') {
+        await openBillModalForTable(tableId, { allowPaid: false });
+        return;
+      }
+      if (card?.dataset.tableStatus === 'paid') {
+        await openBillModalForTable(tableId, { allowPaid: true });
+        return;
+      }
+      await openBillModalForTable(tableId, { allowPaid: false });
     });
   });
 
