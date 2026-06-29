@@ -433,6 +433,24 @@ select:focus {
   padding: 0.7rem;
 }
 
+.ad-card {
+  background: linear-gradient(135deg, #fff8f0 0%, #fffbf7 100%) !important;
+  border: 2px solid var(--accent) !important;
+  box-shadow: 0 4px 12px rgba(230, 106, 61, 0.12) !important;
+  transition: transform 200ms ease, box-shadow 200ms ease;
+  cursor: pointer;
+}
+
+.ad-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 20px rgba(230, 106, 61, 0.2) !important;
+}
+
+.ad-card h3 {
+  font-size: 1rem;
+  font-weight: 700;
+}
+
 .close-btn {
   position: absolute;
   top: 8px;

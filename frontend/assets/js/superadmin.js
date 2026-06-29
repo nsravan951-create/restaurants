@@ -4,6 +4,9 @@
     query: '',
     editingAdId: null,
     activeSection: 'overview',
+    messages: [],
+    selectedRestaurants: new Set(),
+    operations: null,
   };
 
   const currencyFormatter = new Intl.NumberFormat('en-IN', {
@@ -395,9 +398,11 @@
     renderRevenueTrend();
     renderTopRestaurants();
     renderAnalytics();
+    renderOperationsDashboard();
     populateAdRestaurantOptions();
     renderRestaurantList();
     renderAdsList();
+    loadMessages();
   }
 
   async function loadDashboard() {
@@ -406,6 +411,314 @@
     state.dashboard = data;
     renderAll();
     setMessage('Dashboard ready.');
+  }
+
+  // ===== OPERATIONS DASHBOARD =====
+  function renderOperationsDashboard() {
+    const restaurants = getDashboard().restaurants || [];
+    const orders = getDashboard().orders || [];
+
+    // Calculate operations metrics
+    const activeOrders = orders.filter(o => ['pending', 'preparing', 'ready'].includes(o.status)).length;
+    const restaurantsOnline = restaurants.filter(r => r.is_active).length;
+    const totalTableActivity = restaurants.reduce((sum, r) => sum + (r.active_tables || 0), 0);
+    const averageOrderValue = restaurants.length > 0 
+      ? restaurants.reduce((sum, r) => sum + (r.monthly_revenue || 0), 0) / orders.length || 0
+      : 0;
+
+    const operationsCards = [
+      ['🔴 Active Orders', activeOrders],
+      ['🟢 Online Restaurants', restaurantsOnline],
+      ['🪑 Active Tables', totalTableActivity],
+      ['💰 Avg Order Value', formatMoney(averageOrderValue)],
+    ];
+
+    const cardsRoot = el('operationsCards');
+    if (cardsRoot) {
+      cardsRoot.innerHTML = operationsCards.map(([label, value]) => `
+        <article class="metric-card metric-card--premium">
+          <span class="metric-card__label">${escapeHtml(label)}</span>
+          <strong class="metric-card__value">${escapeHtml(String(value))}</strong>
+        </article>
+      `).join('');
+    }
+
+    // Render active orders
+    const activeOrdersList = orders
+      .filter(o => ['pending', 'preparing', 'ready'].includes(o.status))
+      .slice(0, 8);
+
+    const activeOrdersRoot = el('activeOrdersList');
+    if (activeOrdersRoot) {
+      activeOrdersRoot.innerHTML = activeOrdersList.map(order => {
+        const restaurant = restaurants.find(r => r.id === order.restaurant_id);
+        const statusColor = order.status === 'ready' ? '#4ade80' : order.status === 'preparing' ? '#fbbf24' : '#ef4444';
+        return `
+          <div class="rank-card">
+            <div class="rank-card__index" style="background-color: ${statusColor};">📦</div>
+            <div class="rank-card__body">
+              <strong>Order #${order.id}</strong>
+              <p>${escapeHtml(restaurant?.name || 'Unknown')} • Table ${escapeHtml(order.table_number)}</p>
+            </div>
+            <div class="rank-card__value">${escapeHtml(formatMoney(order.total_amount))}</div>
+          </div>
+        `;
+      }).join('') || '<p class="muted">No active orders right now.</p>';
+    }
+
+    // Render restaurant status
+    const restaurantStatusRoot = el('restaurantStatusList');
+    if (restaurantStatusRoot) {
+      restaurantStatusRoot.innerHTML = restaurants.slice(0, 8).map(r => {
+        const statusBadge = r.is_active ? '🟢' : '🔴';
+        const tableUtilization = r.total_tables > 0 
+          ? Math.round((r.active_tables / r.total_tables) * 100) 
+          : 0;
+        return `
+          <div class="rank-card">
+            <div class="rank-card__index">${statusBadge}</div>
+            <div class="rank-card__body">
+              <strong>${escapeHtml(r.name)}</strong>
+              <p>${escapeHtml(r.owner_name || 'No owner')} • ${r.active_tables}/${r.total_tables} tables</p>
+            </div>
+            <div class="rank-card__value">${tableUtilization}%</div>
+          </div>
+        `;
+      }).join('') || '<p class="muted">No restaurant data.</p>';
+    }
+  }
+
+  // ===== MESSAGING SYSTEM =====
+  function populateRestaurantCheckboxes() {
+    const restaurants = getDashboard().restaurants || [];
+    const container = el('specificRestaurantsList');
+    if (!container) return;
+
+    container.innerHTML = restaurants.map(r => `
+      <label class="admin-check">
+        <input type="checkbox" class="restaurant-checkbox" value="${r.id}" />
+        <span>${escapeHtml(r.name)}</span>
+      </label>
+    `).join('');
+
+    container.querySelectorAll('.restaurant-checkbox').forEach(checkbox => {
+      checkbox.addEventListener('change', (e) => {
+        if (e.target.checked) {
+          state.selectedRestaurants.add(e.target.value);
+        } else {
+          state.selectedRestaurants.delete(e.target.value);
+        }
+      });
+    });
+  }
+
+  function handleRecipientTypeChange(value) {
+    const container = el('specificRestaurantsList');
+    if (!container) return;
+
+    if (value === 'specific') {
+      container.style.display = 'block';
+      populateRestaurantCheckboxes();
+    } else {
+      container.style.display = 'none';
+      state.selectedRestaurants.clear();
+    }
+  }
+
+  async function handleMessageSubmit(event) {
+    event.preventDefault();
+    const formData = new FormData(event.currentTarget);
+
+    const recipientType = formData.get('recipientType');
+    const recipientIds = recipientType === 'specific' 
+      ? Array.from(state.selectedRestaurants).map(Number)
+      : [];
+
+    if (recipientType === 'specific' && recipientIds.length === 0) {
+      setMessage('Please select at least one restaurant for specific messages.', true);
+      return;
+    }
+
+    try {
+      const response = await apiRequest('/api/admin/messages', {
+        method: 'POST',
+        body: JSON.stringify({
+          title: formData.get('title'),
+          content: formData.get('content'),
+          messageType: formData.get('messageType'),
+          priority: formData.get('priority'),
+          recipientType: recipientType,
+          recipientIds: recipientIds,
+          isBroadcast: formData.get('isBroadcast') === 'on',
+          expiresAt: formData.get('expiresAt') || null,
+        }),
+      }, true);
+
+      event.currentTarget.reset();
+      state.selectedRestaurants.clear();
+      handleRecipientTypeChange('');
+      await loadMessages();
+      setMessage(`Message sent to ${response.recipientCount} restaurants successfully! ✅`);
+    } catch (error) {
+      setMessage(error.message, true);
+    }
+  }
+
+  async function loadMessages() {
+    try {
+      const data = await apiRequest('/api/admin/messages', {}, true);
+      state.messages = data.messages || [];
+      renderMessagesList();
+    } catch (error) {
+      setMessage('Failed to load messages.', true);
+    }
+  }
+
+  function renderMessagesList() {
+    const messages = state.messages || [];
+    const root = el('messagesList');
+    if (!root) return;
+
+    root.innerHTML = messages.map(msg => {
+      const typeIcon = {
+        'announcement': '📢',
+        'alert': '⚠️',
+        'notice': '📋',
+        'offer': '🎁',
+      }[msg.message_type] || '📝';
+
+      const priorityColor = {
+        'urgent': '#dc2626',
+        'high': '#f97316',
+        'normal': '#3b82f6',
+        'low': '#6b7280',
+      }[msg.priority] || '#3b82f6';
+
+      const readPercentage = msg.recipientCount > 0 
+        ? Math.round((msg.readCount / msg.recipientCount) * 100)
+        : 0;
+
+      return `
+        <article class="admin-item">
+          <div class="admin-item__header">
+            <div>
+              <h4>${typeIcon} ${escapeHtml(msg.title)}</h4>
+              <p>${escapeHtml(msg.content.substring(0, 80))}...</p>
+            </div>
+            <span class="badge" style="background-color: ${priorityColor};">${msg.priority.toUpperCase()}</span>
+          </div>
+          <div class="admin-item__metrics">
+            <span>Sent: ${escapeHtml(formatDate(msg.created_at))}</span>
+            <span>Recipients: ${msg.recipientCount}</span>
+            <span>Read: ${msg.readCount}/${msg.recipientCount} (${readPercentage}%)</span>
+            <span>${msg.is_broadcast ? '📡 Broadcast' : '🎯 Targeted'}</span>
+          </div>
+          <div class="admin-item__actions">
+            <button class="btn btn-light" data-message-view="${msg.id}">View details</button>
+            <button class="btn btn-dark" data-message-delete="${msg.id}">Delete</button>
+          </div>
+        </article>
+      `;
+    }).join('') || '<p class="muted">No messages sent yet. Create one above!</p>';
+
+    // Attach event listeners
+    root.querySelectorAll('[data-message-view]').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const messageId = btn.dataset.messageView;
+        try {
+          const data = await apiRequest(`/api/admin/messages/${messageId}`, {}, true);
+          showMessageDetails(data);
+        } catch (error) {
+          setMessage('Failed to load message details.', true);
+        }
+      });
+    });
+
+    root.querySelectorAll('[data-message-delete]').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        if (!confirm('Delete this message?')) return;
+        try {
+          await apiRequest(`/api/admin/messages/${btn.dataset.messageDelete}`, { method: 'DELETE' }, true);
+          await loadMessages();
+          setMessage('Message deleted successfully.');
+        } catch (error) {
+          setMessage(error.message, true);
+        }
+      });
+    });
+  }
+
+  function showMessageDetails(messageData) {
+    const { message, recipients, stats } = messageData;
+    const detailsHtml = `
+      <h3>${escapeHtml(message.title)}</h3>
+      <p style="margin: 1rem 0; line-height: 1.6;">${escapeHtml(message.content)}</p>
+      <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; margin: 1.5rem 0;">
+        <div style="padding: 1rem; background: #f3f4f6; border-radius: 8px; text-align: center;">
+          <div style="font-size: 1.5rem; font-weight: bold; color: #3b82f6;">${stats.total}</div>
+          <div style="color: #6b7280; font-size: 0.875rem;">Total Recipients</div>
+        </div>
+        <div style="padding: 1rem; background: #f3f4f6; border-radius: 8px; text-align: center;">
+          <div style="font-size: 1.5rem; font-weight: bold; color: #10b981;">${stats.read}</div>
+          <div style="color: #6b7280; font-size: 0.875rem;">Read</div>
+        </div>
+        <div style="padding: 1rem; background: #f3f4f6; border-radius: 8px; text-align: center;">
+          <div style="font-size: 1.5rem; font-weight: bold; color: #ef4444;">${stats.unread}</div>
+          <div style="color: #6b7280; font-size: 0.875rem;">Unread</div>
+        </div>
+        <div style="padding: 1rem; background: #f3f4f6; border-radius: 8px; text-align: center;">
+          <div style="font-size: 1.5rem; font-weight: bold; color: #f59e0b;">${Math.round((stats.read / stats.total) * 100)}%</div>
+          <div style="color: #6b7280; font-size: 0.875rem;">Read Rate</div>
+        </div>
+      </div>
+      <h4 style="margin-top: 2rem; margin-bottom: 1rem;">Recipients:</h4>
+      <div style="max-height: 300px; overflow-y: auto;">
+        ${recipients.map(r => `
+          <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.75rem; border-bottom: 1px solid #e5e7eb;">
+            <div>
+              <div style="font-weight: 500;">${escapeHtml(r.restaurant_name)}</div>
+              <div style="font-size: 0.875rem; color: #6b7280;">${escapeHtml(r.owner_email || 'N/A')}</div>
+            </div>
+            <span style="padding: 0.25rem 0.75rem; border-radius: 4px; font-size: 0.875rem; background-color: ${r.is_read ? '#d1fae5' : '#fee2e2'}; color: ${r.is_read ? '#065f46' : '#991b1b'};">
+              ${r.is_read ? '✓ Read' : 'Unread'}
+            </span>
+          </div>
+        `).join('')}
+      </div>
+    `;
+
+    const modal = document.createElement('div');
+    modal.style.cssText = 'position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 1000;';
+    modal.innerHTML = `
+      <div style="background: white; border-radius: 12px; max-width: 600px; max-height: 80vh; overflow-y: auto; padding: 2rem; width: 90%;">
+        ${detailsHtml}
+        <button class="btn btn-light" style="margin-top: 2rem; width: 100%;" onclick="this.closest('div').parentElement.remove();">Close</button>
+      </div>
+    `;
+    document.body.appendChild(modal);
+  }
+
+  function attachMessageEvents() {
+    const messageForm = el('messageForm');
+    if (messageForm) {
+      messageForm.addEventListener('submit', handleMessageSubmit);
+
+      const recipientTypeSelect = messageForm.querySelector('[name="recipientType"]');
+      if (recipientTypeSelect) {
+        recipientTypeSelect.addEventListener('change', (e) => {
+          handleRecipientTypeChange(e.target.value);
+        });
+      }
+    }
+
+    const messageFilter = el('messageFilter');
+    const messageSearch = el('messageSearch');
+    if (messageFilter) {
+      messageFilter.addEventListener('change', loadMessages);
+    }
+    if (messageSearch) {
+      messageSearch.addEventListener('input', loadMessages);
+    }
   }
 
   async function handleRestaurantCreate(event) {
@@ -507,6 +820,9 @@
 
     const adCancelButton = el('adCancelButton');
     if (adCancelButton) adCancelButton.addEventListener('click', resetAdForm);
+
+    // Attach messaging events
+    attachMessageEvents();
   }
 
   function ensureAdminAuth() {

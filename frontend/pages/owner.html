@@ -50,12 +50,21 @@
             </div>
               </div>
             </div>
-            <form id="paymentSettingsForm" class="grid-3 owner-payment-form">
-              <input name="upiVpa" id="upiVpaInput" placeholder="Restaurant UPI ID (e.g. cafe@upi)" />
-              <input name="bankAccountName" placeholder="Account holder name" />
-              <input name="bankName" placeholder="Bank name" />
-              <button class="btn btn-light" type="submit">Save Payment Details</button>
-            </form>
+            <div class="panel soft-panel" style="margin-bottom:1rem; padding:1rem;">
+              <div class="section-head" style="margin-bottom:0.75rem;">
+                <div>
+                  <h3>Payment Details</h3>
+                  <p class="hero-copy">Only the restaurant owner can update these details. Click edit to verify your dashboard password.</p>
+                </div>
+                <button id="editPaymentDetailsBtn" class="btn btn-light" type="button">Edit</button>
+              </div>
+              <form id="paymentSettingsForm" class="grid-3 owner-payment-form">
+                <input name="upiVpa" id="upiVpaInput" placeholder="Restaurant UPI ID (e.g. cafe@upi)" disabled />
+                <input name="bankAccountName" placeholder="Account holder name" disabled />
+                <input name="bankName" placeholder="Bank name" disabled />
+                <button id="savePaymentDetailsBtn" class="btn btn-light" type="submit" disabled>Save Payment Details</button>
+              </form>
+            </div>
             <form id="autoTableForm" class="inline-form">
               <input name="totalTables" type="number" min="1" max="500" placeholder="How many QR codes to generate" required />
               <button class="btn btn-light" type="submit">Generate QR Codes</button>
@@ -164,6 +173,25 @@
 
       <p id="ownerMessage" class="message"></p>
     </main>
+
+    <div id="paymentAuthModal" class="bill-modal hidden" aria-hidden="true">
+      <div class="bill-modal__sheet" role="dialog" aria-labelledby="paymentAuthTitle">
+        <header class="bill-modal__head">
+          <div>
+            <p class="eyebrow">Secure owner access</p>
+            <h2 id="paymentAuthTitle">Verify dashboard password</h2>
+            <p class="hero-copy">Enter your dashboard password to unlock payment details.</p>
+          </div>
+        </header>
+        <div class="bill-modal__body">
+          <form id="paymentAuthForm" class="inline-form" novalidate>
+            <input id="paymentAuthPassword" name="dashboardPassword" type="password" placeholder="Dashboard password" required />
+            <button class="btn btn-primary" type="submit">Verify</button>
+            <button id="cancelPaymentAuthBtn" class="btn btn-light" type="button">Cancel</button>
+          </form>
+        </div>
+      </div>
+    </div>
 
     <div id="billModal" class="bill-modal" aria-hidden="true">
       <div class="bill-modal__sheet" role="dialog" aria-labelledby="billRestaurantName">

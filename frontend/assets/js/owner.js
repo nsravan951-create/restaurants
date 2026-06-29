@@ -50,6 +50,39 @@ function escapeHtml(str) {
     .replace(/'/g, '&#39;');
 }
 
+function setPaymentSettingsEditable(isEditable) {
+  const form = document.getElementById('paymentSettingsForm');
+  const saveButton = document.getElementById('savePaymentDetailsBtn');
+  const editButton = document.getElementById('editPaymentDetailsBtn');
+
+  if (!form) return;
+
+  form.querySelectorAll('input').forEach((input) => {
+    input.disabled = !isEditable;
+  });
+
+  if (saveButton) saveButton.disabled = !isEditable;
+  if (editButton) editButton.disabled = isEditable;
+}
+
+function openPaymentAuthModal() {
+  const modal = document.getElementById('paymentAuthModal');
+  if (!modal) return;
+  modal.classList.remove('hidden');
+  modal.setAttribute('aria-hidden', 'false');
+  document.body.classList.add('bill-modal-open');
+  const passwordInput = document.getElementById('paymentAuthPassword');
+  if (passwordInput) passwordInput.focus();
+}
+
+function closePaymentAuthModal() {
+  const modal = document.getElementById('paymentAuthModal');
+  if (!modal) return;
+  modal.classList.add('hidden');
+  modal.setAttribute('aria-hidden', 'true');
+  document.body.classList.remove('bill-modal-open');
+}
+
 async function fetchAuthorizedHtml(path) {
   const rawAuth = localStorage.getItem('qr_ordering_auth');
   let auth = null;
@@ -303,6 +336,7 @@ async function loadRestaurant() {
     payForm.upiVpa.value = data.restaurant.upi_vpa || '';
     payForm.bankAccountName.value = data.restaurant.bank_account_name || '';
     payForm.bankName.value = data.restaurant.bank_name || '';
+    setPaymentSettingsEditable(false);
   }
 }
 
@@ -862,6 +896,49 @@ document.getElementById('refreshInvoicesBtn').addEventListener('click', async ()
 });
 
 const paymentSettingsForm = document.getElementById('paymentSettingsForm');
+const editPaymentDetailsBtn = document.getElementById('editPaymentDetailsBtn');
+const paymentAuthForm = document.getElementById('paymentAuthForm');
+const cancelPaymentAuthBtn = document.getElementById('cancelPaymentAuthBtn');
+
+if (editPaymentDetailsBtn) {
+  editPaymentDetailsBtn.addEventListener('click', () => {
+    openPaymentAuthModal();
+  });
+}
+
+if (cancelPaymentAuthBtn) {
+  cancelPaymentAuthBtn.addEventListener('click', () => {
+    closePaymentAuthModal();
+    paymentAuthForm?.reset();
+  });
+}
+
+if (paymentAuthForm) {
+  paymentAuthForm.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const password = String(new FormData(paymentAuthForm).get('dashboardPassword') || '').trim();
+
+    if (!password) {
+      setMessage('ownerMessage', 'Please enter your dashboard password.', true);
+      return;
+    }
+
+    try {
+      await apiRequest('/api/auth/verify-password', {
+        method: 'POST',
+        body: JSON.stringify({ currentPassword: password }),
+      }, true);
+
+      setPaymentSettingsEditable(true);
+      closePaymentAuthModal();
+      paymentAuthForm.reset();
+      setMessage('ownerMessage', 'Verified. You can now update payment details.');
+    } catch (error) {
+      setMessage('ownerMessage', error.message, true);
+    }
+  });
+}
+
 if (paymentSettingsForm) {
   paymentSettingsForm.addEventListener('submit', async (event) => {
     event.preventDefault();

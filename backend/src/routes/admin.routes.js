@@ -189,11 +189,20 @@ router.get('/stats', asyncHandler(async (req, res) => {
 
 // GET /api/admin/dashboard
 router.get('/dashboard', asyncHandler(async (req, res) => {
-  const [summary, restaurants, ads, revenueSeries] = await Promise.all([
+  const [summary, restaurants, ads, revenueSeries, orders] = await Promise.all([
     fetchDashboardSummary(),
     fetchRestaurantAnalytics(),
     fetchAdsOverview(),
     fetchRevenueSeries(),
+    pool.query(`
+      SELECT o.id, o.restaurant_id, o.table_number, o.total_amount, o.status, o.payment_status,
+             r.name AS restaurant_name, r.is_active
+      FROM orders o
+      LEFT JOIN restaurants r ON r.id = o.restaurant_id
+      WHERE o.status IN ('pending', 'preparing', 'ready')
+      ORDER BY o.created_at DESC
+      LIMIT 20
+    `),
   ]);
 
   return res.json({
@@ -202,6 +211,7 @@ router.get('/dashboard', asyncHandler(async (req, res) => {
     ads,
     revenueSeries,
     topRestaurants: restaurants.slice(0, 5),
+    orders: orders.rows || [],
   });
 }));
 

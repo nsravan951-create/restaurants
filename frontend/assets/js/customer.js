@@ -205,21 +205,62 @@ function addToCart(item) {
   renderCart();
 }
 
-function renderMenu(menu) {
-  menuContainer.innerHTML = menu.map((item) => `
-    <article class="card">
-      ${item.image_url ? `<img src="${item.image_url}" alt="${item.name}" style="width:100%;height:140px;object-fit:cover;border-radius:10px;" />` : ''}
-      <h3>${item.name}</h3>
-      <p>${item.category}</p>
-      <p>INR ${formatCurrency(item.price)}</p>
-      <button class="btn btn-primary" data-id="${item.id}">Add to Cart</button>
-    </article>
-  `).join('');
+function renderMenu(menu, ads = []) {
+  const menuHTML = [];
+  
+  menu.forEach((item, index) => {
+    // Add menu item
+    menuHTML.push(`
+      <article class="card">
+        ${item.image_url ? `<img src="${item.image_url}" alt="${item.name}" style="width:100%;height:140px;object-fit:cover;border-radius:10px;" />` : ''}
+        <h3>${item.name}</h3>
+        <p>${item.category}</p>
+        <p>INR ${formatCurrency(item.price)}</p>
+        <button class="btn btn-primary" data-id="${item.id}">Add to Cart</button>
+      </article>
+    `);
+    
+    // Show an ad after every 3 menu items
+    if (ads.length > 0 && (index + 1) % 3 === 0) {
+      const adIndex = Math.floor((index + 1) / 3) - 1;
+      if (adIndex < ads.length) {
+        const ad = ads[adIndex];
+        menuHTML.push(`
+          <article class="card ad-card" data-ad-id="${ad.id}">
+            <div style="position: relative; overflow: hidden; border-radius: 8px; margin-bottom: 0.6rem;">
+              <img src="${ad.image_url}" alt="${ad.title}" style="width:100%;height:140px;object-fit:cover;cursor:pointer;" class="ad-image" />
+              <span style="position: absolute; top: 0.5rem; right: 0.5rem; background: var(--accent); color: white; padding: 0.3rem 0.6rem; border-radius: 6px; font-size: 0.7rem; font-weight: 600;">PROMOTED</span>
+            </div>
+            <h3 style="color: var(--accent); margin-bottom: 0.5rem;">${ad.title}</h3>
+            <p style="color: var(--muted); font-size: 0.85rem; margin-bottom: 0.6rem;">Exclusive offer from our partners</p>
+            <a href="${ad.target_link}" target="_blank" rel="noreferrer" class="btn btn-primary" style="width: 100%; text-align: center;">View Offer</a>
+          </article>
+        `);
+      }
+    }
+  });
+  
+  menuContainer.innerHTML = menuHTML.join('');
 
   menuContainer.querySelectorAll('button[data-id]').forEach((button) => {
     button.addEventListener('click', () => {
       const menuItem = menu.find((m) => Number(m.id) === Number(button.dataset.id));
       if (menuItem) addToCart(menuItem);
+    });
+  });
+
+  // Track ad clicks
+  menuContainer.querySelectorAll('.ad-image').forEach((img) => {
+    img.addEventListener('click', async (e) => {
+      const adCard = e.target.closest('.ad-card');
+      if (adCard) {
+        const adId = adCard.dataset.adId;
+        try {
+          await apiRequest(`/api/ads/click/${adId}`, { method: 'POST' });
+        } catch (error) {
+          console.error('Failed to track ad click:', error.message);
+        }
+      }
     });
   });
 }
@@ -372,9 +413,10 @@ async function initCustomerPage() {
     document.getElementById('restaurantTitle').textContent = data.restaurant.name;
     document.getElementById('tableInfo').textContent = `Table ${data.table.table_number}`;
 
-    renderMenu(data.menu);
+    renderMenu(data.menu, data.ads);
     renderCart();
-    setupAdPopup(data.ads);
+    // Keep popup ad as optional fallback - comment out if you want only inline ads
+    // setupAdPopup(data.ads);
     await startOrJoinSession(false);
   } catch (error) {
     setMessage('orderMessage', error.message, true);

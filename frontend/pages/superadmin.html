@@ -22,11 +22,13 @@
       </div>
 
       <nav class="admin-nav">
-        <button data-section="overview" class="admin-link active">Overview</button>
-        <button data-section="restaurants" class="admin-link">Restaurants</button>
-        <button data-section="ads" class="admin-link">Ads</button>
-        <button data-section="analytics" class="admin-link">Analytics</button>
-        <button id="logoutButton" class="admin-link admin-link--danger">Logout</button>
+        <button data-section="overview" class="admin-link active">📊 Overview</button>
+        <button data-section="operations" class="admin-link">🏪 Operations</button>
+        <button data-section="messaging" class="admin-link">💬 Messages</button>
+        <button data-section="restaurants" class="admin-link">🏢 Restaurants</button>
+        <button data-section="ads" class="admin-link">📢 Ads</button>
+        <button data-section="analytics" class="admin-link">📈 Analytics</button>
+        <button id="logoutButton" class="admin-link admin-link--danger">🚪 Logout</button>
       </nav>
 
       <div class="admin-sidebar__footer">
@@ -149,6 +151,107 @@
         </div>
 
         <div id="analyticsList" class="admin-list"></div>
+      </section>
+
+      <section id="section-operations" class="admin-section hidden">
+        <div class="section-head">
+          <div>
+            <h3>Restaurant Operations Dashboard</h3>
+            <p>Monitor live activity, real-time metrics, and restaurant performance.</p>
+          </div>
+        </div>
+
+        <div id="operationsCards" class="summary-grid"></div>
+
+        <div class="admin-grid-2">
+          <article class="panel">
+            <div class="section-head">
+              <div>
+                <h3>Active orders now</h3>
+                <p>Orders being prepared or ready across all restaurants.</p>
+              </div>
+            </div>
+            <div id="activeOrdersList" class="stack"></div>
+          </article>
+
+          <article class="panel">
+            <div class="section-head">
+              <div>
+                <h3>Restaurant status</h3>
+                <p>Live status of all restaurants and their activity.</p>
+              </div>
+            </div>
+            <div id="restaurantStatusList" class="stack"></div>
+          </article>
+        </div>
+      </section>
+
+      <section id="section-messaging" class="admin-section hidden">
+        <div class="section-head">
+          <div>
+            <h3>Send Messages to Restaurants</h3>
+            <p>Broadcast announcements, alerts, and offers to restaurant dashboards.</p>
+          </div>
+        </div>
+
+        <article class="panel">
+          <div class="section-head">
+            <div>
+              <h4>Create message</h4>
+              <p>Send important updates and announcements to your restaurants.</p>
+            </div>
+          </div>
+          <form id="messageForm" class="admin-form">
+            <input name="title" placeholder="Message title" required />
+            <textarea name="content" placeholder="Message content" rows="5" required></textarea>
+            <select name="messageType" required>
+              <option value="">Select message type</option>
+              <option value="announcement">📢 Announcement</option>
+              <option value="alert">⚠️ Alert</option>
+              <option value="notice">📋 Notice</option>
+              <option value="offer">🎁 Special Offer</option>
+            </select>
+            <select name="priority" required>
+              <option value="normal">Normal Priority</option>
+              <option value="high">High Priority</option>
+              <option value="urgent">🔴 Urgent</option>
+            </select>
+            <select name="recipientType" required>
+              <option value="">Select recipients</option>
+              <option value="all">📡 All Active Restaurants</option>
+              <option value="subscription_based">⭐ Premium Subscription Only</option>
+              <option value="specific">🎯 Select Specific Restaurants</option>
+            </select>
+            <div id="specificRestaurantsList" class="restaurant-checkbox-group" style="display: none;"></div>
+            <input name="expiresAt" type="datetime-local" placeholder="Expires at (optional)" />
+            <label class="admin-check">
+              <input name="isBroadcast" type="checkbox" checked />
+              <span>Broadcast message</span>
+            </label>
+            <button class="btn btn-primary admin-form__submit" type="submit">Send message</button>
+          </form>
+        </article>
+
+        <div class="section-head">
+          <div>
+            <h3>Recent messages</h3>
+            <p>Track message delivery and read status.</p>
+          </div>
+        </div>
+
+        <article class="panel">
+          <div class="admin-toolbar">
+            <input id="messageSearch" class="admin-search" placeholder="Search messages..." />
+            <select id="messageFilter" class="admin-select">
+              <option value="">All types</option>
+              <option value="announcement">Announcements</option>
+              <option value="alert">Alerts</option>
+              <option value="notice">Notices</option>
+              <option value="offer">Offers</option>
+            </select>
+          </div>
+          <div id="messagesList" class="admin-list"></div>
+        </article>
       </section>
 
       <p id="adminMessage" class="message"></p>
