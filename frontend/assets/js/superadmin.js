@@ -7,6 +7,9 @@
     messages: [],
     selectedRestaurants: new Set(),
     operations: null,
+    platformOrders: [],
+    saasProfits: null,
+    paymentVaultUnlocked: false,
   };
 
   const currencyFormatter = new Intl.NumberFormat('en-IN', {
@@ -49,6 +52,9 @@
     document.querySelectorAll('.admin-link[data-section]').forEach((button) => {
       button.classList.toggle('active', button.dataset.section === section);
     });
+
+    if (section === 'profits') loadSaasProfits();
+    if (section === 'platform') loadPlatformOrders();
   }
 
   function setMessage(message, isError = false) {
@@ -207,6 +213,358 @@
     }).join('') || '<p class="muted">No restaurants match your search.</p>';
   }
 
+  function populateRestaurantSelects() {
+    const restaurants = getDashboard().restaurants || [];
+    const options = restaurants.map((r) => `<option value="${r.id}">${escapeHtml(r.name)}</option>`).join('');
+
+    ['platformRestaurantSelect', 'paymentRestaurantSelect', 'platformInvoiceRestaurantSelect'].forEach((id) => {
+      const select = el(id);
+      if (!select) return;
+      const placeholder = id === 'paymentRestaurantSelect'
+        ? '<option value="">Select restaurant to view payment details</option>'
+        : '<option value="">Select restaurant</option>';
+      select.innerHTML = placeholder + options;
+    });
+  }
+
+  async function loadInvoicesForRestaurant(restaurantId) {
+    const listRoot = el('platformInvoicesList');
+    if (!restaurantId) {
+      if (listRoot) listRoot.innerHTML = '<p class="muted">Select a restaurant to load its synced invoices.</p>';
+      return;
+    }
+
+    try {
+      const data = await apiRequest(`/api/invoices/restaurant/${restaurantId}`, {}, true);
+      renderInvoiceList(data.invoices || []);
+    } catch (error) {
+      setMessage(error.message, true);
+    }
+  }
+
+  function renderInvoiceList(invoices) {
+    const listRoot = el('platformInvoicesList');
+    if (!listRoot) return;
+
+    listRoot.innerHTML = invoices.map((invoice) => {
+      const items = Array.isArray(invoice.items_json) ? invoice.items_json : (invoice.items_json ? JSON.parse(invoice.items_json) : []);
+      const itemsText = items.map((item) => `${escapeHtml(item.name)} x${escapeHtml(String(item.quantity))}`).join(', ');
+      return `
+        <article class="admin-item">
+          <div class="admin-item__header">
+            <div>
+              <h4>Invoice #${escapeHtml(String(invoice.order_id || invoice.id))}</h4>
+              <p>${escapeHtml(invoice.customer_name || 'Guest')} • Table ${escapeHtml(invoice.table_number)}</p>
+            </div>
+            <span class="badge badge--muted">${escapeHtml(invoice.payment_status)}</span>
+          </div>
+          <div class="admin-item__metrics">
+            <span>Total: ${escapeHtml(formatMoney(invoice.total_amount || 0))}</span>
+            <span>Created: ${escapeHtml(formatDate(invoice.synced_at))}</span>
+            <span>Items: ${escapeHtml(itemsText || 'No item details')}</span>
+          </div>
+        </article>
+      `;
+    }).join('') || '<p class="muted">No synced invoices found for this restaurant.</p>';
+  }
+
+  async function handlePaymentDetailsSubmit(event) {
+    event.preventDefault();
+    if (!state.paymentVaultUnlocked) {
+      setMessage('Unlock payment vault first.', true);
+      return;
+    }
+
+    const form = event.currentTarget;
+    const formData = new FormData(form);
+    const restaurantId = el('paymentRestaurantSelect')?.value;
+
+    if (!restaurantId) {
+      setMessage('Select a restaurant first.', true);
+      return;
+    }
+
+    try {
+      const payload = {
+        upiVpa: formData.get('upiVpa'),
+        bankAccountName: formData.get('bankAccountName'),
+        bankName: formData.get('bankName'),
+        phone: formData.get('phone'),
+        address: formData.get('address'),
+      };
+
+      await apiRequest(`/api/admin/restaurants/${restaurantId}/payment-details`, {
+        method: 'PATCH',
+        body: JSON.stringify(payload),
+      }, true);
+
+      setMessage('Payment details updated successfully.');
+      await loadPaymentDetails(restaurantId);
+    } catch (error) {
+      setMessage(error.message, true);
+    }
+  }
+
+  async function loadSaasProfits() {
+    try {
+      state.saasProfits = await apiRequest('/api/admin/saas-profits', {}, true);
+      renderSaasProfits();
+    } catch (error) {
+      setMessage(error.message, true);
+    }
+  }
+
+  function renderSaasProfits() {
+    const data = state.saasProfits;
+    if (!data) return;
+
+    const m = data.monthly || {};
+    const cards = [
+      ['Total Profit', formatMoney(m.totalProfit || 0)],
+      ['Dine-in (QR)', formatMoney(m.dineInRevenue || 0)],
+      ['Cash / COD', formatMoney(m.offlineRevenue || 0)],
+      ['Aggregator Gross', formatMoney(m.platformGross || 0)],
+      ['Aggregator Net', formatMoney(m.platformNet || 0)],
+      ['Commission Paid', formatMoney(m.platformCommission || 0)],
+      ['Online Orders', m.onlineOrders || 0],
+      ['Platform Orders', m.platformOrders || 0],
+    ];
+
+    const root = el('saasProfitCards');
+    if (root) {
+      root.innerHTML = cards.map(([label, value]) => `
+        <article class="metric-card metric-card--premium">
+          <span class="metric-card__label">${escapeHtml(label)}</span>
+          <strong class="metric-card__value">${escapeHtml(String(value))}</strong>
+        </article>
+      `).join('');
+    }
+
+    const channels = data.channelBreakdown || [];
+    const maxRev = Math.max(...channels.map((c) => Number(c.revenue || 0)), 1);
+    const channelRoot = el('channelBreakdown');
+    if (channelRoot) {
+      channelRoot.innerHTML = channels.map((ch) => {
+        const rev = Number(ch.revenue || 0);
+        const width = Math.max((rev / maxRev) * 100, 4);
+        return `
+          <div class="trend-row">
+            <div class="trend-row__meta">
+              <span>${escapeHtml(ch.channel)} <small>(${escapeHtml(ch.type)})</small></span>
+              <strong>${escapeHtml(formatMoney(rev))}</strong>
+            </div>
+            <div class="trend-bar"><span style="width:${width}%"></span></div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    const subs = data.subscriptions || {};
+    const subRoot = el('subscriptionStats');
+    if (subRoot) {
+      subRoot.innerHTML = `
+        <div class="rank-card"><div class="rank-card__body"><strong>Active subscriptions</strong></div><div class="rank-card__value">${escapeHtml(subs.active_subscriptions || 0)}</div></div>
+        <div class="rank-card"><div class="rank-card__body"><strong>Premium plans</strong></div><div class="rank-card__value">${escapeHtml(subs.premium_count || 0)}</div></div>
+        <div class="rank-card"><div class="rank-card__body"><strong>Basic plans</strong></div><div class="rank-card__value">${escapeHtml(subs.basic_count || 0)}</div></div>
+      `;
+    }
+  }
+
+  async function loadPlatformOrders() {
+    try {
+      const data = await apiRequest('/api/platform-orders', {}, true);
+      state.platformOrders = data.orders || [];
+      const summary = await apiRequest('/api/platform-orders/summary', {}, true);
+      renderPlatformOrders(summary.summary || []);
+    } catch (error) {
+      setMessage(error.message, true);
+    }
+  }
+
+  function renderPlatformOrders(summary) {
+    const orders = state.platformOrders || [];
+    const platformIcons = { swiggy: '🟠', zomato: '🔴', dunzo: '🟢', uber_eats: '⚫', other: '📦' };
+
+    const summaryRoot = el('platformSummaryCards');
+    if (summaryRoot) {
+      summaryRoot.innerHTML = (summary.length ? summary : [{ platform: 'none', order_count: 0, gross_revenue: 0 }]).map((row) => `
+        <article class="metric-card metric-card--soft">
+          <span class="metric-card__label">${escapeHtml((platformIcons[row.platform] || '') + ' ' + (row.platform || 'No orders'))}</span>
+          <strong class="metric-card__value">${escapeHtml(formatMoney(row.gross_revenue || 0))} (${row.order_count || 0})</strong>
+        </article>
+      `).join('');
+    }
+
+    const listRoot = el('platformOrdersList');
+    if (!listRoot) return;
+
+    listRoot.innerHTML = orders.map((order) => {
+      const items = typeof order.items_json === 'string' ? JSON.parse(order.items_json) : (order.items_json || []);
+      const itemsText = items.map((i) => `${i.name} x${i.quantity}`).join(', ') || '—';
+      return `
+        <article class="admin-item">
+          <div class="admin-item__header">
+            <div>
+              <h4>${platformIcons[order.platform] || '📦'} ${escapeHtml(order.platform)} — #${escapeHtml(order.external_order_id || order.id)}</h4>
+              <p>${escapeHtml(order.restaurant_name || '')} • ${escapeHtml(order.customer_name || 'Guest')}</p>
+            </div>
+            <span class="badge badge--success">${escapeHtml(order.status)}</span>
+          </div>
+          <div class="admin-item__metrics">
+            <span>Total: ${escapeHtml(formatMoney(order.total_amount))}</span>
+            <span>Net: ${escapeHtml(formatMoney(order.net_amount))}</span>
+            <span>Commission: ${escapeHtml(formatMoney(order.commission_amount))}</span>
+            <span>Items: ${escapeHtml(itemsText)}</span>
+            <span>${escapeHtml(formatDate(order.created_at))}</span>
+          </div>
+          <div class="admin-item__actions">
+            <button class="btn btn-light" data-platform-status="${order.id}" data-status="preparing">Preparing</button>
+            <button class="btn btn-primary" data-platform-status="${order.id}" data-status="ready">Ready</button>
+            <button class="btn btn-dark" data-platform-status="${order.id}" data-status="delivered">Delivered</button>
+          </div>
+        </article>
+      `;
+    }).join('') || '<p class="muted">No platform orders yet. Record a Swiggy or Zomato order above.</p>';
+
+    listRoot.querySelectorAll('[data-platform-status]').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        try {
+          await apiRequest(`/api/platform-orders/${btn.dataset.platformStatus}/status`, {
+            method: 'PATCH',
+            body: JSON.stringify({ status: btn.dataset.status }),
+          }, true);
+          await loadPlatformOrders();
+        } catch (error) {
+          setMessage(error.message, true);
+        }
+      });
+    });
+  }
+
+  async function handlePlatformOrderSubmit(event) {
+    event.preventDefault();
+    const formData = new FormData(event.currentTarget);
+    const itemsSummary = formData.get('itemsSummary') || '';
+    const items = itemsSummary.split(',').map((part) => {
+      const trimmed = part.trim();
+      const match = trimmed.match(/^(.+?)\s*x(\d+)$/i);
+      if (match) return { name: match[1].trim(), quantity: Number(match[2]), price: 0 };
+      return { name: trimmed, quantity: 1, price: 0 };
+    }).filter((i) => i.name);
+
+    try {
+      await apiRequest('/api/platform-orders', {
+        method: 'POST',
+        body: JSON.stringify({
+          restaurantId: Number(formData.get('restaurantId')),
+          platform: formData.get('platform'),
+          externalOrderId: formData.get('externalOrderId') || null,
+          customerName: formData.get('customerName') || null,
+          totalAmount: Number(formData.get('totalAmount')),
+          commissionAmount: Number(formData.get('commissionAmount') || 0),
+          status: formData.get('status') || 'received',
+          items,
+        }),
+      }, true);
+      event.currentTarget.reset();
+      await loadPlatformOrders();
+      setMessage('Platform order recorded successfully.');
+    } catch (error) {
+      setMessage(error.message, true);
+    }
+  }
+
+  function renderPromoPreview() {
+    const ads = getFilteredAds().filter((ad) => ad.isActive && ['vertical', 'grid'].includes(ad.displayMode || ad.display_mode));
+    const root = el('promoPreview');
+    if (!root) return;
+
+    root.innerHTML = ads.length ? `
+      <p class="eyebrow">Customer preview — promotions stay in grid, never collapsed</p>
+      <div class="promo-preview-grid__inner">
+        ${ads.map((ad) => {
+          const mediaType = ad.mediaType || ad.media_type || 'image';
+          const videoUrl = ad.videoUrl || ad.video_url;
+          const imageUrl = ad.imageUrl || ad.image_url;
+          if (mediaType === 'video' && videoUrl) {
+            return `<div class="promo-preview-card promo-preview-card--video"><video src="${escapeHtml(videoUrl)}" muted loop playsinline autoplay></video><span>${escapeHtml(ad.title)}</span></div>`;
+          }
+          return `<div class="promo-preview-card"><img src="${escapeHtml(imageUrl)}" alt="${escapeHtml(ad.title)}" /><span>${escapeHtml(ad.title)}</span></div>`;
+        }).join('')}
+      </div>
+    ` : '';
+  }
+
+  function openPaymentAuthModal() {
+    const modal = el('paymentAuthModal');
+    if (!modal) return;
+    modal.classList.remove('hidden');
+    modal.setAttribute('aria-hidden', 'false');
+    el('paymentAuthPassword')?.focus();
+  }
+
+  function closePaymentAuthModal() {
+    const modal = el('paymentAuthModal');
+    if (!modal) return;
+    modal.classList.add('hidden');
+    modal.setAttribute('aria-hidden', 'true');
+  }
+
+  async function unlockPaymentVault(password) {
+    await apiRequest('/api/auth/verify-password', {
+      method: 'POST',
+      body: JSON.stringify({ password }),
+    }, true);
+    state.paymentVaultUnlocked = true;
+    closePaymentAuthModal();
+    el('paymentVaultContent')?.classList.remove('hidden');
+    const panel = el('paymentVaultPanel');
+    if (panel) panel.querySelector('.muted')?.classList.add('hidden');
+    setMessage('Payment vault unlocked for this session.');
+
+    const selectedRestaurantId = el('paymentRestaurantSelect')?.value;
+    if (selectedRestaurantId) {
+      await loadPaymentDetails(selectedRestaurantId);
+    }
+  }
+
+  async function loadPaymentDetails(restaurantId) {
+    if (!state.paymentVaultUnlocked || !restaurantId) return;
+    try {
+      const data = await apiRequest(`/api/admin/restaurants/${restaurantId}/payment-details`, {}, true);
+      const r = data.restaurant || {};
+      const form = el('paymentDetailsForm');
+      if (form) {
+        form.classList.remove('hidden');
+        form.querySelector('[name="upiVpa"]').value = r.upi_vpa || '';
+        form.querySelector('[name="bankAccountName"]').value = r.bank_account_name || '';
+        form.querySelector('[name="bankName"]').value = r.bank_name || '';
+        form.querySelector('[name="phone"]').value = r.phone || '';
+        form.querySelector('[name="address"]').value = r.address || '';
+      }
+
+      el('paymentDetailsView').innerHTML = `
+        <div class="admin-item">
+          <div class="admin-item__metrics">
+            <span><strong>UPI VPA:</strong> ${escapeHtml(r.upi_vpa || 'Not set')}</span>
+            <span><strong>Account holder:</strong> ${escapeHtml(r.bank_account_name || 'Not set')}</span>
+            <span><strong>Bank:</strong> ${escapeHtml(r.bank_name || 'Not set')}</span>
+            <span><strong>Phone:</strong> ${escapeHtml(r.phone || '—')}</span>
+            <span><strong>Address:</strong> ${escapeHtml(r.address || '—')}</span>
+          </div>
+        </div>
+      `;
+    } catch (error) {
+      setMessage(error.message, true);
+    }
+  }
+
+  function toggleAdMediaFields() {
+    const mediaType = el('adMediaType')?.value || 'image';
+    el('adImageUrl')?.classList.toggle('hidden', mediaType === 'video');
+    el('adVideoUrl')?.classList.toggle('hidden', mediaType !== 'video');
+  }
+
   function populateAdRestaurantOptions() {
     const select = el('adRestaurantSelect');
     if (!select) return;
@@ -238,7 +596,16 @@
 
     form.querySelector('[name="adId"]').value = ad.id;
     form.querySelector('[name="title"]').value = ad.title || '';
-    form.querySelector('[name="imageUrl"]').value = ad.imageUrl || '';
+    form.querySelector('[name="imageUrl"]').value = ad.imageUrl || ad.image_url || '';
+    const videoInput = form.querySelector('[name="videoUrl"]');
+    if (videoInput) videoInput.value = ad.videoUrl || ad.video_url || '';
+    const mediaTypeSelect = form.querySelector('[name="mediaType"]');
+    if (mediaTypeSelect) mediaTypeSelect.value = ad.mediaType || ad.media_type || 'image';
+    const displayModeSelect = form.querySelector('[name="displayMode"]');
+    if (displayModeSelect) displayModeSelect.value = ad.displayMode || ad.display_mode || 'grid';
+    const displayOrderInput = form.querySelector('[name="displayOrder"]');
+    if (displayOrderInput) displayOrderInput.value = ad.displayOrder || ad.display_order || 0;
+    toggleAdMediaFields();
     form.querySelector('[name="targetLink"]').value = ad.targetLink || '';
     form.querySelector('[name="restaurantId"]').value = ad.restaurantId || '';
     form.querySelector('[name="startsAt"]').value = ad.startsAt ? new Date(ad.startsAt).toISOString().slice(0, 16) : '';
@@ -355,7 +722,7 @@
         const ad = getDashboard().ads.find((item) => String(item.id) === String(button.dataset.adEdit));
         if (!ad) return;
         startAdEdit(ad);
-        setSection('ads');
+        setSection('promotions');
       });
     });
 
@@ -400,9 +767,13 @@
     renderAnalytics();
     renderOperationsDashboard();
     populateAdRestaurantOptions();
+    populateRestaurantSelects();
     renderRestaurantList();
     renderAdsList();
+    renderPromoPreview();
     loadMessages();
+    if (state.saasProfits) renderSaasProfits();
+    if (state.platformOrders.length) renderPlatformOrders([]);
   }
 
   async function loadDashboard() {
@@ -754,7 +1125,11 @@
 
     const payload = {
       title: formData.get('title'),
-      imageUrl: formData.get('imageUrl'),
+      imageUrl: formData.get('imageUrl') || null,
+      videoUrl: formData.get('videoUrl') || null,
+      mediaType: formData.get('mediaType') || 'image',
+      displayMode: formData.get('displayMode') || 'grid',
+      displayOrder: Number(formData.get('displayOrder') || 0),
       targetLink: formData.get('targetLink'),
       restaurantId: formData.get('restaurantId') ? Number(formData.get('restaurantId')) : null,
       isActive: formData.get('isActive') === 'on',
@@ -786,6 +1161,32 @@
   function attachEvents() {
     document.querySelectorAll('.admin-link[data-section]').forEach((button) => {
       button.addEventListener('click', () => setSection(button.dataset.section));
+    });
+
+    el('adMediaType')?.addEventListener('change', toggleAdMediaFields);
+
+    el('platformOrderForm')?.addEventListener('submit', handlePlatformOrderSubmit);
+
+    el('unlockPaymentsBtn')?.addEventListener('click', openPaymentAuthModal);
+    el('cancelPaymentAuthBtn')?.addEventListener('click', closePaymentAuthModal);
+    el('paymentAuthForm')?.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const password = el('paymentAuthPassword')?.value;
+      try {
+        await unlockPaymentVault(password);
+      } catch (error) {
+        setMessage(error.message, true);
+      }
+    });
+    el('paymentRestaurantSelect')?.addEventListener('change', (e) => {
+      loadPaymentDetails(e.target.value);
+    });
+    el('paymentDetailsForm')?.addEventListener('submit', handlePaymentDetailsSubmit);
+    el('platformInvoiceRestaurantSelect')?.addEventListener('change', (e) => {
+      loadInvoicesForRestaurant(e.target.value);
+    });
+    el('refreshInvoicesBtn')?.addEventListener('click', () => {
+      loadInvoicesForRestaurant(el('platformInvoiceRestaurantSelect')?.value);
     });
 
     const searchInput = el('dashboardSearch');
@@ -844,6 +1245,8 @@
 
     try {
       await loadDashboard();
+      await loadSaasProfits();
+      toggleAdMediaFields();
     } catch (error) {
       setMessage(error.message, true);
     }

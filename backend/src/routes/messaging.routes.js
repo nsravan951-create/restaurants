@@ -11,7 +11,7 @@ router.use(requireAuth(['super_admin']));
 // POST /api/admin/messages - Create a message
 router.post('/', asyncHandler(async (req, res) => {
   const { title, content, messageType, priority, recipientType, recipientIds, isBroadcast, expiresAt } = req.body;
-  const superAdminId = req.user.id;
+  const superAdminId = req.user.userId;
 
   if (!title || !content || !messageType || !recipientType) {
     return res.status(400).json({ error: 'Missing required fields' });

@@ -205,10 +205,11 @@ router.get('/me', requireAuth(), asyncHandler(async (req, res) => {
   return res.json({ user: rows[0] });
 }));
 
-router.post('/verify-password', requireAuth(['owner']), asyncHandler(async (req, res) => {
-  const { currentPassword } = req.body || {};
+router.post('/verify-password', requireAuth(['owner', 'super_admin']), asyncHandler(async (req, res) => {
+  const { currentPassword, password } = req.body || {};
+  const verifyPassword = String(currentPassword || password || '').trim();
 
-  if (!currentPassword || String(currentPassword).trim().length < 6) {
+  if (!verifyPassword || verifyPassword.length < 6) {
     return res.status(400).json({ message: 'Password is required' });
   }
 
@@ -218,7 +219,7 @@ router.post('/verify-password', requireAuth(['owner']), asyncHandler(async (req,
     return res.status(404).json({ message: 'User not found' });
   }
 
-  const ok = await bcrypt.compare(String(currentPassword), rows[0].password_hash);
+  const ok = await bcrypt.compare(verifyPassword, rows[0].password_hash);
   if (!ok) {
     return res.status(400).json({ message: 'Current password is incorrect' });
   }

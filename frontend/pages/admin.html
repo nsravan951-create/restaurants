@@ -1,25 +1,310 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Admin Dashboard</title>
-    <meta http-equiv="refresh" content="0; url=./superadmin.html" />
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@600;700&family=Sora:wght@400;500;600&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="../assets/css/styles.css" />
-  </head>
-  <body>
-    <main class="hero-page">
-      <section class="hero-card">
-        <p class="eyebrow">Admin dashboard moved</p>
-        <h1>Opening the new super admin dashboard.</h1>
-        <p class="hero-copy">You will be redirected to the cleaner management view for restaurants, ads, and analytics.</p>
-        <div class="hero-actions">
-          <a class="btn btn-primary" href="./superadmin.html">Open dashboard</a>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>SaaS Admin — Restaurant Control Center</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@600;700&family=Sora:wght@400;500;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="../assets/css/styles.css" />
+  <link rel="stylesheet" href="../assets/css/superadmin.css" />
+  <script src="../assets/js/config.js"></script>
+  <script src="../assets/js/common.js"></script>
+</head>
+<body class="theme-dark">
+  <div class="admin-shell">
+    <aside class="admin-sidebar panel">
+      <div>
+        <p class="eyebrow admin-eyebrow">SaaS Platform</p>
+        <h1>Restaurant Control Center</h1>
+        <p class="admin-intro">Online + offline profits, aggregator orders, promotions &amp; payments — all in one place.</p>
+      </div>
+
+      <nav class="admin-nav">
+        <button data-section="overview" class="admin-link active">📊 Overview</button>
+        <button data-section="profits" class="admin-link">💰 SaaS Profits</button>
+        <button data-section="platform" class="admin-link">🛵 Swiggy / Zomato</button>
+        <button data-section="operations" class="admin-link">🏪 Operations</button>
+        <button data-section="promotions" class="admin-link">🎬 Promotions</button>
+        <button data-section="payments" class="admin-link">🔐 Payment Vault</button>
+        <button data-section="messaging" class="admin-link">💬 Messages</button>
+        <button data-section="restaurants" class="admin-link">🏢 Restaurants</button>
+        <button data-section="analytics" class="admin-link">📈 Analytics</button>
+        <button id="logoutButton" class="admin-link admin-link--danger">🚪 Logout</button>
+      </nav>
+
+      <div class="admin-sidebar__footer">
+        <div id="sessionSummary" class="admin-sidebar__note">Ready to manage the platform.</div>
+        <button id="sidebarRefresh" class="btn btn-light" type="button">Refresh</button>
+      </div>
+    </aside>
+
+    <main class="admin-main">
+      <header class="panel admin-topbar">
+        <div>
+          <p class="eyebrow">SaaS Command Center</p>
+          <h2>Full restaurant ecosystem — dine-in, delivery aggregators &amp; offline revenue.</h2>
+        </div>
+        <div class="admin-toolbar">
+          <input id="dashboardSearch" class="admin-search" placeholder="Search restaurants or promotions" />
+          <button id="refreshDashboard" class="btn btn-light" type="button">Refresh</button>
+        </div>
+      </header>
+
+      <section id="section-overview" class="admin-section">
+        <div id="summaryCards" class="summary-grid"></div>
+        <div class="admin-grid-2">
+          <article class="panel">
+            <div class="section-head"><div><h3>Revenue trend</h3><p>Last 14 days across all restaurants.</p></div></div>
+            <div id="revenueTrend" class="trend-list"></div>
+          </article>
+          <article class="panel">
+            <div class="section-head"><div><h3>Top restaurants</h3><p>Ranked by monthly revenue.</p></div></div>
+            <div id="topRestaurants" class="stack"></div>
+          </article>
         </div>
       </section>
+
+      <section id="section-profits" class="admin-section hidden">
+        <div class="section-head">
+          <div>
+            <h3>SaaS Profit Dashboard</h3>
+            <p>Combined online dine-in, offline cash/COD, and Swiggy/Zomato aggregator revenue.</p>
+          </div>
+        </div>
+        <div id="saasProfitCards" class="summary-grid"></div>
+        <div class="admin-grid-2">
+          <article class="panel">
+            <div class="section-head"><div><h3>Revenue channels</h3><p>Online vs offline vs aggregator breakdown.</p></div></div>
+            <div id="channelBreakdown" class="trend-list"></div>
+          </article>
+          <article class="panel">
+            <div class="section-head"><div><h3>Subscriptions</h3><p>Active SaaS plans across restaurants.</p></div></div>
+            <div id="subscriptionStats" class="stack"></div>
+          </article>
+        </div>
+      </section>
+
+      <section id="section-platform" class="admin-section hidden">
+        <div class="section-head">
+          <div>
+            <h3>Aggregator Orders — Swiggy, Zomato &amp; More</h3>
+            <p>Record and track delivery platform orders with invoices and commission tracking.</p>
+          </div>
+        </div>
+        <article class="panel">
+          <form id="platformOrderForm" class="admin-form">
+            <select name="restaurantId" id="platformRestaurantSelect" required>
+              <option value="">Select restaurant</option>
+            </select>
+            <select name="platform" required>
+              <option value="">Platform</option>
+              <option value="swiggy">🟠 Swiggy</option>
+              <option value="zomato">🔴 Zomato</option>
+              <option value="dunzo">🟢 Dunzo</option>
+              <option value="uber_eats">⚫ Uber Eats</option>
+              <option value="other">Other</option>
+            </select>
+            <input name="externalOrderId" placeholder="External order ID" />
+            <input name="customerName" placeholder="Customer name" />
+            <input name="totalAmount" type="number" step="0.01" placeholder="Order total (₹)" required />
+            <input name="commissionAmount" type="number" step="0.01" placeholder="Platform commission (₹)" value="0" />
+            <input name="itemsSummary" placeholder="Items (e.g. Biryani x2, Coke x1)" required />
+            <select name="status">
+              <option value="received">Received</option>
+              <option value="preparing">Preparing</option>
+              <option value="ready">Ready</option>
+              <option value="delivered">Delivered</option>
+            </select>
+            <button class="btn btn-primary admin-form__submit" type="submit">Record platform order</button>
+          </form>
+        </article>
+        <div id="platformSummaryCards" class="summary-grid summary-grid--compact"></div>
+        <div id="platformOrdersList" class="admin-list"></div>
+
+        <article class="panel">
+          <div class="section-head">
+            <div>
+              <h3>Aggregated invoices</h3>
+              <p>View synced invoices for any restaurant from the platform ecosystem.</p>
+            </div>
+          </div>
+          <div class="admin-form">
+            <select id="platformInvoiceRestaurantSelect" class="admin-select">
+              <option value="">Select restaurant to view invoices</option>
+            </select>
+            <button id="refreshInvoicesBtn" class="btn btn-light" type="button">Refresh invoices</button>
+          </div>
+          <div id="platformInvoicesList" class="admin-list"></div>
+        </article>
+      </section>
+
+      <section id="section-promotions" class="admin-section hidden">
+        <div class="section-head">
+          <div>
+            <h3>Promotion Studio — Photos &amp; Videos</h3>
+            <p>Upload promotional media. Customers see vertical scroll &amp; video grid on their menu.</p>
+          </div>
+        </div>
+        <article class="panel">
+          <form id="adForm" class="admin-form">
+            <input name="title" placeholder="Promotion title" required />
+            <select name="mediaType" id="adMediaType">
+              <option value="image">📷 Photo</option>
+              <option value="video">🎬 Video</option>
+            </select>
+            <input name="imageUrl" id="adImageUrl" placeholder="Image URL" />
+            <input name="videoUrl" id="adVideoUrl" placeholder="Video URL (MP4 or embed)" class="hidden" />
+            <input name="targetLink" placeholder="Target link" required />
+            <select name="displayMode">
+              <option value="grid">Video Grid (side-by-side)</option>
+              <option value="vertical">Vertical Scroll (Reels-style)</option>
+              <option value="inline">Inline in menu</option>
+            </select>
+            <input name="displayOrder" type="number" placeholder="Display order (lower = first)" value="0" />
+            <select name="restaurantId" id="adRestaurantSelect">
+              <option value="">Global promotion</option>
+            </select>
+            <input name="startsAt" type="datetime-local" />
+            <input name="endsAt" type="datetime-local" />
+            <label class="admin-check">
+              <input name="isActive" type="checkbox" checked />
+              <span>Active now</span>
+            </label>
+            <div class="admin-form__actions">
+              <input type="hidden" name="adId" value="" />
+              <button id="adSubmitButton" class="btn btn-primary admin-form__submit" type="submit">Create promotion</button>
+              <button id="adCancelButton" class="btn btn-light" type="button">Cancel edit</button>
+            </div>
+          </form>
+        </article>
+        <div id="promoPreview" class="promo-preview-grid"></div>
+        <div id="adsList" class="admin-list"></div>
+      </section>
+
+      <section id="section-payments" class="admin-section hidden">
+        <div class="section-head">
+          <div>
+            <h3>Payment Details Vault</h3>
+            <p>View restaurant UPI &amp; bank details — password required for security.</p>
+          </div>
+          <button id="unlockPaymentsBtn" class="btn btn-primary" type="button">🔓 Unlock with password</button>
+        </div>
+        <article class="panel" id="paymentVaultPanel">
+          <p class="muted" id="paymentVaultNote">Payment details are locked. Click "Unlock with password" and enter your super admin password.</p>
+          <div id="paymentVaultContent" class="hidden">
+            <div class="admin-form">
+              <select id="paymentRestaurantSelect" class="admin-select">
+                <option value="">Select restaurant to view payment details</option>
+              </select>
+            </div>
+            <form id="paymentDetailsForm" class="admin-form hidden" style="margin-top:1rem;">
+              <input name="upiVpa" placeholder="UPI VPA" />
+              <input name="bankAccountName" placeholder="Account holder name" />
+              <input name="bankName" placeholder="Bank name" />
+              <input name="phone" placeholder="Phone" />
+              <input name="address" placeholder="Address" />
+              <button class="btn btn-primary admin-form__submit" type="submit">Save payment details</button>
+            </form>
+            <div id="paymentDetailsView" class="stack" style="margin-top:1rem;"></div>
+          </div>
+        </article>
+      </section>
+
+      <section id="section-restaurants" class="admin-section hidden">
+        <div class="section-head"><div><h3>Restaurant management</h3><p>Create owners, toggle activation, and manage subscriptions.</p></div></div>
+        <article class="panel">
+          <form id="restaurantForm" class="admin-form">
+            <input name="name" placeholder="Owner name" required />
+            <input name="email" type="email" placeholder="Owner email" required />
+            <input name="password" type="password" placeholder="Owner password" required />
+            <input name="restaurantName" placeholder="Restaurant name" required />
+            <input name="totalTables" type="number" min="1" max="500" placeholder="Tables" required />
+            <input name="phone" placeholder="Phone" />
+            <input name="address" placeholder="Address" />
+            <button class="btn btn-primary admin-form__submit" type="submit">Create restaurant</button>
+          </form>
+        </article>
+        <div id="restaurantList" class="admin-list"></div>
+      </section>
+
+      <section id="section-analytics" class="admin-section hidden">
+        <div class="section-head"><div><h3>All restaurants analytics</h3><p>Revenue, order volume, tables, and promotion performance.</p></div></div>
+        <div class="panel"><div id="analyticsCards" class="summary-grid summary-grid--compact"></div></div>
+        <div id="analyticsList" class="admin-list"></div>
+      </section>
+
+      <section id="section-operations" class="admin-section hidden">
+        <div class="section-head"><div><h3>Live Operations</h3><p>Monitor real-time activity across all restaurants.</p></div></div>
+        <div id="operationsCards" class="summary-grid"></div>
+        <div class="admin-grid-2">
+          <article class="panel">
+            <div class="section-head"><div><h3>Active orders</h3></div></div>
+            <div id="activeOrdersList" class="stack"></div>
+          </article>
+          <article class="panel">
+            <div class="section-head"><div><h3>Restaurant status</h3></div></div>
+            <div id="restaurantStatusList" class="stack"></div>
+          </article>
+        </div>
+      </section>
+
+      <section id="section-messaging" class="admin-section hidden">
+        <div class="section-head"><div><h3>Broadcast Messages</h3><p>Send announcements to restaurant owners.</p></div></div>
+        <article class="panel">
+          <form id="messageForm" class="admin-form">
+            <input name="title" placeholder="Message title" required />
+            <textarea name="content" placeholder="Message content" rows="5" required></textarea>
+            <select name="messageType" required>
+              <option value="">Select type</option>
+              <option value="announcement">📢 Announcement</option>
+              <option value="alert">⚠️ Alert</option>
+              <option value="notice">📋 Notice</option>
+              <option value="offer">🎁 Special Offer</option>
+            </select>
+            <select name="priority" required>
+              <option value="normal">Normal</option>
+              <option value="high">High</option>
+              <option value="urgent">🔴 Urgent</option>
+            </select>
+            <select name="recipientType" required>
+              <option value="">Recipients</option>
+              <option value="all">📡 All Active Restaurants</option>
+              <option value="specific">🎯 Specific Restaurants</option>
+            </select>
+            <div id="specificRestaurantsList" class="restaurant-checkbox-group" style="display:none;"></div>
+            <input name="expiresAt" type="datetime-local" />
+            <label class="admin-check"><input name="isBroadcast" type="checkbox" checked /><span>Broadcast</span></label>
+            <button class="btn btn-primary admin-form__submit" type="submit">Send message</button>
+          </form>
+        </article>
+        <div id="messagesList" class="admin-list"></div>
+      </section>
+
+      <p id="adminMessage" class="message"></p>
     </main>
-  </body>
+  </div>
+
+  <div id="paymentAuthModal" class="bill-modal hidden" aria-hidden="true">
+    <div class="bill-modal__sheet" role="dialog">
+      <header class="bill-modal__head">
+        <div>
+          <p class="eyebrow">Secure access</p>
+          <h2>Verify super admin password</h2>
+          <p class="admin-intro">Enter your password to view restaurant payment details.</p>
+        </div>
+      </header>
+      <div class="bill-modal__body">
+        <form id="paymentAuthForm" class="admin-form">
+          <input id="paymentAuthPassword" name="password" type="password" placeholder="Super admin password" required />
+          <button class="btn btn-primary" type="submit">Unlock payment vault</button>
+          <button id="cancelPaymentAuthBtn" class="btn btn-light" type="button">Cancel</button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <script src="../assets/js/superadmin.js"></script>
+</body>
 </html>

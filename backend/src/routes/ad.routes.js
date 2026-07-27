@@ -4,23 +4,37 @@ const { z } = require('zod');
 const pool = require('../config/db');
 const asyncHandler = require('../utils/asyncHandler');
 const { requireAuth } = require('../middleware/auth');
+const { ensureSaasSchema } = require('../utils/saasMigrate');
 
 const router = express.Router();
 
 const adSchema = z.object({
   title: z.string().min(2),
-  imageUrl: z.string().url(),
+  imageUrl: z.string().url().optional().nullable(),
+  videoUrl: z.string().url().optional().nullable(),
+  mediaType: z.enum(['image', 'video']).optional().default('image'),
+  displayMode: z.enum(['inline', 'vertical', 'grid']).optional().default('grid'),
+  displayOrder: z.number().int().optional().default(0),
   targetLink: z.string().url(),
   restaurantId: z.number().nullable().optional(),
   isActive: z.boolean().optional().default(true),
   startsAt: z.string().optional().nullable(),
   endsAt: z.string().optional().nullable(),
-});
+}).refine((data) => {
+  if (data.mediaType === 'video') return Boolean(data.videoUrl);
+  return Boolean(data.imageUrl);
+}, { message: 'imageUrl required for image ads, videoUrl required for video ads' });
+
+router.use(asyncHandler(async (req, res, next) => {
+  await ensureSaasSchema();
+  next();
+}));
 
 router.get('/active', asyncHandler(async (req, res) => {
   const restaurantId = req.query.restaurantId ? Number(req.query.restaurantId) : null;
+  const displayMode = req.query.displayMode || null;
 
-  let query = `SELECT id, title, image_url, target_link, restaurant_id
+  let query = `SELECT id, title, image_url, video_url, media_type, display_mode, display_order, target_link, restaurant_id
                FROM ads
                WHERE is_active = TRUE
                  AND (starts_at IS NULL OR starts_at <= NOW())
@@ -28,15 +42,48 @@ router.get('/active', asyncHandler(async (req, res) => {
   const params = [];
 
   if (restaurantId) {
-    query += ' AND (restaurant_id IS NULL OR restaurant_id = $1)';
     params.push(restaurantId);
+    query += ` AND (restaurant_id IS NULL OR restaurant_id = $${params.length})`;
   }
 
-  query += ' ORDER BY id DESC';
+  if (displayMode) {
+    params.push(displayMode);
+    query += ` AND (display_mode = $${params.length} OR display_mode = 'grid')`;
+  }
+
+  query += ' ORDER BY display_order ASC, id DESC';
 
   const { rows } = await pool.query(query, params);
 
   return res.json({ ads: rows });
+}));
+
+router.get('/promotions-feed', asyncHandler(async (req, res) => {
+  const restaurantId = req.query.restaurantId ? Number(req.query.restaurantId) : null;
+
+  let query = `SELECT id, title, image_url, video_url, media_type, display_mode, display_order, target_link
+               FROM ads
+               WHERE is_active = TRUE
+                 AND display_mode IN ('vertical', 'grid')
+                 AND (starts_at IS NULL OR starts_at <= NOW())
+                 AND (ends_at IS NULL OR ends_at >= NOW())`;
+  const params = [];
+
+  if (restaurantId) {
+    params.push(restaurantId);
+    query += ` AND (restaurant_id IS NULL OR restaurant_id = $${params.length})`;
+  }
+
+  query += ' ORDER BY display_order ASC, id DESC';
+
+  const { rows } = await pool.query(query, params);
+  return res.json({ promotions: rows });
+}));
+
+router.post('/impression/:adId', asyncHandler(async (req, res) => {
+  const { adId } = req.params;
+  await pool.query('UPDATE ads SET impressions = impressions + 1 WHERE id = $1', [adId]);
+  return res.json({ message: 'Impression tracked' });
 }));
 
 router.post('/click/:adId', asyncHandler(async (req, res) => {
@@ -46,7 +93,7 @@ router.post('/click/:adId', asyncHandler(async (req, res) => {
 }));
 
 router.get('/', requireAuth(['super_admin', 'owner']), asyncHandler(async (req, res) => {
-  const { rows } = await pool.query('SELECT * FROM ads ORDER BY id DESC');
+  const { rows } = await pool.query('SELECT * FROM ads ORDER BY display_order ASC, id DESC');
   return res.json({ ads: rows });
 }));
 
@@ -54,12 +101,27 @@ router.post('/', requireAuth(['super_admin']), asyncHandler(async (req, res) => 
   const parsed = adSchema.parse({
     ...req.body,
     restaurantId: req.body.restaurantId !== undefined && req.body.restaurantId !== null ? Number(req.body.restaurantId) : null,
+    displayOrder: req.body.displayOrder !== undefined ? Number(req.body.displayOrder) : 0,
   });
 
+  const imageUrl = parsed.imageUrl || parsed.videoUrl || '';
+
   const result = await pool.query(
-    `INSERT INTO ads (title, image_url, target_link, restaurant_id, is_active, starts_at, ends_at)
-     VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id`,
-    [parsed.title, parsed.imageUrl, parsed.targetLink, parsed.restaurantId, parsed.isActive, parsed.startsAt, parsed.endsAt]
+    `INSERT INTO ads (title, image_url, video_url, media_type, display_mode, display_order, target_link, restaurant_id, is_active, starts_at, ends_at)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING id`,
+    [
+      parsed.title,
+      imageUrl,
+      parsed.videoUrl || null,
+      parsed.mediaType,
+      parsed.displayMode,
+      parsed.displayOrder,
+      parsed.targetLink,
+      parsed.restaurantId,
+      parsed.isActive,
+      parsed.startsAt,
+      parsed.endsAt,
+    ]
   );
 
   return res.status(201).json({ message: 'Ad created', adId: result.rows[0].id });
@@ -70,6 +132,10 @@ router.put('/:adId', requireAuth(['super_admin']), asyncHandler(async (req, res)
   const updates = {
     title: req.body.title,
     image_url: req.body.imageUrl,
+    video_url: req.body.videoUrl,
+    media_type: req.body.mediaType,
+    display_mode: req.body.displayMode,
+    display_order: req.body.displayOrder !== undefined ? Number(req.body.displayOrder) : undefined,
     target_link: req.body.targetLink,
     restaurant_id: req.body.restaurantId !== undefined ? (req.body.restaurantId === null ? null : Number(req.body.restaurantId)) : undefined,
     is_active: req.body.isActive !== undefined ? req.body.isActive : undefined,

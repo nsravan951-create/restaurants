@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Customer Menu Demo - with Ads</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@600;700&family=Sora:wght@400;500;600&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="../assets/css/styles.css" />
+    <style>
+      .demo-header {
+        background: var(--accent);
+        color: white;
+        padding: 1rem;
+        border-radius: 8px;
+        margin-bottom: 1rem;
+        text-align: center;
+      }
+      .demo-header h2 {
+        margin: 0;
+      }
+      .demo-note {
+        background: #fff3cd;
+        border-left: 4px solid #ffc107;
+        padding: 0.8rem;
+        border-radius: 4px;
+        margin-bottom: 1rem;
+        font-size: 0.9rem;
+      }
+    </style>
+  </head>
+  <body>
+    <main class="customer-layout">
+      <header class="panel">
+        <h1>Sunrise Diner</h1>
+        <p>Table T1</p>
+        <div class="demo-note">
+          <strong>📌 Demo:</strong> This shows how super admin ads appear inline with menu items in a vertical grid. Ads appear after every 3 menu items naturally blended with the menu.
+        </div>
+      </header>
+
+      <section class="panel">
+        <div class="menu-grid">
+          <!-- Menu Items -->
+          <article class="card">
+            <img src="https://images.unsplash.com/photo-1601924638867-3ec2b0d6f490" alt="Margherita Pizza" style="width:100%;height:140px;object-fit:cover;border-radius:10px;" />
+            <h3>Margherita Pizza</h3>
+            <p>Pizza</p>
+            <p>INR 249.00</p>
+            <button class="btn btn-primary">Add to Cart</button>
+          </article>
+
+          <article class="card">
+            <img src="https://images.unsplash.com/photo-1568901346375-23c9450c58cd" alt="Veg Burger" style="width:100%;height:140px;object-fit:cover;border-radius:10px;" />
+            <h3>Veg Burger</h3>
+            <p>Burgers</p>
+            <p>INR 149.00</p>
+            <button class="btn btn-primary">Add to Cart</button>
+          </article>
+
+          <article class="card">
+            <img src="https://images.unsplash.com/photo-1495474472287-4d71bcdd2085" alt="Cold Coffee" style="width:100%;height:140px;object-fit:cover;border-radius:10px;" />
+            <h3>Cold Coffee</h3>
+            <p>Beverages</p>
+            <p>INR 99.00</p>
+            <button class="btn btn-primary">Add to Cart</button>
+          </article>
+
+          <!-- AD CARD (appears after 3rd item) -->
+          <article class="card ad-card">
+            <div style="position: relative; overflow: hidden; border-radius: 8px; margin-bottom: 0.6rem;">
+              <img src="https://images.unsplash.com/photo-1570197788417-0e82375c9371" alt="Buy 1 Get 1 Ice Cream" style="width:100%;height:140px;object-fit:cover;cursor:pointer;" class="ad-image" />
+              <span style="position: absolute; top: 0.5rem; right: 0.5rem; background: var(--accent); color: white; padding: 0.3rem 0.6rem; border-radius: 6px; font-size: 0.7rem; font-weight: 600;">PROMOTED</span>
+            </div>
+            <h3 style="color: var(--accent); margin-bottom: 0.5rem;">Buy 1 Get 1 Ice Cream</h3>
+            <p style="color: var(--muted); font-size: 0.85rem; margin-bottom: 0.6rem;">Exclusive offer from our partners</p>
+            <a href="https://example.com/ice-cream-offer" target="_blank" rel="noreferrer" class="btn btn-primary" style="width: 100%; text-align: center;">View Offer</a>
+          </article>
+
+          <article class="card">
+            <img src="https://images.unsplash.com/photo-1563805042-7684c019e1cb" alt="Vanilla Ice Cream" style="width:100%;height:140px;object-fit:cover;border-radius:10px;" />
+            <h3>Vanilla Ice Cream</h3>
+            <p>Desserts</p>
+            <p>INR 79.00</p>
+            <button class="btn btn-primary">Add to Cart</button>
+          </article>
+
+          <article class="card">
+            <h3>Paneer Tikka</h3>
+            <p>Appetizers</p>
+            <p>INR 199.00</p>
+            <button class="btn btn-primary">Add to Cart</button>
+          </article>
+
+          <article class="card">
+            <h3>Garlic Bread</h3>
+            <p>Starters</p>
+            <p>INR 129.00</p>
+            <button class="btn btn-primary">Add to Cart</button>
+          </article>
+
+          <!-- Another AD CARD (appears after 6th item) -->
+          <article class="card ad-card">
+            <div style="position: relative; overflow: hidden; border-radius: 8px; margin-bottom: 0.6rem;">
+              <img src="https://images.unsplash.com/photo-1560518883-ce09059eeffa" alt="Local Real Estate Expo" style="width:100%;height:140px;object-fit:cover;cursor:pointer;" class="ad-image" />
+              <span style="position: absolute; top: 0.5rem; right: 0.5rem; background: var(--accent); color: white; padding: 0.3rem 0.6rem; border-radius: 6px; font-size: 0.7rem; font-weight: 600;">PROMOTED</span>
+            </div>
+            <h3 style="color: var(--accent); margin-bottom: 0.5rem;">Local Real Estate Expo</h3>
+            <p style="color: var(--muted); font-size: 0.85rem; margin-bottom: 0.6rem;">Exclusive offer from our partners</p>
+            <a href="https://example.com/real-estate" target="_blank" rel="noreferrer" class="btn btn-primary" style="width: 100%; text-align: center;">View Offer</a>
+          </article>
+        </div>
+      </section>
+
+      <aside class="panel sticky-cart">
+        <h2>Your Cart</h2>
+        <div id="cartItems">
+          <p>Your cart is empty.</p>
+        </div>
+        <p class="total">Total: INR <span id="cartTotal">0</span></p>
+        <input placeholder="Your name (optional)" />
+        <textarea placeholder="Notes (optional)"></textarea>
+
+        <div class="payment-actions">
+          <button class="btn btn-dark">Place COD Order</button>
+          <button class="btn btn-primary">Pay Online (Razorpay)</button>
+        </div>
+      </aside>
+    </main>
+
+    <footer class="brand-footer">Powered by Online Solutionzzz</footer>
+  </body>
+</html>

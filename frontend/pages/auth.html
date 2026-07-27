@@ -11,12 +11,20 @@
   </head>
   <body>
     <main class="auth-page">
-      <section class="panel auth-panel">
-        <h1>Restaurant Owner Access</h1>
-        <p>Create your restaurant account or login.</p>
+      <section class="panel auth-panel auth-hero">
+        <div class="auth-hero__copy">
+          <p class="eyebrow">Restaurant SaaS</p>
+          <h1>One platform for dine-in, delivery, promos, and invoices.</h1>
+          <p class="hero-copy">Sign in to manage restaurants, track Swiggy/Zomato orders, publish promotions, and make every restaurant owner feel the power of a modern SaaS dashboard.</p>
+          <div class="hero-actions">
+            <span class="badge badge--success">SaaS analytics</span>
+            <span class="badge badge--soft">Platform orders</span>
+            <span class="badge badge--premium">Promotions grid</span>
+          </div>
+        </div>
 
-        <div class="grid-2">
-          <form id="registerForm" class="stack">
+        <div class="auth-card-grid">
+          <form id="registerForm" class="stack auth-card auth-card--glass">
             <h2>Register</h2>
             <input name="name" placeholder="Owner Name" required />
             <input name="email" type="email" placeholder="Email" required />
@@ -28,7 +36,7 @@
             <button class="btn btn-primary" type="submit">Create Account</button>
           </form>
 
-          <form id="loginForm" class="stack">
+          <form id="loginForm" class="stack auth-card auth-card--glass">
             <h2>Login</h2>
             <input name="email" type="email" placeholder="Email" required />
             <input name="password" type="password" placeholder="Password" required />

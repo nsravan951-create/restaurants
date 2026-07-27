@@ -61,12 +61,95 @@ main {
   animation: rise 0.75s ease both;
 }
 
-.eyebrow {
-  color: var(--accent-dark);
-  text-transform: uppercase;
-  letter-spacing: 0.09em;
-  font-size: 0.74rem;
-  font-weight: 600;
+.auth-hero {
+  display: grid;
+  grid-template-columns: 1.2fr 0.8fr;
+  gap: 1.5rem;
+  align-items: stretch;
+  padding: 2rem;
+  min-height: calc(100vh - 3rem);
+  overflow: hidden;
+  background: radial-gradient(circle at top left, rgba(255, 160, 86, 0.16), transparent 30%),
+    radial-gradient(circle at 90% 15%, rgba(120, 210, 190, 0.15), transparent 24%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0.02));
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  backdrop-filter: blur(20px);
+}
+
+.auth-hero__copy {
+  padding: 1rem;
+}
+
+.auth-card-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1rem;
+}
+
+.auth-card {
+  background: rgba(255, 255, 255, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.45);
+  box-shadow: 0 25px 65px rgba(16, 24, 40, 0.15);
+  border-radius: 24px;
+  padding: 1.4rem;
+  position: relative;
+  overflow: hidden;
+}
+
+.auth-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at top right, rgba(255, 138, 0, 0.12), transparent 25%);
+  pointer-events: none;
+}
+
+.auth-card--glass {
+  background: rgba(255, 255, 255, 0.72);
+  backdrop-filter: blur(14px);
+}
+
+.auth-hero .eyebrow {
+  color: var(--accent);
+}
+
+.auth-hero h1 {
+  font-size: clamp(2rem, 3vw, 3.4rem);
+  line-height: 1.05;
+}
+
+.auth-hero .hero-copy {
+  max-width: 680px;
+}
+
+.hero-actions {
+  margin-top: 1.5rem;
+}
+
+.auth-card input,
+.auth-card select,
+.auth-card textarea {
+  background: rgba(255, 255, 255, 0.98);
+}
+
+.auth-card .btn {
+  width: 100%;
+}
+
+.auth-page {
+  padding: 1rem 0;
+}
+
+@media (max-width: 940px) {
+  .auth-hero {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 640px) {
+  .auth-card {
+    padding: 1.2rem;
+  }
 }
 
 .hero-copy {
@@ -272,10 +355,30 @@ main {
   gap: 1rem;
 }
 
-.grid-3 {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 0.75rem;
+.auth-hero .badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.65rem 1rem;
+  border-radius: 999px;
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+.badge--success {
+  background: rgba(16, 185, 129, 0.16);
+  color: #0f766e;
+}
+
+.badge--soft {
+  background: rgba(255, 138, 0, 0.14);
+  color: #c2410c;
+}
+
+.badge--premium {
+  background: rgba(96, 165, 250, 0.16);
+  color: #2563eb;
+}
   margin-bottom: 1rem;
 }
 

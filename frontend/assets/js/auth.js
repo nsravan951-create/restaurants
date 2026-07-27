@@ -55,7 +55,7 @@ if (loginForm) {
 
       const role = data.user.role;
       if (role === 'owner') window.location.href = './owner.html';
-      else if (role === 'super_admin') window.location.href = './superadmin.html';
+      else if (role === 'super_admin') window.location.href = './admin.html';
       else if (role === 'kitchen') window.location.href = './kitchen.html';
       else if (role === 'staff') window.location.href = './staff.html';
       else window.location.href = '../index.html';
