@@ -524,15 +524,29 @@
 
       .checkout-pay-btn {
         width: 100%;
-        border: 0;
+        border: 2px solid rgba(255,255,255,0.2);
         border-radius: 16px;
         padding: 1rem;
         text-align: left;
         color: #fff;
         cursor: pointer;
+        box-shadow: 0 10px 24px rgba(17, 24, 39, 0.12);
+      }
+
+      .checkout-pay-btn:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 14px 28px rgba(17, 24, 39, 0.16);
       }
 
       .checkout-pay-btn strong { display: block; font-size: 1rem; }
+
+      .pay-btn--cash {
+        background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+      }
+
+      .pay-btn--upi {
+        background: linear-gradient(135deg, #7c3aed 0%, #5b21b6 100%);
+      }
       .checkout-pay-btn small { display: block; margin-top: 0.2rem; opacity: 0.9; font-size: 0.82rem; }
 
       .checkout-upi-panel {
@@ -541,6 +555,13 @@
         border-radius: 16px;
         background: rgba(255, 255, 255, 0.9);
         border: 1px solid var(--line);
+      }
+
+      .receipt-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        margin-top: 12px;
       }
 
       .checkout-upi-hint {
@@ -762,6 +783,10 @@
           </div>
           <div class="section-body">
             <div id="receiptBox" class="invoice-box"></div>
+            <div id="receiptActions" class="receipt-actions hidden">
+              <button class="btn btn-light" id="receiptPrintBtn" type="button">Print Receipt</button>
+              <button class="btn btn-primary" id="receiptPdfBtn" type="button">Save as PDF</button>
+            </div>
           </div>
         </section>
       </section>
@@ -877,6 +902,9 @@
         receiptState: document.getElementById('receiptState'),
         receiptMessage: document.getElementById('receiptMessage'),
         receiptBox: document.getElementById('receiptBox'),
+        receiptActions: document.getElementById('receiptActions'),
+        receiptPrintBtn: document.getElementById('receiptPrintBtn'),
+        receiptPdfBtn: document.getElementById('receiptPdfBtn'),
       };
 
       const state = {
@@ -1043,6 +1071,7 @@
         els.trackingState.classList.toggle('hidden', view !== 'tracking');
         els.receiptState.classList.toggle('hidden', view !== 'receipt');
         els.stickyBar.classList.toggle('hidden', view !== 'menu');
+        els.receiptActions?.classList.toggle('hidden', view !== 'receipt');
       }
 
       function setLoading(message = 'Loading your menu...') {
@@ -1348,6 +1377,37 @@
         `).join('');
       }
 
+      async function printReceipt(orderId) {
+        const targetId = Number(orderId || state.activeOrder?.orderId || state.invoicePayload?.orderId || 0);
+        if (!targetId) return;
+        const win = window.open('', '_blank', 'noopener,noreferrer');
+        if (!win) return;
+        const response = await fetch(`${BACKEND_BASE_URL}/orders/${targetId}/invoice?format=html`);
+        const html = await response.text();
+        win.document.write(html);
+        win.document.close();
+        win.focus();
+        setTimeout(() => {
+          try { win.print(); } catch (_) {}
+        }, 250);
+      }
+
+      async function downloadReceiptPdf(orderId) {
+        const targetId = Number(orderId || state.activeOrder?.orderId || state.invoicePayload?.orderId || 0);
+        if (!targetId) return;
+        const response = await fetch(`${BACKEND_BASE_URL}/orders/${targetId}/invoice?format=pdf`);
+        if (!response.ok) throw new Error('PDF download failed');
+        const blob = await response.blob();
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `receipt-${targetId}.pdf`;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        URL.revokeObjectURL(url);
+      }
+
       function showReceiptView(invoicePayload) {
         state.invoicePayload = invoicePayload;
         setView('receipt');
@@ -1464,6 +1524,11 @@
               finalizePaidReceipt(state.activeOrder, 'paid').catch((error) => console.warn(error.message));
               setTimeout(() => showReceiptView(invoicePayload), 0);
             }
+          }
+          if (payload.type === 'paid') {
+            const invoicePayload = buildInvoicePayload(state.activeOrder, 'paid');
+            finalizePaidReceipt(state.activeOrder, 'paid').catch((error) => console.warn(error.message));
+            setTimeout(() => showReceiptView(invoicePayload), 0);
           }
         });
       }
@@ -1656,6 +1721,22 @@
             return;
           }
           setCheckoutPayMessage(`Open your UPI app and pay ${vpa || 'the restaurant'}. Then tap “I have paid”.`);
+        });
+
+        els.receiptPrintBtn?.addEventListener('click', async () => {
+          try {
+            await printReceipt();
+          } catch (error) {
+            setCheckoutPayMessage(error.message || 'Unable to print receipt', true);
+          }
+        });
+
+        els.receiptPdfBtn?.addEventListener('click', async () => {
+          try {
+            await downloadReceiptPdf();
+          } catch (error) {
+            setCheckoutPayMessage(error.message || 'Unable to download PDF', true);
+          }
         });
       }
 

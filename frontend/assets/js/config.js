@@ -7,5 +7,7 @@
   window.APP_CONFIG = {
     API_BASE_URL: window.API_URL,
     SOCKET_URL: window.API_URL,
+    GST_PERCENT: Number(window.GST_PERCENT || 0),
+    BILL_THANK_YOU_MESSAGE: window.BILL_THANK_YOU_MESSAGE || 'Thank you for visiting! Please come again.',
   };
 })();

@@ -119,7 +119,9 @@ function tableStatusLabel(table) {
 function tablePaymentPill(table) {
   const method = String(table.order_payment_method || '').toLowerCase();
   const payStatus = String(table.order_payment_status || '').toLowerCase();
-  if (table.availability_status === 'paid') {
+  const availabilityStatus = String(table.availability_status || 'available').toLowerCase();
+
+  if (payStatus === 'paid' || availabilityStatus === 'paid') {
     if (method === 'cash' || method === 'cod') {
       return '<span class="table-card__pay-pill table-card__pay-pill--cash">CASH</span>';
     }
@@ -216,10 +218,14 @@ function renderBillModal(order, tableId) {
 
   document.getElementById('billRestaurantName').textContent = restaurantName;
   document.getElementById('billTableMeta').textContent = `Table ${order.table_number || ''} • Order #${order.id} • ${order.customer_name || 'Guest'}`;
+  const logoUrl = restaurantProfile?.logo_url || restaurantProfile?.logo || null;
+  const thankYouMessage = (window.APP_CONFIG?.BILL_THANK_YOU_MESSAGE || 'Thank you for visiting! Please come again.');
   document.getElementById('billOrderInfo').innerHTML = `
+    ${logoUrl ? `<img src="${escapeHtml(logoUrl)}" alt="${escapeHtml(restaurantName)} logo" style="max-width:120px;max-height:80px;object-fit:contain;margin-bottom:0.6rem;border-radius:10px;" />` : ''}
     <p><strong>${escapeHtml(restaurantName)}</strong></p>
     <p>${escapeHtml(order.bank_name || restaurantProfile?.bank_name || '')} ${escapeHtml(order.bank_account_name || restaurantProfile?.bank_account_name || '')}</p>
     <p>UPI: ${escapeHtml(order.upi_vpa || restaurantProfile?.upi_vpa || 'Not set')}</p>
+    <p style="margin-top:0.5rem;color:#6b7280;">${escapeHtml(thankYouMessage)}</p>
   `;
 
   document.getElementById('billItemsBody').innerHTML = items.length ? items.map((it) => `
@@ -231,7 +237,21 @@ function renderBillModal(order, tableId) {
     </tr>
   `).join('') : '<tr><td colspan="4">No items</td></tr>';
 
-  document.getElementById('billGrandTotal').textContent = `INR ${formatCurrency(order.total_amount)}`;
+  const subtotal = items.reduce((sum, it) => sum + Number(it.line_total || 0), 0);
+  const gstPercent = Number(window.APP_CONFIG?.GST_PERCENT || 0);
+  const gstAmount = subtotal * (gstPercent / 100);
+  const grandTotal = subtotal + gstAmount;
+
+  document.getElementById('billGrandTotal').textContent = `INR ${formatCurrency(grandTotal)}`;
+  const grandTotalRow = document.querySelector('#billModal tfoot tr');
+  if (grandTotalRow) {
+    const gstRow = document.createElement('tr');
+    gstRow.innerHTML = `<td colspan="3">GST ${gstPercent ? `(${gstPercent}%)` : ''}</td><td>INR ${formatCurrency(gstAmount)}</td>`;
+    grandTotalRow.insertAdjacentElement('beforebegin', gstRow);
+    const subtotalRow = document.createElement('tr');
+    subtotalRow.innerHTML = `<td colspan="3">Subtotal</td><td>INR ${formatCurrency(subtotal)}</td>`;
+    grandTotalRow.insertAdjacentElement('beforebegin', subtotalRow);
+  }
 
   const isPaid = String(order.payment_status || '').toLowerCase() === 'paid';
   const isRunning = !isPaid;
@@ -288,16 +308,40 @@ async function openBillModalForTable(tableId, { allowPaid = false } = {}) {
   }
 }
 
+async function printInvoiceForOrder(orderId) {
+  try {
+    const html = await fetchAuthorizedHtml(`/orders/${orderId}/invoice?format=html`);
+    const printWindow = window.open('', '_blank', 'noopener,noreferrer');
+    if (!printWindow) {
+      throw new Error('Popup blocked');
+    }
+    printWindow.document.write(html);
+    printWindow.document.close();
+    printWindow.focus();
+    setTimeout(() => {
+      try {
+        printWindow.print();
+      } catch (error) {
+        // ignore print dialog errors
+      }
+    }, 250);
+  } catch (error) {
+    console.warn('Unable to print invoice', error.message);
+  }
+}
+
 async function markBillPaid(method, customerUpi = '') {
   if (!activeBillOrder) return;
-  await apiRequest(`/orders/${activeBillOrder.id}/mark-paid`, {
+  const orderId = activeBillOrder.id;
+  await apiRequest(`/orders/${orderId}/mark-paid`, {
     method: 'POST',
     body: JSON.stringify({ method, customerUpi }),
   }, true);
   hideBillModal();
-  setMessage('ownerMessage', method === 'cash' ? 'Cash recorded — table is green.' : 'UPI payment confirmed.');
+  setMessage('ownerMessage', method === 'cash' ? 'Cash recorded — table is ready for the next guest.' : 'UPI payment confirmed.');
   await loadTables();
   await loadInvoices();
+  await printInvoiceForOrder(orderId);
 }
 
 function setActiveSection(sectionName) {
@@ -336,6 +380,8 @@ async function loadRestaurant() {
     payForm.upiVpa.value = data.restaurant.upi_vpa || '';
     payForm.bankAccountName.value = data.restaurant.bank_account_name || '';
     payForm.bankName.value = data.restaurant.bank_name || '';
+    payForm.logoUrl.value = data.restaurant.logo_url || '';
+    payForm.thankYouMessage.value = data.restaurant.thank_you_message || '';
     setPaymentSettingsEditable(false);
   }
 }
@@ -950,6 +996,8 @@ if (paymentSettingsForm) {
           upiVpa: fd.get('upiVpa'),
           bankAccountName: fd.get('bankAccountName'),
           bankName: fd.get('bankName'),
+          logoUrl: fd.get('logoUrl'),
+          thankYouMessage: fd.get('thankYouMessage'),
         }),
       }, true);
       await loadRestaurant();
@@ -1045,12 +1093,7 @@ document.getElementById('billTerminalReset')?.addEventListener('click', async ()
 document.getElementById('billPrintInvoice')?.addEventListener('click', async () => {
   if (!activeBillOrder) return;
   try {
-    const html = await fetchAuthorizedHtml(`/orders/${activeBillOrder.id}/invoice?format=html`);
-    const win = window.open('', '_blank');
-    win.document.write(html);
-    win.document.close();
-    win.focus();
-    win.print();
+    await printInvoiceForOrder(activeBillOrder.id);
   } catch (error) {
     setMessage('ownerMessage', error.message, true);
   }

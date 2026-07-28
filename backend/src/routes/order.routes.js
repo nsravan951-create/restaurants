@@ -339,15 +339,13 @@ router.post('/:orderId/mark-paid', requireAuth(['owner', 'super_admin']), asyncH
     ]
   );
 
-  if (method === 'cash') {
-    await endSessionByOrderId(orderId, 'payment_completed');
-  }
+  await endSessionByOrderId(orderId, 'payment_completed');
   await syncInvoiceForOrder(orderId);
 
   emitOrderUpdate(rows[0].restaurant_id, { type: 'paid', orderId, method: paymentMethod });
   emitTableUpdate(rows[0].restaurant_id, {
     tableId: rows[0].table_id,
-    status: method === 'cash' ? 'paid' : 'active',
+    status: 'available',
     paymentMethod,
     paymentStatus: 'paid',
   });

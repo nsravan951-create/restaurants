@@ -26,6 +26,8 @@ async function ensureSaasSchema() {
   await pool.query(`ALTER TABLE IF NOT EXISTS restaurants ADD COLUMN IF NOT EXISTS subscription_plan VARCHAR(80);`);
   await pool.query(`ALTER TABLE IF NOT EXISTS restaurants ADD COLUMN IF NOT EXISTS subscription_status VARCHAR(40);`);
   await pool.query(`ALTER TABLE IF NOT EXISTS restaurants ADD COLUMN IF NOT EXISTS subscription_expires_at TIMESTAMP;`);
+  await pool.query(`ALTER TABLE IF NOT EXISTS restaurants ADD COLUMN IF NOT EXISTS logo_url VARCHAR(500);`);
+  await pool.query(`ALTER TABLE IF NOT EXISTS restaurants ADD COLUMN IF NOT EXISTS thank_you_message VARCHAR(255);`);
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS platform_orders (

@@ -28,11 +28,14 @@ function buildInvoiceModel(order, restaurant, items) {
     gstAmount,
     grandTotal,
     paymentLabel: order.payment_status === 'paid' ? 'Paid' : (order.payment_method === 'cod' ? 'COD' : 'Pending'),
+    logoUrl: restaurant?.logo_url || restaurant?.restaurant_logo || restaurant?.logo || null,
+    thankYouMessage: process.env.BILL_THANK_YOU_MESSAGE || 'Thank you for visiting! Please come again.',
   };
 }
 
 function renderInvoiceHtml(model) {
-  const { restaurant, order, items, subtotal, gstPercent, gstAmount, grandTotal, paymentLabel } = model;
+  const { restaurant, order, items, subtotal, gstPercent, gstAmount, grandTotal, paymentLabel, logoUrl, thankYouMessage } = model;
+  const hasLogo = Boolean(logoUrl);
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -45,6 +48,7 @@ function renderInvoiceHtml(model) {
     body { font-family: Arial, sans-serif; margin: 0; padding: 0; background: #f5f5f5; color: #111; }
     .sheet { max-width: 760px; margin: 20px auto; background: #fff; padding: 24px; border: 1px solid #ddd; }
     .top { text-align: center; border-bottom: 2px dashed #333; padding-bottom: 12px; margin-bottom: 16px; }
+    .logo { max-width: 120px; max-height: 90px; object-fit: contain; margin-bottom: 10px; border-radius: 12px; }
     h1, h2, h3, p { margin: 0; }
     .meta { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 16px; margin-bottom: 16px; }
     .meta div, .summary div { display: flex; justify-content: space-between; gap: 12px; }
@@ -64,6 +68,7 @@ function renderInvoiceHtml(model) {
 <body>
   <div class="sheet">
     <div class="top">
+      ${hasLogo ? `<img class="logo" src="${escapeHtml(logoUrl)}" alt="${escapeHtml(restaurant.name)} logo" />` : ''}
       <h1>${escapeHtml(restaurant.name)}</h1>
       <p class="small">Powered by Online Solutionzzz</p>
     </div>
@@ -105,18 +110,30 @@ function renderInvoiceHtml(model) {
       <div><span>Total Amount</span><strong>${formatMoney(grandTotal)}</strong></div>
     </div>
 
-    <div class="footer">Powered by Online Solutionzzz</div>
+    <div class="footer">
+      <p style="margin-bottom: 6px;">${escapeHtml(thankYouMessage)}</p>
+      <p>Powered by Online Solutionzzz</p>
+    </div>
   </div>
 </body>
 </html>`;
 }
 
 function buildInvoicePdf(res, model) {
-  const { restaurant, order, items, subtotal, gstPercent, gstAmount, grandTotal, paymentLabel } = model;
+  const { restaurant, order, items, subtotal, gstPercent, gstAmount, grandTotal, paymentLabel, logoUrl, thankYouMessage } = model;
   const doc = new PDFDocument({ size: 'A4', margin: 36 });
   res.setHeader('Content-Type', 'application/pdf');
   res.setHeader('Content-Disposition', `attachment; filename=invoice-${order.id}.pdf`);
   doc.pipe(res);
+
+  if (logoUrl) {
+    try {
+      doc.image(logoUrl, { fit: [140, 90], align: 'center' });
+      doc.moveDown(0.25);
+    } catch (error) {
+      console.warn('Invoice logo could not be loaded:', error.message);
+    }
+  }
 
   doc.fontSize(20).text(restaurant.name, { align: 'center' });
   doc.fontSize(10).text('Powered by Online Solutionzzz', { align: 'center' });
@@ -137,7 +154,9 @@ function buildInvoicePdf(res, model) {
   doc.text(`Subtotal: ${formatMoney(subtotal)}`);
   doc.text(`GST${gstPercent ? ` (${gstPercent}%)` : ''}: ${formatMoney(gstAmount)}`);
   doc.text(`Total Amount: ${formatMoney(grandTotal)}`);
-  doc.moveDown(2);
+  doc.moveDown(1.2);
+  doc.fontSize(10).text(thankYouMessage, { align: 'center' });
+  doc.moveDown(0.5);
   doc.fontSize(10).text('Powered by Online Solutionzzz', { align: 'center' });
 
   doc.end();

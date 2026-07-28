@@ -33,7 +33,7 @@ router.param('restaurantId', (req, res, next, restaurantId) => {
 
 router.get('/owner/me', requireAuth(['owner']), asyncHandler(async (req, res) => {
   const { rows } = await pool.query(
-    `SELECT id, name, slug, phone, address, is_active, upi_vpa, bank_account_name, bank_name
+    `SELECT id, name, slug, phone, address, is_active, upi_vpa, bank_account_name, bank_name, logo_url, thank_you_message
      FROM restaurants WHERE owner_user_id = $1 LIMIT 1`,
     [req.user.userId]
   );
@@ -42,24 +42,30 @@ router.get('/owner/me', requireAuth(['owner']), asyncHandler(async (req, res) =>
 }));
 
 router.patch('/owner/payment-settings', requireAuth(['owner']), asyncHandler(async (req, res) => {
-  const { upiVpa, bankAccountName, bankName } = req.body || {};
+  const { upiVpa, bankAccountName, bankName, logoUrl, thankYouMessage } = req.body || {};
   const { rows } = await pool.query('SELECT id FROM restaurants WHERE owner_user_id = $1 LIMIT 1', [req.user.userId]);
   if (!rows.length) return res.status(404).json({ message: 'Restaurant not found' });
 
   await pool.query(
     `UPDATE restaurants
-     SET upi_vpa = $1, bank_account_name = $2, bank_name = $3
-     WHERE id = $4`,
+     SET upi_vpa = $1,
+         bank_account_name = $2,
+         bank_name = $3,
+         logo_url = $4,
+         thank_you_message = $5
+     WHERE id = $6`,
     [
       String(upiVpa || '').trim() || null,
       String(bankAccountName || '').trim() || null,
       String(bankName || '').trim() || null,
+      String(logoUrl || '').trim() || null,
+      String(thankYouMessage || '').trim() || null,
       rows[0].id,
     ]
   );
 
   const { rows: updated } = await pool.query(
-    'SELECT id, name, upi_vpa, bank_account_name, bank_name FROM restaurants WHERE id = $1',
+    'SELECT id, name, upi_vpa, bank_account_name, bank_name, logo_url, thank_you_message FROM restaurants WHERE id = $1',
     [rows[0].id]
   );
   return res.json({ message: 'Payment settings saved', restaurant: updated[0] });
@@ -180,7 +186,7 @@ router.get('/table/:tableId', asyncHandler(async (req, res) => {
        r.upi_vpa,
        r.bank_account_name,
        r.bank_name,
-       NULL as restaurant_logo
+       r.logo_url as restaurant_logo
      FROM restaurant_tables t
      INNER JOIN restaurants r ON r.id = t.restaurant_id
      WHERE t.id = $1
@@ -243,6 +249,7 @@ router.get('/table/:tableId', asyncHandler(async (req, res) => {
       bank_account_name: tableData.bank_account_name,
       bank_name: tableData.bank_name,
       logo: tableData.restaurant_logo,
+      thank_you_message: tableData.thank_you_message,
     },
     lock: {
       isLocked: orderPlaced || Boolean(session),

@@ -54,7 +54,7 @@ function getSessionExpiryDate() {
 }
 
 function getTableStatusAfterSessionEnd(reason) {
-  return reason === 'payment_completed' || reason === 'order_delivered' ? 'paid' : 'available';
+  return 'available';
 }
 
 async function endSessionByOrderId(orderId, reason) {
