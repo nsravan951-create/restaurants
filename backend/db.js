@@ -62,6 +62,18 @@ const schemaReady = (async () => {
           ALTER TABLE restaurants ADD COLUMN bank_name VARCHAR(120);
         END IF;
 
+        IF NOT EXISTS (
+          SELECT 1 FROM information_schema.columns WHERE table_name = 'restaurants' AND column_name = 'logo_url'
+        ) THEN
+          ALTER TABLE restaurants ADD COLUMN logo_url VARCHAR(500);
+        END IF;
+
+        IF NOT EXISTS (
+          SELECT 1 FROM information_schema.columns WHERE table_name = 'restaurants' AND column_name = 'thank_you_message'
+        ) THEN
+          ALTER TABLE restaurants ADD COLUMN thank_you_message VARCHAR(255);
+        END IF;
+
         ALTER TABLE orders DROP CONSTRAINT IF EXISTS chk_orders_payment_method;
         ALTER TABLE orders ADD CONSTRAINT chk_orders_payment_method
           CHECK (payment_method IN ('online', 'cod', 'upi', 'cash'));

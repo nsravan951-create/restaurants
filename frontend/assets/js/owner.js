@@ -69,6 +69,7 @@ function openPaymentAuthModal() {
   const modal = document.getElementById('paymentAuthModal');
   if (!modal) return;
   modal.classList.remove('hidden');
+  modal.classList.add('is-open');
   modal.setAttribute('aria-hidden', 'false');
   document.body.classList.add('bill-modal-open');
   const passwordInput = document.getElementById('paymentAuthPassword');
@@ -79,6 +80,7 @@ function closePaymentAuthModal() {
   const modal = document.getElementById('paymentAuthModal');
   if (!modal) return;
   modal.classList.add('hidden');
+  modal.classList.remove('is-open');
   modal.setAttribute('aria-hidden', 'true');
   document.body.classList.remove('bill-modal-open');
 }

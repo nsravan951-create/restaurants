@@ -22,6 +22,8 @@ CREATE TABLE IF NOT EXISTS restaurants (
   upi_vpa VARCHAR(120) NULL,
   bank_account_name VARCHAR(120) NULL,
   bank_name VARCHAR(120) NULL,
+  logo_url VARCHAR(500) NULL,
+  thank_you_message VARCHAR(255) NULL,
   is_active BOOLEAN DEFAULT TRUE,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   CONSTRAINT fk_restaurants_owner FOREIGN KEY (owner_user_id) REFERENCES users(id) ON DELETE CASCADE
