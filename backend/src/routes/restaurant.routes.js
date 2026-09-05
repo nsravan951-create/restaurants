@@ -124,6 +124,7 @@ router.get('/:restaurantId/tables', requireAuth(['owner', 'super_admin', 'staff'
        SELECT o.id AS active_order_id, o.total_amount, o.payment_method, o.payment_status
        FROM orders o
        WHERE o.table_id = t.id
+         AND (o.payment_status = 'pending' OR t.availability_status = 'paid')
        ORDER BY o.id DESC
        LIMIT 1
      ) lo ON TRUE
@@ -547,46 +548,28 @@ router.post('/:restaurantId/tables/:tableId/terminal-reset', requireAuth(['owner
     }
 
     const { rows: sessionRows } = await conn.query(
-      `SELECT id, status
+      `SELECT id
        FROM table_sessions
        WHERE restaurant_id = $1 AND table_id = $2 AND status = 'active'
-       ORDER BY id DESC
-       LIMIT 1
        FOR UPDATE`,
       [restaurantId, tableId]
     );
 
-    const activeSession = sessionRows[0] || null;
-
-    const { rows: orderRows } = await conn.query(
-      `SELECT id
-       FROM orders
-       WHERE restaurant_id = $1 AND table_id = $2 AND payment_status = 'pending'
-       ORDER BY id DESC
-       LIMIT 1
-       FOR UPDATE`,
-      [restaurantId, tableId]
+    const { rows: terminatedSessions } = await conn.query(
+      `UPDATE table_sessions
+       SET status = 'completed', ended_at = NOW(), ended_reason = $1
+       WHERE restaurant_id = $2 AND table_id = $3 AND status = 'active'
+       RETURNING id`,
+      ['manual_terminate', restaurantId, tableId]
     );
 
-    const pendingOrder = orderRows[0] || null;
-
-    if (activeSession) {
-      await conn.query(
-        `UPDATE table_sessions
-         SET status = 'completed', ended_at = NOW(), ended_reason = $1
-         WHERE id = $2`,
-        ['manual_terminate', activeSession.id]
-      );
-    }
-
-    if (pendingOrder) {
-      await conn.query(
-        `UPDATE orders
-         SET payment_status = 'failed', notes = COALESCE(notes, '') || $1
-         WHERE id = $2`,
-        [' | Terminated by owner', pendingOrder.id]
-      );
-    }
+    const { rows: terminatedOrders } = await conn.query(
+      `UPDATE orders
+       SET payment_status = 'failed', notes = COALESCE(notes, '') || $1
+       WHERE restaurant_id = $2 AND table_id = $3 AND payment_status = 'pending'
+       RETURNING id`,
+      [' | Terminated by owner', restaurantId, tableId]
+    );
 
     if (tableRows[0].availability_status !== 'available') {
       await conn.query('UPDATE restaurant_tables SET availability_status = $1 WHERE id = $2', ['available', tableId]);
@@ -596,10 +579,10 @@ router.post('/:restaurantId/tables/:tableId/terminal-reset', requireAuth(['owner
 
     try {
       emitTableUpdate(Number(restaurantId), { tableId: Number(tableId), status: 'available' });
-      if (pendingOrder) {
+      for (const order of terminatedOrders) {
         emitOrderUpdate(Number(restaurantId), {
           type: 'status_changed',
-          orderId: Number(pendingOrder.id),
+          orderId: Number(order.id),
           status: 'failed',
         });
       }
@@ -608,9 +591,9 @@ router.post('/:restaurantId/tables/:tableId/terminal-reset', requireAuth(['owner
     }
 
     return res.json({
-      message: activeSession || pendingOrder ? 'Table terminated and reset' : 'Table reset to available',
-      sessionTerminated: Boolean(activeSession),
-      orderTerminated: Boolean(pendingOrder),
+      message: terminatedSessions.length || terminatedOrders.length ? 'Table terminated and reset' : 'Table reset to available',
+      sessionTerminated: terminatedSessions.length > 0,
+      orderTerminated: terminatedOrders.length > 0,
     });
   } catch (error) {
     await conn.query('ROLLBACK');
