@@ -4,6 +4,7 @@
   --muted: #5b5f71;
   --surface: #ffffff;
   --accent: #e66a3d;
+  --accent-rgb: 230, 106, 61;
   --accent-dark: #c44f25;
   --soft: #ffe8dd;
   --ring: #2d9c8f;
@@ -16,6 +17,7 @@
   --muted: #99a6b8;
   --surface: rgba(12,18,28,0.65);
   --accent: #ff8a00;
+  --accent-rgb: 255, 138, 0;
   --accent-dark: #ff6b00;
   --soft: rgba(255,138,0,0.08);
   --ring: #76e0c9;
@@ -413,6 +415,33 @@ main {
   background: #fff;
 }
 
+.menu-item-card img {
+  width: 100%;
+  height: 140px;
+  object-fit: cover;
+  border-radius: 8px;
+  margin-bottom: 0.6rem;
+}
+
+.menu-item-card .card-content h3 {
+  margin-top: 0;
+  margin-bottom: 0.3rem;
+  font-size: 1.1rem;
+}
+
+.menu-item-card .card-content .category {
+  color: var(--muted);
+  font-size: 0.85rem;
+  margin-bottom: 0.5rem;
+}
+
+.menu-item-card .card-content .price {
+  font-weight: 600;
+  font-size: 1.05rem;
+  color: var(--ink);
+  margin-bottom: 0.8rem;
+}
+
 .card p {
   margin: 0.3rem 0;
   color: var(--muted);
@@ -430,11 +459,23 @@ main {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  transition: all 0.2s ease;
+}
+
+.btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.15);
 }
 
 .btn-primary {
-  background: linear-gradient(120deg, var(--accent), #f29e4c);
+  background: linear-gradient(120deg, var(--accent), var(--accent-dark));
   color: white;
+  box-shadow: 0 8px 24px rgba(var(--accent-rgb), 0.3);
+}
+
+.btn-primary:hover {
+  box-shadow: 0 10px 30px rgba(var(--accent-rgb), 0.4);
 }
 
 .btn-dark {
@@ -537,34 +578,52 @@ select:focus {
 }
 
 .ad-card {
-  background: linear-gradient(135deg, #fff8f0 0%, #fffbf7 100%) !important;
-  border: 2px solid var(--accent) !important;
-  box-shadow: 0 4px 12px rgba(230, 106, 61, 0.12) !important;
-  transition: transform 200ms ease, box-shadow 200ms ease;
-  cursor: pointer;
+  border: 2px solid var(--soft);
+  background: linear-gradient(145deg, var(--soft) 0%, rgba(255, 255, 255, 0) 100%);
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 8px 20px rgba(var(--accent-rgb), 0.1);
 }
 
-.ad-card:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 8px 20px rgba(230, 106, 61, 0.2) !important;
+.ad-card::before {
+  content: 'AD';
+  position: absolute;
+  top: 0.8rem;
+  left: 0.8rem;
+  background: var(--accent);
+  color: white;
+  padding: 0.2rem 0.5rem;
+  border-radius: 6px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  z-index: 1;
+}
+
+.ad-card img,
+.ad-card video {
+  border-radius: 8px;
+  margin-bottom: 0.6rem;
+  display: block;
+  width: 100%;
+  height: 140px;
+  object-fit: cover;
 }
 
 .ad-card h3 {
-  font-size: 1rem;
-  font-weight: 700;
+  color: var(--accent);
+  margin-bottom: 0.5rem;
+  font-size: 1.1rem;
 }
 
-.close-btn {
-  position: absolute;
-  top: 8px;
-  right: 8px;
-  border: none;
-  width: 28px;
-  height: 28px;
-  border-radius: 999px;
-  background: rgba(0, 0, 0, 0.65);
-  color: white;
-  cursor: pointer;
+.ad-card p {
+  color: var(--muted);
+  font-size: 0.85rem;
+  margin-bottom: 0.6rem;
+}
+
+.ad-card .btn {
+  width: 100%;
+  text-align: center;
 }
 
 .hidden {

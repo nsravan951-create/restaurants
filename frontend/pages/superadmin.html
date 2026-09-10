@@ -117,8 +117,19 @@
         <article class="panel">
           <form id="adForm" class="admin-form">
             <input name="title" placeholder="Ad title" required />
-            <input name="imageUrl" placeholder="Image URL" required />
+            <select name="mediaType" id="adMediaType">
+              <option value="image">Image Ad</option>
+              <option value="video">Video Ad</option>
+            </select>
+            <input name="imageUrl" placeholder="Image URL (if image ad)" />
+            <input name="videoUrl" placeholder="Video URL (if video ad)" />
             <input name="targetLink" placeholder="Target link" required />
+            <select name="displayMode" id="adDisplayMode">
+              <option value="grid">Grid Display</option>
+              <option value="inline">Inline Display</option>
+              <option value="vertical">Vertical Display</option>
+            </select>
+            <input name="displayOrder" type="number" min="0" value="0" placeholder="Display order" />
             <select name="restaurantId" id="adRestaurantSelect">
               <option value="">Global ad</option>
             </select>

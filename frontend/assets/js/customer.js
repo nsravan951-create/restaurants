@@ -211,12 +211,14 @@ function renderMenu(menu, ads = []) {
   menu.forEach((item, index) => {
     // Add menu item
     menuHTML.push(`
-      <article class="card">
-        ${item.image_url ? `<img src="${item.image_url}" alt="${item.name}" style="width:100%;height:140px;object-fit:cover;border-radius:10px;" />` : ''}
-        <h3>${item.name}</h3>
-        <p>${item.category}</p>
-        <p>INR ${formatCurrency(item.price)}</p>
-        <button class="btn btn-primary" data-id="${item.id}">Add to Cart</button>
+      <article class="card menu-item-card">
+        ${item.image_url ? `<img src="${escapeHtml(item.image_url)}" alt="${escapeHtml(item.name)}" />` : ''}
+        <div class="card-content">
+          <h3>${escapeHtml(item.name)}</h3>
+          <p class="category">${escapeHtml(item.category)}</p>
+          <p class="price">INR ${formatCurrency(item.price)}</p>
+          <button class="btn btn-primary" data-id="${item.id}">Add to Cart</button>
+        </div>
       </article>
     `);
     
@@ -225,15 +227,17 @@ function renderMenu(menu, ads = []) {
       const adIndex = Math.floor((index + 1) / 3) - 1;
       if (adIndex < ads.length) {
         const ad = ads[adIndex];
+        const mediaHTML = ad.media_type === 'video' && ad.video_url
+          ? `<video src="${escapeHtml(ad.video_url)}" muted loop playsinline autoplay></video>`
+          : `<img src="${escapeHtml(ad.image_url)}" alt="${escapeHtml(ad.title)}" />`;
         menuHTML.push(`
           <article class="card ad-card" data-ad-id="${ad.id}">
-            <div style="position: relative; overflow: hidden; border-radius: 8px; margin-bottom: 0.6rem;">
-              <img src="${ad.image_url}" alt="${ad.title}" style="width:100%;height:140px;object-fit:cover;cursor:pointer;" class="ad-image" />
-              <span style="position: absolute; top: 0.5rem; right: 0.5rem; background: var(--accent); color: white; padding: 0.3rem 0.6rem; border-radius: 6px; font-size: 0.7rem; font-weight: 600;">PROMOTED</span>
+            ${mediaHTML}
+            <div class="card-content">
+              <h3>${escapeHtml(ad.title)}</h3>
+              <p>${escapeHtml(ad.description || 'Exclusive offer from our partners')}</p>
+              <a href="${escapeHtml(ad.target_link)}" target="_blank" rel="noreferrer" class="btn btn-primary">View Offer</a>
             </div>
-            <h3 style="color: var(--accent); margin-bottom: 0.5rem;">${ad.title}</h3>
-            <p style="color: var(--muted); font-size: 0.85rem; margin-bottom: 0.6rem;">Exclusive offer from our partners</p>
-            <a href="${ad.target_link}" target="_blank" rel="noreferrer" class="btn btn-primary" style="width: 100%; text-align: center;">View Offer</a>
           </article>
         `);
       }
@@ -358,36 +362,6 @@ async function handleOnline() {
   }
 }
 
-function setupAdPopup(ads) {
-  if (!ads || !ads.length) return;
-
-  const ad = ads[Math.floor(Math.random() * ads.length)];
-  const popup = document.getElementById('adPopup');
-  const adImage = document.getElementById('adImage');
-  const adTitle = document.getElementById('adTitle');
-  const adLink = document.getElementById('adLink');
-
-  const showInMs = 60000 + Math.floor(Math.random() * 60000);
-
-  setTimeout(() => {
-    adImage.src = ad.image_url;
-    adTitle.textContent = ad.title;
-    adLink.href = ad.target_link;
-    popup.classList.remove('hidden');
-  }, showInMs);
-
-  adLink.addEventListener('click', async () => {
-    try {
-      await apiRequest(`/api/ads/click/${ad.id}`, { method: 'POST' });
-    } catch (error) {
-      console.error(error.message);
-    }
-  });
-
-  document.getElementById('closeAd').addEventListener('click', () => {
-    popup.classList.add('hidden');
-  });
-}
 
 async function initCustomerPage() {
   try {
@@ -415,8 +389,7 @@ async function initCustomerPage() {
 
     renderMenu(data.menu, data.ads);
     renderCart();
-    // Keep popup ad as optional fallback - comment out if you want only inline ads
-    // setupAdPopup(data.ads);
+
     await startOrJoinSession(false);
   } catch (error) {
     setMessage('orderMessage', error.message, true);

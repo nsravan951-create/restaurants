@@ -217,14 +217,33 @@
     const restaurants = getDashboard().restaurants || [];
     const options = restaurants.map((r) => `<option value="${r.id}">${escapeHtml(r.name)}</option>`).join('');
 
-    ['platformRestaurantSelect', 'paymentRestaurantSelect', 'platformInvoiceRestaurantSelect'].forEach((id) => {
-      const select = el(id);
-      if (!select) return;
-      const placeholder = id === 'paymentRestaurantSelect'
-        ? '<option value="">Select restaurant to view payment details</option>'
-        : '<option value="">Select restaurant</option>';
-      select.innerHTML = placeholder + options;
-    });
+    // Populate adRestaurantSelect
+    const adRestaurantSelect = el('adRestaurantSelect');
+    if (adRestaurantSelect) {
+      adRestaurantSelect.innerHTML = '<option value="">Global ad</option>' + options;
+    }
+    
+    const adMediaTypeSelect = el('adMediaType');
+    const adImageUrlInput = el('adForm').elements.namedItem('imageUrl');
+    const adVideoUrlInput = el('adForm').elements.namedItem('videoUrl');
+
+    if (adMediaTypeSelect && adImageUrlInput && adVideoUrlInput) {
+      const toggleMediaInputs = () => {
+        if (adMediaTypeSelect.value === 'video') {
+          adVideoUrlInput.style.display = 'block';
+          adImageUrlInput.style.display = 'none';
+          adVideoUrlInput.setAttribute('required', 'required');
+          adImageUrlInput.removeAttribute('required');
+        } else {
+          adVideoUrlInput.style.display = 'none';
+          adImageUrlInput.style.display = 'block';
+          adImageUrlInput.setAttribute('required', 'required');
+          adVideoUrlInput.removeAttribute('required');
+        }
+      };
+      adMediaTypeSelect.addEventListener('change', toggleMediaInputs);
+      toggleMediaInputs(); // Set initial state
+    }
   }
 
   async function loadInvoicesForRestaurant(restaurantId) {
@@ -691,73 +710,48 @@
 
   function renderAdsList() {
     const ads = getFilteredAds();
-    const root = el('adsList');
+    const adsListRoot = el('adsList');
+    if (!adsListRoot) return;
 
-    root.innerHTML = ads.map((ad) => `
+    adsListRoot.innerHTML = ads.map((ad) => `
       <article class="admin-item">
         <div class="admin-item__header">
           <div>
             <h4>${escapeHtml(ad.title)}</h4>
-            <p>${escapeHtml(ad.restaurantName || 'Global')} • ${escapeHtml(ad.targetLink)}</p>
+            <p>${ad.restaurant_id ? `Restaurant: ${escapeHtml(ad.restaurant_name)}` : 'Global Ad'} • Target: <a href="${escapeHtml(ad.target_link)}" target="_blank">${escapeHtml(ad.target_link)}</a></p>
           </div>
-          <span class="badge ${ad.isActive ? 'badge--success' : 'badge--muted'}">${ad.isActive ? 'Active' : 'Paused'}</span>
+          <span class="badge ${ad.is_active ? 'badge--success' : 'badge--muted'}">${ad.is_active ? 'Active' : 'Inactive'}</span>
         </div>
         <div class="admin-item__metrics">
+          <span>Type: ${escapeHtml(ad.media_type)} (${ad.image_url ? 'Image' : 'Video'})</span>
           <span>Impressions: ${escapeHtml(ad.impressions || 0)}</span>
           <span>Clicks: ${escapeHtml(ad.clicks || 0)}</span>
-          <span>CTR: ${escapeHtml(ad.ctr || 0)}%</span>
-          <span>Starts: ${escapeHtml(formatDate(ad.startsAt))}</span>
-          <span>Ends: ${escapeHtml(formatDate(ad.endsAt))}</span>
+          <span>CTR: ${ad.impressions ? `${((Number(ad.clicks || 0) / Number(ad.impressions || 1)) * 100).toFixed(2)}%` : '0%'}</span>
         </div>
         <div class="admin-item__actions">
-          <button class="btn btn-light" data-ad-edit="${ad.id}">Edit</button>
-          <button class="btn btn-primary" data-ad-toggle="${ad.id}">${ad.isActive ? 'Disable' : 'Enable'}</button>
-          <button class="btn btn-dark" data-ad-delete="${ad.id}">Delete</button>
+          <button class="btn btn-light" data-action="edit-ad" data-id="${ad.id}">Edit</button>
+          <button class="btn btn-danger" data-action="delete-ad" data-id="${ad.id}">Delete</button>
         </div>
       </article>
-    `).join('') || '<p class="muted">No ads match your search.</p>';
+    `).join('') || '<p class="muted">No ads found.</p>';
 
-    root.querySelectorAll('[data-ad-edit]').forEach((button) => {
-      button.addEventListener('click', () => {
-        const ad = getDashboard().ads.find((item) => String(item.id) === String(button.dataset.adEdit));
-        if (!ad) return;
-        startAdEdit(ad);
-        setSection('promotions');
-      });
+    adsListRoot.querySelectorAll('[data-action="edit-ad"]').forEach((btn) => {
+      btn.addEventListener('click', handleEditAd);
     });
-
-    root.querySelectorAll('[data-ad-toggle]').forEach((button) => {
-      button.addEventListener('click', async () => {
-        const ad = getDashboard().ads.find((item) => String(item.id) === String(button.dataset.adToggle));
-        if (!ad) return;
-
-        try {
-          await apiRequest(`/api/ads/${ad.id}`, {
-            method: 'PUT',
-            body: JSON.stringify({ isActive: !ad.isActive }),
-          }, true);
-          await loadDashboard();
-        } catch (error) {
-          setMessage(error.message, true);
-        }
-      });
+    adsListRoot.querySelectorAll('[data-action="delete-ad"]').forEach((btn) => {
+      btn.addEventListener('click', handleDeleteAd);
     });
+  }
 
-    root.querySelectorAll('[data-ad-delete]').forEach((button) => {
-      button.addEventListener('click', async () => {
-        if (!confirm('Delete this ad?')) return;
-
-        try {
-          await apiRequest(`/api/ads/${button.dataset.adDelete}`, { method: 'DELETE' }, true);
-          if (state.editingAdId && String(state.editingAdId) === String(button.dataset.adDelete)) {
-            resetAdForm();
-          }
-          await loadDashboard();
-        } catch (error) {
-          setMessage(error.message, true);
-        }
-      });
-    });
+  async function loadAds() {
+    try {
+      const data = await apiRequest('/api/ad', {}, true);
+      state.dashboard.ads = data.ads || [];
+      renderAdsList();
+      renderSummary();
+    } catch (error) {
+      setMessage(error.message, true);
+    }
   }
 
   function renderAll() {
@@ -1120,41 +1114,110 @@
 
   async function handleAdSubmit(event) {
     event.preventDefault();
-    const formData = new FormData(event.currentTarget);
-    const adId = String(formData.get('adId') || '').trim();
+    setMessage('');
+
+    const form = event.currentTarget;
+    const formData = new FormData(form);
+    const adId = formData.get('adId');
 
     const payload = {
       title: formData.get('title'),
       imageUrl: formData.get('imageUrl') || null,
       videoUrl: formData.get('videoUrl') || null,
-      mediaType: formData.get('mediaType') || 'image',
-      displayMode: formData.get('displayMode') || 'grid',
-      displayOrder: Number(formData.get('displayOrder') || 0),
+      mediaType: formData.get('mediaType'),
       targetLink: formData.get('targetLink'),
       restaurantId: formData.get('restaurantId') ? Number(formData.get('restaurantId')) : null,
       isActive: formData.get('isActive') === 'on',
       startsAt: formData.get('startsAt') || null,
       endsAt: formData.get('endsAt') || null,
+      displayOrder: formData.get('displayOrder') ? Number(formData.get('displayOrder')) : 0,
+      displayMode: formData.get('displayMode') || 'grid',
     };
 
     try {
       if (adId) {
-        await apiRequest(`/api/ads/${adId}`, {
+        await apiRequest(`/api/ad/${adId}`, {
           method: 'PUT',
           body: JSON.stringify(payload),
         }, true);
+        setMessage('Ad updated successfully.');
       } else {
-        await apiRequest('/api/ads', {
+        await apiRequest('/api/ad', {
           method: 'POST',
           body: JSON.stringify(payload),
         }, true);
+        setMessage('Ad created successfully.');
       }
-
-      resetAdForm();
-      await loadDashboard();
-      setMessage(adId ? 'Ad updated successfully.' : 'Ad created successfully.');
+      form.reset();
+      state.editingAdId = null;
+      el('adSubmitButton').textContent = 'Create ad';
+      el('adCancelButton').classList.add('hidden');
+      await loadAds();
     } catch (error) {
       setMessage(error.message, true);
+    }
+  }
+
+  function handleEditAd(event) {
+    const adId = Number(event.currentTarget.dataset.id);
+    const ad = getDashboard().ads.find((a) => a.id === adId);
+
+    if (!ad) return;
+
+    state.editingAdId = adId;
+    const form = el('adForm');
+    if (!form) return;
+
+    form.title.value = ad.title;
+    form.imageUrl.value = ad.image_url || '';
+    form.videoUrl.value = ad.video_url || '';
+    form.mediaType.value = ad.media_type || 'image';
+    form.targetLink.value = ad.target_link;
+    form.restaurantId.value = ad.restaurant_id || '';
+    form.startsAt.value = ad.starts_at ? new Date(ad.starts_at).toISOString().slice(0, 16) : '';
+    form.endsAt.value = ad.ends_at ? new Date(ad.ends_at).toISOString().slice(0, 16) : '';
+    form.isActive.checked = ad.is_active;
+    form.adId.value = ad.id;
+    form.displayMode.value = ad.display_mode || 'grid';
+    form.displayOrder.value = ad.display_order || 0;
+
+    // Manually trigger change to update visibility of imageUrl/videoUrl
+    const changeEvent = new Event('change');
+    el('adMediaType').dispatchEvent(changeEvent);
+
+    el('adSubmitButton').textContent = 'Update ad';
+    el('adCancelButton').classList.remove('hidden');
+    setSection('ads'); // Ensure ad section is visible
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  async function handleDeleteAd(event) {
+    const adId = Number(event.currentTarget.dataset.id);
+    if (!confirm('Are you sure you want to delete this ad?')) return;
+
+    try {
+      await apiRequest(`/api/ad/${adId}`, {
+        method: 'DELETE',
+      }, true);
+      setMessage('Ad deleted successfully.');
+      await loadAds();
+    } catch (error) {
+      setMessage(error.message, true);
+    }
+  }
+
+  function clearAdForm() {
+    const form = el('adForm');
+    form.reset();
+    state.editingAdId = null;
+    el('adSubmitButton').textContent = 'Create ad';
+    el('adCancelButton').classList.add('hidden');
+    
+    // Reset media input visibility
+    const adMediaTypeSelect = el('adMediaType');
+    if (adMediaTypeSelect) {
+      adMediaTypeSelect.value = 'image';
+      adMediaTypeSelect.dispatchEvent(new Event('change'));
     }
   }
 
@@ -1217,10 +1280,10 @@
     if (restaurantForm) restaurantForm.addEventListener('submit', handleRestaurantCreate);
 
     const adForm = el('adForm');
-    if (adForm) adForm.addEventListener('submit', handleAdSubmit);
+    if (adForm) adForm.addEventListener('submit', handleAdFormSubmit);
 
     const adCancelButton = el('adCancelButton');
-    if (adCancelButton) adCancelButton.addEventListener('click', resetAdForm);
+    if (adCancelButton) adCancelButton.addEventListener('click', clearAdForm);
 
     // Attach messaging events
     attachMessageEvents();
