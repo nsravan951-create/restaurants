@@ -544,18 +544,10 @@
         background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
       }
 
-      .pay-btn--upi {
-        background: linear-gradient(135deg, #7c3aed 0%, #5b21b6 100%);
+      .pay-btn--cashfree {
+        background: linear-gradient(135deg, #0f766e 0%, #115e59 100%);
       }
       .checkout-pay-btn small { display: block; margin-top: 0.2rem; opacity: 0.9; font-size: 0.82rem; }
-
-      .checkout-upi-panel {
-        margin-top: 0.85rem;
-        padding: 0.9rem;
-        border-radius: 16px;
-        background: rgba(255, 255, 255, 0.9);
-        border: 1px solid var(--line);
-      }
 
       .receipt-actions {
         display: flex;
@@ -564,72 +556,12 @@
         margin-top: 12px;
       }
 
-      .checkout-upi-hint {
-        margin: 0 0 0.65rem;
-        font-size: 0.88rem;
-        color: var(--muted);
-      }
-
-      .checkout-upi-vpa {
-        margin: 0.5rem 0 0;
-        font-size: 0.85rem;
-        color: var(--ink);
-        word-break: break-all;
-      }
-
-      .checkout-upi-form {
-        display: grid;
-        gap: 8px;
-        margin-top: 0.65rem;
-      }
-
-      .checkout-upi-form input {
-        border-radius: 12px;
-        border: 1px solid var(--line);
-        padding: 10px 12px;
-      }
-
-      .checkout-confirm-paid {
-        width: 100%;
-        margin-top: 0.5rem;
-      }
-
       .checkout-pay-message {
         margin: 0.65rem 0 0;
         font-size: 0.88rem;
         color: var(--success);
         min-height: 1.2em;
       }
-
-      .bill-upi-panel {
-        margin-top: 12px;
-        padding: 12px;
-        border-radius: 16px;
-        background: rgba(255,255,255,0.85);
-        border: 1px dashed var(--line);
-      }
-
-      .upi-app-grid {
-        display: grid;
-        grid-template-columns: repeat(3, 1fr);
-        gap: 8px;
-      }
-
-      .upi-app-btn {
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        min-height: 2.5rem;
-        border-radius: 12px;
-        font-weight: 600;
-        text-decoration: none;
-        color: #fff;
-        font-size: 0.82rem;
-      }
-
-      .upi-app-btn--phonepe { background: #5f259f; }
-      .upi-app-btn--gpay { background: #1a73e8; }
-      .upi-app-btn--paytm { background: #00baf2; color: #003a4d; }
 
       .btn.full { width: 100%; margin-top: 8px; }
 
@@ -826,25 +758,11 @@
                 <strong>Pay with Cash</strong>
                 <small>Book order &amp; pay at counter</small>
               </button>
-              <button class="pay-btn pay-btn--upi checkout-pay-btn" id="upiCheckoutBtn" type="button">
-                <span class="pay-btn__icon">UPI</span>
-                <strong>Pay with UPI</strong>
-                <small>PhonePe · GPay · Paytm</small>
+              <button class="pay-btn pay-btn--cashfree checkout-pay-btn" id="cashfreeCheckoutBtn" type="button">
+                <span class="pay-btn__icon">↗</span>
+                <strong>Pay Online with Cashfree</strong>
+                <small>Choose an available method in Cashfree Checkout</small>
               </button>
-            </div>
-            <div id="checkoutUpiPanel" class="checkout-upi-panel hidden">
-              <p class="checkout-upi-hint">Amount is pre-filled. Pay the restaurant UPI, then tap confirm.</p>
-              <div class="upi-app-grid">
-                <a id="customerUpiPhonePe" class="upi-app-btn upi-app-btn--phonepe" href="#">PhonePe</a>
-                <a id="customerUpiGPay" class="upi-app-btn upi-app-btn--gpay" href="#">Google Pay</a>
-                <a id="customerUpiPaytm" class="upi-app-btn upi-app-btn--paytm" href="#">Paytm</a>
-              </div>
-              <p id="checkoutUpiVpa" class="checkout-upi-vpa"></p>
-              <form id="customerUpiRequestForm" class="checkout-upi-form">
-                <input id="customerUpiId" type="text" placeholder="Your UPI ID (optional)" />
-                <button class="btn btn-light" type="submit">Send payment request</button>
-              </form>
-              <button id="customerUpiPaidBtn" class="btn btn-primary checkout-confirm-paid" type="button">I have paid — show receipt</button>
             </div>
             <p id="checkoutPayMessage" class="checkout-pay-message"></p>
           </section>
@@ -888,9 +806,7 @@
         customerName: document.getElementById('customerName'),
         orderNotes: document.getElementById('orderNotes'),
         cashCheckoutBtn: document.getElementById('cashCheckoutBtn'),
-        upiCheckoutBtn: document.getElementById('upiCheckoutBtn'),
-        checkoutUpiPanel: document.getElementById('checkoutUpiPanel'),
-        checkoutUpiVpa: document.getElementById('checkoutUpiVpa'),
+        cashfreeCheckoutBtn: document.getElementById('cashfreeCheckoutBtn'),
         checkoutPayMessage: document.getElementById('checkoutPayMessage'),
         closeCheckoutBtn: document.getElementById('closeCheckoutBtn'),
         trackingState: document.getElementById('trackingState'),
@@ -919,7 +835,6 @@
         invoicePayload: null,
         estimatedMinutes: '15-20',
         checkoutIdempotencyKey: null,
-        pendingUpiOrderId: null,
         tableLocked: false,
       };
 
@@ -1256,29 +1171,9 @@
         els.checkoutPayMessage.style.color = isError ? 'var(--danger)' : 'var(--success)';
       }
 
-      function hideCheckoutUpiPanel() {
-        els.checkoutUpiPanel?.classList.add('hidden');
-        state.pendingUpiOrderId = null;
-      }
-
-      function showCheckoutUpiPanel(orderId, amount) {
-        const vpa = state.context?.restaurant?.upi_vpa || '';
-        if (!vpa) {
-          setCheckoutPayMessage('Restaurant UPI is not set. Ask staff or pay with Cash.', true);
-          return false;
-        }
-        if (!bindCustomerUpiLinks(orderId, amount)) return false;
-        if (els.checkoutUpiVpa) {
-          els.checkoutUpiVpa.textContent = `Pay to: ${vpa}`;
-        }
-        els.checkoutUpiPanel?.classList.remove('hidden');
-        return true;
-      }
-
       function openCheckoutModal() {
         const { count, subtotal } = cartTotals();
         if (!count) return;
-        hideCheckoutUpiPanel();
         setCheckoutPayMessage('');
         els.checkoutSummary.innerHTML = `
           <div class="invoice-box" style="padding:14px;">
@@ -1301,7 +1196,6 @@
         els.checkoutModal.classList.add('hidden');
         els.checkoutModal.setAttribute('aria-hidden', 'true');
         document.body.style.overflow = '';
-        hideCheckoutUpiPanel();
         setCheckoutPayMessage('');
       }
 
@@ -1646,40 +1540,22 @@
         }
       }
 
-      function bindCustomerUpiLinks(orderId, amount) {
-        const vpa = state.context.restaurant.upi_vpa || '';
-        if (!vpa) return false;
-        const params = new URLSearchParams({
-          pa: vpa,
-          pn: state.context.restaurant.name,
-          am: Number(amount || 0).toFixed(2),
-          cu: 'INR',
-          tn: `Order ${orderId} Table ${state.context.table.table_number}`,
-        });
-        const upiUrl = `upi://pay?${params.toString()}`;
-        document.getElementById('customerUpiPhonePe').href = upiUrl;
-        document.getElementById('customerUpiGPay').href = upiUrl;
-        document.getElementById('customerUpiPaytm').href = upiUrl;
-        return true;
-      }
-
-      async function handleUpiCheckout() {
+      async function handleCashfreeCheckout() {
         try {
-          hideCheckoutUpiPanel();
-          const orderData = await placeOrder('upi');
-          state.pendingUpiOrderId = orderData.orderId;
-          state.activeOrder = buildOrderSnapshot(orderData);
-          lockTableAfterBooking('Complete UPI payment in this window.');
-          clearCartStorage();
-          state.cart.clear();
-          renderCart();
+          setCheckoutPayMessage('Preparing secure Cashfree Checkout...');
+          const orderData = await placeOrder('cashfree');
+          const paymentData = await apiRequest('/api/payments/cashfree/create-order', {
+            method: 'POST',
+            body: JSON.stringify({ orderId: orderData.orderId }),
+          });
 
-          if (!showCheckoutUpiPanel(orderData.orderId, orderData.totalAmount)) {
-            throw new Error('Restaurant UPI is not configured. Use Cash or ask staff.');
+          if (!paymentData.checkoutUrl && !paymentData.paymentSessionId) {
+            throw new Error('Cashfree checkout is not ready. No payment was marked as successful.');
           }
-          setCheckoutPayMessage('Tap a UPI app, pay the amount, then tap “I have paid”.');
+
+          setCheckoutPayMessage('Cashfree Checkout integration is ready for the official SDK.');
         } catch (error) {
-          setCheckoutPayMessage(error.message || 'UPI checkout failed', true);
+          setCheckoutPayMessage(error.message || 'Cashfree checkout is unavailable', true);
         }
       }
 
@@ -1692,35 +1568,7 @@
           if (event.target === els.checkoutModal) closeCheckoutModal();
         });
         els.cashCheckoutBtn?.addEventListener('click', handleCashCheckout);
-        els.upiCheckoutBtn?.addEventListener('click', handleUpiCheckout);
-
-        document.getElementById('customerUpiPaidBtn')?.addEventListener('click', async () => {
-          if (!state.pendingUpiOrderId || !state.activeOrder) {
-            setCheckoutPayMessage('Tap Pay with UPI first to place your order.', true);
-            return;
-          }
-          try {
-            await apiRequest('/api/payments/upi/confirm', {
-              method: 'POST',
-              body: JSON.stringify({ orderId: state.pendingUpiOrderId }),
-            });
-            closeCheckoutModal();
-            await finalizePaidReceipt(state.activeOrder, 'paid');
-          } catch (error) {
-            setCheckoutPayMessage(error.message || 'Could not confirm payment', true);
-          }
-        });
-
-        document.getElementById('customerUpiRequestForm')?.addEventListener('submit', (event) => {
-          event.preventDefault();
-          const guestUpi = document.getElementById('customerUpiId').value.trim();
-          const vpa = state.context?.restaurant?.upi_vpa || '';
-          if (!guestUpi) {
-            setCheckoutPayMessage('Enter your UPI ID or tap a UPI app above.', true);
-            return;
-          }
-          setCheckoutPayMessage(`Open your UPI app and pay ${vpa || 'the restaurant'}. Then tap “I have paid”.`);
-        });
+        els.cashfreeCheckoutBtn?.addEventListener('click', handleCashfreeCheckout);
 
         els.receiptPrintBtn?.addEventListener('click', async () => {
           try {
@@ -1741,46 +1589,6 @@
 
       attachEvents();
       loadTable();
-      // Handle UPI return callback if present in URL
-      (async function handleUpiReturn() {
-        try {
-          const params = new URLSearchParams(window.location.search);
-          if (params.get('upi_return') === '1' && params.get('orderId')) {
-            const orderId = Number(params.get('orderId'));
-            // call backend to confirm UPI payment and get invoice HTML
-            const response = await fetch(`${BACKEND_BASE_URL}/api/payments/upi/confirm`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ orderId }),
-            });
-            if (!response.ok) {
-              const err = await response.json().catch(() => ({}));
-              setError(err.message || 'Unable to confirm UPI payment');
-              return;
-            }
-
-            const html = await response.text();
-            const win = window.open('', '_blank');
-            if (win) {
-              win.document.write(html);
-              win.document.close();
-              win.focus();
-              win.print();
-            }
-
-            // show thank you tracking view and clear cart
-            const paidOrder = { orderId, totalAmount: Number(state.cartTotals?.total || 0) };
-            closeCheckoutModal();
-            setView('tracking');
-            showTrackingView(paidOrder, 'Payment confirmed');
-            clearCart();
-            // remove upi_return params from URL
-            history.replaceState(null, '', window.location.pathname);
-          }
-        } catch (e) {
-          // ignore
-        }
-      })();
     </script>
   </body>
 </html>

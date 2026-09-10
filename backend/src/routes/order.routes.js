@@ -18,7 +18,7 @@ const createOrderSchema = z.object({
   tableSessionId: z.number().int().positive(),
   sessionToken: z.string().min(10),
   customerName: z.string().optional().default(''),
-  paymentMethod: z.enum(['online', 'cod', 'cash', 'upi']),
+  paymentMethod: z.enum(['cash', 'cashfree']),
   items: z.array(z.object({
     menuItemId: z.number(),
     itemPrice: z.number().positive(),
@@ -85,7 +85,7 @@ router.post('/', asyncHandler(async (req, res) => {
       tableSessionId: sessionRows[0].id,
       sessionToken: sessionRows[0].session_token,
       customerName: req.body.customerName || '',
-      paymentMethod: req.body.paymentMethod || 'cod',
+      paymentMethod: req.body.paymentMethod || 'cash',
       notes: req.body.notes || '',
       items: normalizedItems,
     };
@@ -202,9 +202,9 @@ router.post('/', asyncHandler(async (req, res) => {
     const orderResult = await conn.query(
       `INSERT INTO orders (
          restaurant_id, table_id, table_session_id, table_number, customer_name,
-         total_amount, status, payment_method, payment_status, notes, idempotency_key
+         total_amount, status, payment_method, payment_provider, payment_status, notes, idempotency_key
        )
-       VALUES ($1, $2, $3, $4, $5, $6, 'pending', $7, 'pending', $8, $9)
+       VALUES ($1, $2, $3, $4, $5, $6, 'pending', $7, $7, 'pending', $8, $9)
        RETURNING id`,
       [
         data.restaurantId,
@@ -309,8 +309,8 @@ router.post('/:orderId/mark-paid', requireAuth(['owner', 'super_admin']), asyncH
   const orderId = Number(req.params.orderId);
   const method = String(req.body?.method || 'cash').toLowerCase();
 
-  if (!['cash', 'upi'].includes(method)) {
-    return res.status(400).json({ message: 'method must be cash or upi' });
+  if (method !== 'cash') {
+    return res.status(400).json({ message: 'method must be cash' });
   }
 
   const { rows } = await pool.query(
@@ -325,24 +325,17 @@ router.post('/:orderId/mark-paid', requireAuth(['owner', 'super_admin']), asyncH
     return res.json({ message: 'Order already paid', orderId });
   }
 
-  const paymentMethod = method === 'cash' ? 'cash' : 'upi';
-  const customerUpi = String(req.body?.customerUpi || '').trim();
-
   await pool.query(
     `UPDATE orders
-     SET payment_status = 'paid', payment_method = $1, notes = COALESCE(notes, '') || $2
-     WHERE id = $3`,
-    [
-      paymentMethod,
-      customerUpi ? ` | Customer UPI: ${customerUpi}` : '',
-      orderId,
-    ]
+     SET payment_status = 'paid', payment_method = 'cash', payment_provider = 'cash'
+     WHERE id = $1`,
+    [orderId]
   );
 
   await endSessionByOrderId(orderId, 'payment_completed');
   await syncInvoiceForOrder(orderId);
 
-  emitOrderUpdate(rows[0].restaurant_id, { type: 'paid', orderId, method: paymentMethod });
+  emitOrderUpdate(rows[0].restaurant_id, { type: 'paid', orderId, method: 'cash' });
   emitTableUpdate(rows[0].restaurant_id, {
     tableId: rows[0].table_id,
     status: 'available',
@@ -351,9 +344,9 @@ router.post('/:orderId/mark-paid', requireAuth(['owner', 'super_admin']), asyncH
   });
 
   return res.json({
-    message: method === 'cash' ? 'Cash payment recorded' : 'UPI payment recorded and awaiting session termination',
+    message: 'Cash payment recorded',
     orderId,
-    paymentMethod,
+    paymentMethod: 'cash',
   });
 }));
 

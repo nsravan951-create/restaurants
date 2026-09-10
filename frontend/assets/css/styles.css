@@ -868,9 +868,7 @@ body.bill-modal-open {
   color: #fff;
 }
 
-.upi-app-btn--phonepe { background: #5f259f; }
 .upi-app-btn--gpay { background: #1a73e8; }
-.upi-app-btn--paytm { background: #00baf2; color: #003a4d; }
 
 .btn.full { width: 100%; margin-top: 0.5rem; }
 

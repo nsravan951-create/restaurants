@@ -305,7 +305,7 @@ async function placeOrder(paymentMethod) {
 
 async function handleCod() {
   try {
-    const orderData = await placeOrder('cod');
+    const orderData = await placeOrder('cash');
     setMessage('orderMessage', `Order #${orderData.orderId} placed successfully. Wait for staff delivery.`);
     setOrderingLocked(true, 'Order already placed for this active table session.');
     cart.clear();
@@ -317,46 +317,15 @@ async function handleCod() {
 
 async function handleOnline() {
   try {
-    const orderData = await placeOrder('online');
-    const paymentData = await apiRequest('/api/payments/create-order', {
+    const orderData = await placeOrder('cashfree');
+    const paymentData = await apiRequest('/api/payments/cashfree/create-order', {
       method: 'POST',
       body: JSON.stringify({ orderId: orderData.orderId }),
     });
-
-    const options = {
-      key: paymentData.keyId,
-      amount: paymentData.razorpayOrder.amount,
-      currency: 'INR',
-      name: context.restaurant.name,
-      description: `Table ${context.table.table_number} Order`,
-      order_id: paymentData.razorpayOrder.id,
-      handler: async function (response) {
-        try {
-          await apiRequest('/api/payments/verify', {
-            method: 'POST',
-            body: JSON.stringify({
-              orderId: orderData.orderId,
-              razorpay_order_id: response.razorpay_order_id,
-              razorpay_payment_id: response.razorpay_payment_id,
-              razorpay_signature: response.razorpay_signature,
-            }),
-          });
-          setMessage('orderMessage', `Payment successful and order #${orderData.orderId} confirmed`);
-          clearStoredSession(routeState.restaurantId, routeState.tableId);
-          activeSession = null;
-          setOrderingLocked(true, 'Payment completed. Table session ended.');
-          sessionTimerEl.textContent = 'Table is now available for a new session.';
-          cart.clear();
-          renderCart();
-        } catch (error) {
-          setMessage('orderMessage', error.message, true);
-        }
-      },
-      theme: { color: '#e66a3d' },
-    };
-
-    const rzp = new Razorpay(options);
-    rzp.open();
+    if (!paymentData.checkoutUrl && !paymentData.paymentSessionId) {
+      throw new Error('Cashfree checkout is not ready. No payment was marked as successful.');
+    }
+    setMessage('orderMessage', 'Cashfree Checkout is ready for the official SDK integration.');
   } catch (error) {
     setMessage('orderMessage', error.message, true);
   }

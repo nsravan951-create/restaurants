@@ -1,0 +1,539 @@
+RESTAURANT QR ORDERING PLATFORM
+===============================
+
+1. PROJECT OVERVIEW
+-------------------
+This project is a multi-restaurant QR ordering SaaS platform. Customers scan a QR code placed on a restaurant table, view the menu, create an order, pay online or manually, and receive an invoice. Restaurant owners and employees manage restaurants, tables, menus, orders, payments, invoices, and analytics.
+
+The main production architecture is:
+
+- Frontend: Static HTML, CSS, and vanilla JavaScript
+- Backend: Node.js and Express
+- Database: PostgreSQL
+- Authentication: JWT and bcrypt
+- Realtime updates: Socket.IO
+- Payments: Cash and Cashfree Checkout
+- QR generation: qrcode package
+- Validation: Zod
+- Invoices: HTML and PDF using PDFKit
+- Deployment: Railway-style backend deployment and Netlify-style frontend hosting
+
+The main project documentation is in README.md.
+
+2. PROJECT STRUCTURE
+--------------------
+
+backend/
+  server.js                 Starts the HTTP and Socket.IO server
+  app.js                    Configures Express and mounts routes
+  db.js                     Creates the PostgreSQL pool and startup schema checks
+  src/routes/               Authentication, restaurant, menu, order, payment, and admin routes
+  src/middleware/           Authentication and error handling
+  src/services/socket.js    Realtime event helpers
+  src/utils/                QR, sessions, invoices, access, and async helpers
+
+frontend/
+  table.html                Current customer QR ordering page
+  pages/auth.html           Login and owner registration
+  pages/owner.html          Owner dashboard
+  pages/kitchen.html        Kitchen dashboard
+  pages/staff.html          Staff dashboard
+  pages/superadmin.html     Super-admin dashboard
+  pages/invoice.html        Invoice page
+  assets/js/                Frontend application logic
+  assets/css/               Styling
+
+ database/
+  schema.sql                PostgreSQL schema
+  sample_data.sql            Sample data
+  setup_postgresql.sql       Database setup helper
+
+There is also a root Next.js/Supabase implementation. It is an older or alternate path and is separate from the primary static frontend and Express backend flow.
+
+3. BACKEND STARTUP
+------------------
+The backend starts from backend/server.js.
+
+Startup process:
+
+1. Loads environment variables.
+2. Creates an HTTP server using the Express app.
+3. Configures Socket.IO and allowed origins.
+4. Initializes realtime event helpers.
+5. Checks database schema readiness.
+6. Starts listening on PORT, defaulting to 5000.
+7. Runs a session expiration check every 60 seconds.
+
+Express configuration is in backend/app.js. It handles CORS, JSON parsing, request logging, health checks, route registration, error handling, and invalid URL responses.
+
+Health check:
+
+GET /api/health
+
+4. USER ROLES
+-------------
+The database supports four roles:
+
+- owner: Manages one restaurant, tables, QR codes, menu, bills, payments, and invoices
+- kitchen: Views incoming orders and updates preparation status
+- staff: Views ready orders and marks them delivered
+- super_admin: Manages the complete platform and all restaurants
+
+Authentication uses JWT. The client sends:
+
+Authorization: Bearer <JWT_TOKEN>
+
+The backend verifies the token and stores user information in req.user. Restaurant access is then checked so users cannot access another restaurant's data.
+
+5. OWNER REGISTRATION AND LOGIN
+-------------------------------
+Owner registration uses:
+
+POST /api/auth/register-owner
+
+The backend:
+
+1. Validates the request with Zod.
+2. Checks whether the email already exists.
+3. Hashes the password with bcrypt.
+4. Creates an owner user.
+5. Creates a restaurant.
+6. Generates the requested number of tables.
+7. Generates a QR code for every table.
+8. Associates the owner with the restaurant.
+9. Returns a JWT and restaurant information.
+
+This operation uses a PostgreSQL transaction.
+
+Login uses:
+
+POST /api/auth/login
+
+The backend compares the submitted password with the bcrypt password hash and returns the JWT, user role, and restaurant information.
+
+Authentication code is in backend/src/routes/auth.routes.js and backend/src/middleware/auth.js.
+
+6. QR CODE FLOW
+---------------
+Each restaurant table has:
+
+- A table ID
+- A table number
+- A unique QR token
+- A QR URL
+- A generated QR image
+
+QR generation is implemented in backend/src/utils/qr.js.
+
+The canonical URL is:
+
+https://restaurantts.netlify.app/table.html?id={tableId}
+
+When a customer scans the QR code:
+
+1. table.html reads the table ID from the URL.
+2. It calls GET /api/restaurants/table/:tableId.
+3. The backend returns restaurant data, table data, menu items, payment details, and current lock information.
+4. The customer can start or join a table session.
+
+This endpoint is useful because the frontend does not need to know the restaurant ID before scanning the QR code.
+
+7. TABLE SESSION FLOW
+---------------------
+A table session represents a customer's active visit. Session logic is implemented in:
+
+- backend/src/routes/tableSession.routes.js
+- backend/src/utils/tableSession.js
+
+The customer starts a session with:
+
+POST /api/table-sessions/start
+
+The backend:
+
+1. Validates the restaurant and table.
+2. Locks the table row during the operation.
+3. Checks whether the table is already marked as paid.
+4. Checks whether another active session exists.
+5. Allows the original customer to resume using the session token.
+6. Allows another customer to join before an order exists.
+7. Rejects another customer after an order has been placed.
+8. Creates a secure random session token.
+9. Sets the session expiration time.
+10. Changes the table status to active.
+11. Emits a realtime table update.
+
+The default timeout is 20 minutes and can be changed with:
+
+TABLE_SESSION_TIMEOUT_MINUTES
+
+The frontend periodically calls:
+
+POST /api/table-sessions/:sessionId/ping
+
+This refreshes the expiration time. The backend also checks for expired sessions every minute.
+
+Table availability states are:
+
+- available: Ready for a new customer
+- active: A customer has started a session
+- paid: Payment has completed or the owner must reset the table
+
+8. CUSTOMER ORDERING FLOW
+-------------------------
+The current customer experience is frontend/table.html. Related logic also exists in frontend/assets/js/customer.js.
+
+The customer flow is:
+
+1. Scan the QR code.
+2. Load restaurant, table, and menu information.
+3. Start or join a table session.
+4. Browse available menu items.
+5. Add items to the cart.
+6. Choose a payment method.
+7. Submit the order.
+8. Wait while the kitchen prepares it.
+9. Receive the order from staff.
+10. Complete payment if payment was not made online.
+
+The cart and session information are stored in browser localStorage. The session token lets the customer refresh the page or resume the same session.
+
+9. ORDER CREATION
+-----------------
+Orders are implemented in backend/src/routes/order.routes.js.
+
+The main endpoint is:
+
+POST /api/orders
+
+The request contains:
+
+- Restaurant ID
+- Table ID
+- Table session ID
+- Session token
+- Customer name
+- Payment method
+- Menu items and quantities
+- Optional notes
+
+The backend verifies:
+
+- The table belongs to the restaurant.
+- The session belongs to the table.
+- The session is still active.
+- The session token matches.
+- Menu items belong to the restaurant.
+- Menu items are available.
+- No order already exists for the session.
+
+The backend stores menu prices in order_items when the order is created. This keeps old invoices correct even when menu prices change later.
+
+An idempotency key is supported to protect against duplicate order requests.
+
+Order statuses:
+
+- pending
+- preparing
+- ready
+- delivered
+
+Payment statuses:
+
+- pending
+- paid
+- failed
+
+10. KITCHEN FLOW
+----------------
+The kitchen interface is controlled by frontend/assets/js/kitchen.js.
+
+Kitchen users:
+
+1. Log in with the kitchen role.
+2. Load restaurant orders.
+3. View pending orders.
+4. Mark orders as preparing.
+5. Mark orders as ready.
+6. Print invoices when needed.
+
+The kitchen dashboard listens for Socket.IO order updates, allowing new orders to appear without a manual refresh.
+
+11. STAFF FLOW
+--------------
+The staff interface is controlled by frontend/assets/js/staff.js.
+
+Staff users:
+
+1. Log in with the staff role.
+2. View orders that are ready.
+3. Deliver the food.
+4. Mark the order as delivered.
+5. Print the invoice.
+
+Order status changes use:
+
+PATCH /api/orders/:orderId/status
+
+12. OWNER DASHBOARD
+-------------------
+The owner dashboard is controlled by frontend/assets/js/owner.js.
+
+Owners can manage:
+
+- Restaurant profile
+- Tables
+- QR codes
+- Menu items
+- Running bills
+- Cash payments
+- UPI payments
+- Invoices
+- Analytics
+- Payment settings
+- Bank details
+- UPI details
+- Restaurant logo
+- Thank-you message
+
+The table display uses these states:
+
+- White: available
+- Orange: active customer session
+- Green: paid
+
+Owners can use Terminal Reset to make a paid table available again.
+
+13. PAYMENT FLOW
+----------------
+Customer checkout has exactly two choices: Cash and Cashfree.
+
+Cash:
+
+1. The customer places an order with payment_provider=cash.
+2. The order remains pending payment.
+3. Staff or the owner confirms the cash payment.
+4. The session ends and the invoice is synchronized.
+
+Cashfree:
+
+POST /api/payments/cashfree/create-order
+POST /api/payments/cashfree/webhook
+GET /api/payments/cashfree/return
+
+The backend calculates the amount from the stored order, creates a provider transaction, and must verify payment using Cashfree's official server-side API or webhook before changing payment_status to paid. The current adapter intentionally refuses to create or confirm payments until the official Cashfree SDK/API contract is supplied.
+
+Owners can manually record cash payments using:
+
+POST /api/orders/:orderId/mark-paid
+
+14. INVOICES
+-----------
+Invoices are generated from stored order and order item data.
+
+The backend supports:
+
+- Invoice HTML
+- Invoice PDF
+- Invoice JSON data
+- Invoice synchronization
+
+Invoice data is stored in the invoice_syncs table, including:
+
+- Restaurant
+- Table
+- Order
+- Customer
+- Payment status
+- Total amount
+- Item data
+- Invoice payload
+- Timestamps
+
+Invoices remain stable because item names and prices are copied into order_items at order creation time.
+
+15. REALTIME UPDATES
+--------------------
+Socket.IO is configured in backend/server.js and backend/src/services/socket.js.
+
+Clients join a restaurant-specific room using:
+
+socket.emit('restaurant:join', restaurantId)
+
+Important events include:
+
+- order:update: Restaurant-specific order changes
+- order:update:global: Platform-wide order updates for super admin
+- table:update: Table session, payment, and availability changes
+- invoice:created: New invoice notifications
+
+Examples:
+
+- A customer starts a session and the owner table becomes active.
+- A customer places an order and the kitchen receives it.
+- Kitchen status changes refresh staff and owner screens.
+- Payment completion updates the owner dashboard.
+
+16. DATABASE DESIGN
+-------------------
+The database schema is in database/schema.sql.
+
+Main tables:
+
+- users
+- restaurants
+- restaurant_tables
+- qr_codes
+- table_sessions
+- menu_items
+- orders
+- order_items
+- invoice_syncs
+- ads
+- admin_messages
+- message_recipients
+
+Relationships:
+
+User -> Restaurant
+Restaurant -> Tables
+Table -> QR Code
+Table -> Table Sessions
+Table Session -> Order
+Order -> Order Items
+Order -> Invoice
+Restaurant -> Menu Items
+
+Foreign keys, unique constraints, indexes, check constraints, and transactions protect data integrity.
+
+17. ADVERTISEMENTS AND SUPER ADMIN
+----------------------------------
+Advertisements can be global or linked to a specific restaurant. Ads support images, videos, target links, date ranges, impressions, and clicks.
+
+The super-admin dashboard can manage:
+
+- Restaurants
+- Restaurant activity
+- Revenue analytics
+- Order analytics
+- Advertisements
+- Platform orders
+- Invoices
+- Admin messages
+- Payment information
+
+Super-admin endpoints are protected with the super_admin role.
+
+18. API ROUTE GROUPS
+--------------------
+The Express app registers these route groups:
+
+/api/auth
+/api/restaurants
+/api/menu
+/api/orders
+/api/payments
+/api/invoices
+/api/table-sessions
+/api/ads
+/api/admin
+/api/platform-orders
+/api/admin/messages
+
+Some compatibility aliases also exist, such as /auth, /restaurants, /menu, /orders, /payments, /tables, and /sessions.
+
+19. SECURITY AND VALIDATION
+---------------------------
+The project uses:
+
+- bcrypt password hashing
+- JWT authentication
+- Role-based authorization
+- Restaurant access checks
+- Zod request validation
+- PostgreSQL parameterized queries
+- CORS restrictions
+- Cashfree server-side verification when the official provider contract is configured
+- UPI webhook signature checking
+- Random table session tokens
+- PostgreSQL row locks
+- Idempotency keys
+- Foreign keys and database constraints
+
+Customers do not need normal user accounts. Their access is controlled by the table session token.
+
+20. RUNNING THE PROJECT
+----------------------
+Database setup:
+
+createdb qr_restaurant
+psql -d qr_restaurant -f database/schema.sql
+psql -d qr_restaurant -f database/sample_data.sql
+
+Backend setup:
+
+cd backend
+npm install
+npm run dev
+
+Backend URL:
+
+http://localhost:5000
+
+Frontend setup:
+
+Serve the frontend directory using Live Server or:
+
+npx serve frontend
+
+Important environment variables:
+
+DATABASE_URL
+JWT_SECRET
+CORS_ORIGIN
+FRONTEND_PUBLIC_URL
+CASHFREE_CLIENT_ID
+CASHFREE_CLIENT_SECRET
+CASHFREE_ENVIRONMENT
+CASHFREE_API_VERSION
+CASHFREE_RETURN_URL
+CASHFREE_WEBHOOK_URL
+TABLE_SESSION_TIMEOUT_MINUTES
+
+21. CURRENT ARCHITECTURE NOTE
+-----------------------------
+The repository contains two overlapping architectures.
+
+Primary production flow:
+
+QR code -> Static frontend -> Express backend -> PostgreSQL -> Socket.IO/payment/invoice services
+
+Alternate older flow:
+
+Next.js pages/API routes -> Supabase and some in-memory API behavior
+
+The alternate implementation includes the root package.json, pages/, api/, and Supabase helper files. The current static frontend and Express backend do not use that path for their main ordering workflow.
+
+22. COMPLETE BUSINESS FLOW
+--------------------------
+
+1. Owner registers a restaurant.
+2. Backend creates the owner, restaurant, tables, and QR codes.
+3. Owner manages the menu.
+4. Customer scans a table QR code.
+5. Frontend loads the table context and menu.
+6. Customer starts a table session.
+7. Table becomes active.
+8. Customer adds food items to the cart.
+9. Customer submits one order for that session.
+10. Kitchen receives the order in realtime.
+11. Kitchen marks the order preparing and ready.
+12. Staff delivers the food.
+13. Customer or owner completes payment.
+14. Backend verifies or records payment.
+15. Backend ends the table session.
+16. Backend synchronizes the invoice.
+17. Owner sees the updated payment and invoice state.
+18. The table can be reset and made available for the next customer.
+
+The central business rule is that a table has one active session and one order per session. This prevents multiple unrelated bills from being created for the same table visit.

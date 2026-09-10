@@ -36,3 +36,5 @@
 - Admin: `/admin/*`
 
 Order items persist `item_price` so invoices and bill totals remain stable even if the menu changes later.
+
+Customer checkout supports exactly two choices: Cash and Cashfree. Cashfree routes are prepared but intentionally do not create or confirm provider payments until the official Cashfree SDK/API contract and credentials are configured. Historical provider fields remain readable.

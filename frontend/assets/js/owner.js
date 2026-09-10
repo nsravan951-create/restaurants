@@ -332,15 +332,15 @@ async function printInvoiceForOrder(orderId) {
   }
 }
 
-async function markBillPaid(method, customerUpi = '') {
+async function markBillPaid(method) {
   if (!activeBillOrder) return;
   const orderId = activeBillOrder.id;
   await apiRequest(`/orders/${orderId}/mark-paid`, {
     method: 'POST',
-    body: JSON.stringify({ method, customerUpi }),
+    body: JSON.stringify({ method }),
   }, true);
   hideBillModal();
-  setMessage('ownerMessage', method === 'cash' ? 'Cash recorded — table is ready for the next guest.' : 'UPI payment confirmed.');
+  setMessage('ownerMessage', 'Cash recorded — table is ready for the next guest.');
   await loadTables();
   await loadInvoices();
   await printInvoiceForOrder(orderId);
@@ -1003,7 +1003,7 @@ if (paymentSettingsForm) {
         }),
       }, true);
       await loadRestaurant();
-      setMessage('ownerMessage', 'Payment details saved for UPI checkout.');
+      setMessage('ownerMessage', 'Restaurant payment details saved for administration.');
     } catch (error) {
       setMessage('ownerMessage', error.message, true);
     }

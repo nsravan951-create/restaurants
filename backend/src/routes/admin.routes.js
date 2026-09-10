@@ -186,7 +186,7 @@ router.get('/stats', asyncHandler(async (req, res) => {
   const { rows: pendingPaymentsRows } = await pool.query("SELECT COUNT(*)::int AS total FROM orders WHERE payment_status='pending'");
   stats.pendingPayments = pendingPaymentsRows[0] ? pendingPaymentsRows[0].total : 0;
 
-  const { rows: onlinePaymentsRows } = await pool.query("SELECT COUNT(*)::int AS total FROM orders WHERE payment_method='online' AND payment_status='paid'");
+  const { rows: onlinePaymentsRows } = await pool.query("SELECT COUNT(*)::int AS total FROM orders WHERE (payment_provider='cashfree' OR payment_method='online') AND payment_status='paid'");
   stats.onlinePayments = onlinePaymentsRows[0] ? onlinePaymentsRows[0].total : 0;
 
   const { rows: cashOrdersRows } = await pool.query("SELECT COUNT(*)::int AS total FROM orders WHERE payment_method='cod'");

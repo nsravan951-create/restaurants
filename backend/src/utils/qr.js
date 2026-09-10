@@ -1,6 +1,6 @@
 const QRCode = require('qrcode');
 
-const DEFAULT_FRONTEND_ORIGIN = 'https://restaurantts.netlify.app';
+const DEFAULT_FRONTEND_ORIGIN = 'https://autoresto.in';
 
 /**
  * Canonical customer URL: https://restaurantts.netlify.app/table.html?id=71
