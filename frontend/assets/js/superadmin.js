@@ -55,6 +55,9 @@
 
     if (section === 'profits') loadSaasProfits();
     if (section === 'platform') loadPlatformOrders();
+    if (section === 'reconciliation') loadReconciliation();
+    if (section === 'team') loadTeamPanel();
+    if (section === 'audit') loadAuditLogs();
   }
 
   function setMessage(message, isError = false) {
@@ -1300,8 +1303,115 @@
     const adCancelButton = el('adCancelButton');
     if (adCancelButton) adCancelButton.addEventListener('click', clearAdForm);
 
+    el('reconRefreshBtn')?.addEventListener('click', loadReconciliation);
+    el('reconSearch')?.addEventListener('input', () => {
+      clearTimeout(window.__reconTimer);
+      window.__reconTimer = setTimeout(loadReconciliation, 300);
+    });
+    el('teamCreateForm')?.addEventListener('submit', (e) => {
+      handleTeamCreate(e).catch((error) => setMessage(error.message, true));
+    });
+
     // Attach messaging events
     attachMessageEvents();
+  }
+
+  async function loadReconciliation() {
+    const q = el('reconSearch')?.value || '';
+    const data = await apiRequest(`/api/admin/reconciliation/transactions?q=${encodeURIComponent(q)}`, {}, true);
+    const summary = data.summary || {};
+    const root = el('reconSummaryCards');
+    if (root) {
+      root.innerHTML = [
+        ['Gross paid', formatMoney(summary.gross_paid)],
+        ['Total commission', formatMoney(summary.total_commission)],
+        ['Net to restaurants', formatMoney(summary.net_to_restaurants)],
+        ['Records', summary.total_count || 0],
+      ].map(([label, value]) => `<article class="summary-card"><p>${label}</p><strong>${value}</strong></article>`).join('');
+    }
+
+    const rows = data.transactions || [];
+    const table = el('reconTable');
+    if (!table) return;
+    table.innerHTML = `
+      <table class="admin-table">
+        <thead><tr>
+          <th>Order</th><th>Restaurant</th><th>Gross</th><th>Commission</th><th>Restaurant amt</th>
+          <th>Cashfree order</th><th>Payment</th><th>Date</th>
+        </tr></thead>
+        <tbody>
+          ${rows.map((r) => `
+            <tr>
+              <td>#${r.order_id}<div class="small">${escapeHtml(r.invoice_number || '')}</div></td>
+              <td>${escapeHtml(r.restaurant_name)}</td>
+              <td>${formatMoney(r.gross_amount)}</td>
+              <td>${formatMoney(r.commission_amount)}</td>
+              <td>${formatMoney(r.restaurant_amount)}</td>
+              <td><small>${escapeHtml(r.cashfree_order_id || '—')}</small></td>
+              <td>${escapeHtml(r.payment_status)} / ${escapeHtml(r.payment_provider || '')}</td>
+              <td>${formatDate(r.created_at)}</td>
+            </tr>
+          `).join('') || '<tr><td colspan="8">No transactions found.</td></tr>'}
+        </tbody>
+      </table>`;
+  }
+
+  async function loadTeamPanel() {
+    const rolesData = await apiRequest('/api/team/roles', {}, true);
+    const membersData = await apiRequest('/api/team/members', {}, true);
+
+    const matrix = el('teamRoleMatrix');
+    if (matrix) {
+      const grouped = {};
+      (rolesData.mappings || []).forEach((row) => {
+        if (!grouped[row.role]) grouped[row.role] = [];
+        grouped[row.role].push(row.permission_key);
+      });
+      matrix.innerHTML = Object.entries(grouped).map(([role, perms]) => `
+        <article class="admin-list-item">
+          <strong>${escapeHtml(role.replace(/_/g, ' '))}</strong>
+          <p>${perms.map((p) => `<span class="chip">${escapeHtml(p)}</span>`).join(' ')}</p>
+        </article>
+      `).join('');
+    }
+
+    const list = el('teamMembersList');
+    if (list) {
+      list.innerHTML = (membersData.members || []).map((m) => `
+        <article class="admin-list-item">
+          <div>
+            <strong>${escapeHtml(m.name)}</strong>
+            <p>${escapeHtml(m.email)} · ${escapeHtml(m.role.replace(/_/g, ' '))}</p>
+          </div>
+          <span class="chip">${m.is_active ? 'Active' : 'Inactive'}</span>
+        </article>
+      `).join('') || '<p>No team members yet.</p>';
+    }
+  }
+
+  async function handleTeamCreate(event) {
+    event.preventDefault();
+    const form = event.target;
+    const payload = Object.fromEntries(new FormData(form).entries());
+    await apiRequest('/api/team/members', { method: 'POST', body: JSON.stringify(payload) }, true);
+    form.reset();
+    setMessage('Team member created.');
+    await loadTeamPanel();
+  }
+
+  async function loadAuditLogs() {
+    const data = await apiRequest('/api/admin/audit-logs?limit=150', {}, true);
+    const root = el('auditLogsList');
+    if (!root) return;
+    root.innerHTML = (data.logs || []).map((log) => `
+      <article class="admin-list-item">
+        <div>
+          <strong>${escapeHtml(log.action)}</strong>
+          <p>${escapeHtml(log.resource_type)} ${escapeHtml(log.resource_id || '')} · role ${escapeHtml(log.actor_role || '—')}</p>
+          <small>${formatDate(log.created_at)}</small>
+        </div>
+      </article>
+    `).join('') || '<p>No audit logs recorded yet.</p>';
   }
 
   function ensureAdminAuth() {

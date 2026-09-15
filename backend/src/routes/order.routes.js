@@ -12,6 +12,10 @@ const { buildInvoiceModel, renderInvoiceHtml, buildInvoicePdf } = require('../ut
 const { syncInvoiceForOrder } = require('../utils/invoiceSync');
 const { completeCashPayment } = require('../utils/paymentCompletion');
 const { validateCoupon, recordCouponRedemption } = require('../utils/coupons');
+const { calculateGstBreakdown, getRestaurantGstProfile } = require('../utils/gst');
+const { renderKotHtml, renderThermalBillHtml } = require('../utils/kot');
+const { calculateGstBreakdown, getRestaurantGstProfile } = require('../utils/gst');
+const { renderKotHtml, renderThermalBillHtml } = require('../utils/kot');
 
 const router = express.Router();
 
@@ -221,15 +225,22 @@ router.post('/', publicOrderLimiter, asyncHandler(async (req, res) => {
       couponMeta = couponResult;
     }
 
-    const total = Math.max(0, Number((subtotal - discountAmount).toFixed(2)));
+    const { rows: gstRows } = await conn.query(
+      'SELECT default_gst_rate FROM restaurants WHERE id = $1 LIMIT 1',
+      [data.restaurantId]
+    );
+    const gstRate = Number(gstRows[0]?.default_gst_rate || process.env.GST_PERCENT || 0);
+    const tax = calculateGstBreakdown({ subtotal, discountAmount, gstRate, isInterState: false });
 
     const orderResult = await conn.query(
       `INSERT INTO orders (
          restaurant_id, table_id, table_session_id, table_number, customer_name,
-         total_amount, discount_amount, coupon_code, status, payment_method, payment_provider,
+         total_amount, subtotal_amount, discount_amount, taxable_amount,
+         cgst_amount, sgst_amount, igst_amount, gst_rate,
+         coupon_code, status, payment_method, payment_provider,
          payment_status, notes, idempotency_key
        )
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'pending', $9, $9, 'pending', $10, $11)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, 'pending', $15, $15, 'pending', $16, $17)
        RETURNING id`,
       [
         data.restaurantId,
@@ -237,8 +248,14 @@ router.post('/', publicOrderLimiter, asyncHandler(async (req, res) => {
         data.tableSessionId,
         tableRows[0].table_number,
         data.customerName,
-        total,
-        discountAmount,
+        tax.grandTotal,
+        tax.subtotal,
+        tax.discountAmount,
+        tax.taxableAmount,
+        tax.cgstAmount,
+        tax.sgstAmount,
+        tax.igstAmount,
+        tax.gstRate,
         couponMeta?.code || null,
         data.paymentMethod,
         data.notes,
@@ -491,18 +508,37 @@ router.post('/:orderId/items', requireAuth(['owner', 'super_admin', 'kitchen', '
   }
 }));
 
-router.get('/:orderId/invoice', requireAuth(['owner', 'super_admin', 'kitchen', 'staff']), asyncHandler(async (req, res) => {
-  const { orderId } = req.params;
-  const format = (req.query.format || 'html').toLowerCase();
-
+async function loadInvoiceContext(orderId) {
   const { rows: orderRows } = await pool.query(
-    'SELECT id, restaurant_id, table_number, customer_name, total_amount, status, payment_method, payment_status, created_at FROM orders WHERE id = $1 LIMIT 1',
+    `SELECT id, restaurant_id, table_number, customer_name, total_amount, subtotal_amount,
+            discount_amount, taxable_amount, cgst_amount, sgst_amount, igst_amount, gst_rate,
+            invoice_number, status, payment_method, payment_provider, payment_status, notes, created_at
+     FROM orders WHERE id = $1 LIMIT 1`,
+    [orderId]
+  );
+  if (!orderRows.length) return null;
+
+  const restaurant = await getRestaurantGstProfile(pool, orderRows[0].restaurant_id);
+  const { rows: itemRows } = await pool.query(
+    `SELECT item_name, item_price, quantity, line_total
+     FROM order_items WHERE order_id = $1 ORDER BY id ASC`,
     [orderId]
   );
 
-  if (!orderRows.length) {
-    return res.status(404).json({ message: 'Order not found' });
-  }
+  return { order: orderRows[0], restaurant, items: itemRows };
+}
+
+router.get('/:orderId/kot', requireAuth(['owner', 'super_admin', 'kitchen', 'staff']), asyncHandler(async (req, res) => {
+  const orderId = Number(req.params.orderId);
+  const format = String(req.query.format || 'html').toLowerCase();
+  const printType = req.query.reprint === 'true' ? 'reprint' : 'kot';
+
+  const { rows: orderRows } = await pool.query(
+    `SELECT id, restaurant_id, table_number, customer_name, notes, status, created_at, kot_print_count
+     FROM orders WHERE id = $1 LIMIT 1`,
+    [orderId]
+  );
+  if (!orderRows.length) return res.status(404).json({ message: 'Order not found' });
 
   await ensureRestaurantAccess(req.user, orderRows[0].restaurant_id);
 
@@ -510,16 +546,51 @@ router.get('/:orderId/invoice', requireAuth(['owner', 'super_admin', 'kitchen', 
     'SELECT id, name FROM restaurants WHERE id = $1 LIMIT 1',
     [orderRows[0].restaurant_id]
   );
-
   const { rows: itemRows } = await pool.query(
-    `SELECT item_name, item_price, quantity, line_total
-     FROM order_items
-     WHERE order_id = $1
-     ORDER BY id ASC`,
+    'SELECT item_name, quantity FROM order_items WHERE order_id = $1 ORDER BY id ASC',
     [orderId]
   );
 
-  const model = buildInvoiceModel(orderRows[0], restaurantRows[0], itemRows);
+  await pool.query(
+    `INSERT INTO kot_prints (order_id, restaurant_id, printed_by_user_id, print_type)
+     VALUES ($1, $2, $3, $4)`,
+    [orderId, orderRows[0].restaurant_id, req.user.userId, printType]
+  );
+  await pool.query(
+    'UPDATE orders SET kot_print_count = kot_print_count + 1 WHERE id = $1',
+    [orderId]
+  );
+
+  const html = renderKotHtml({
+    restaurant: restaurantRows[0],
+    order: orderRows[0],
+    items: itemRows,
+    printType,
+  });
+
+  if (format === 'json') {
+    return res.json({ message: 'KOT ready', orderId, printType, html });
+  }
+  return res.send(html);
+}));
+
+router.get('/:orderId/thermal-bill', requireAuth(['owner', 'super_admin', 'kitchen', 'staff']), asyncHandler(async (req, res) => {
+  const orderId = Number(req.params.orderId);
+  const ctx = await loadInvoiceContext(orderId);
+  if (!ctx) return res.status(404).json({ message: 'Order not found' });
+  await ensureRestaurantAccess(req.user, ctx.order.restaurant_id);
+  const model = buildInvoiceModel(ctx.order, ctx.restaurant, ctx.items);
+  return res.send(renderThermalBillHtml(model));
+}));
+
+router.get('/:orderId/invoice', requireAuth(['owner', 'super_admin', 'kitchen', 'staff']), asyncHandler(async (req, res) => {
+  const { orderId } = req.params;
+  const format = (req.query.format || 'html').toLowerCase();
+  const ctx = await loadInvoiceContext(orderId);
+  if (!ctx) return res.status(404).json({ message: 'Order not found' });
+  await ensureRestaurantAccess(req.user, ctx.order.restaurant_id);
+
+  const model = buildInvoiceModel(ctx.order, ctx.restaurant, ctx.items);
 
   if (format === 'pdf') {
     return buildInvoicePdf(res, model);
@@ -530,32 +601,10 @@ router.get('/:orderId/invoice', requireAuth(['owner', 'super_admin', 'kitchen', 
 
 router.get('/:orderId/invoice-data', requireAuth(['owner', 'super_admin', 'kitchen', 'staff']), asyncHandler(async (req, res) => {
   const { orderId } = req.params;
-
-  const { rows: orderRows } = await pool.query(
-    'SELECT id, restaurant_id, table_number, customer_name, total_amount, status, payment_method, payment_status, created_at FROM orders WHERE id = $1 LIMIT 1',
-    [orderId]
-  );
-
-  if (!orderRows.length) {
-    return res.status(404).json({ message: 'Order not found' });
-  }
-
-  await ensureRestaurantAccess(req.user, orderRows[0].restaurant_id);
-
-  const { rows: restaurantRows } = await pool.query(
-    'SELECT id, name FROM restaurants WHERE id = $1 LIMIT 1',
-    [orderRows[0].restaurant_id]
-  );
-
-  const { rows: itemRows } = await pool.query(
-    `SELECT item_name, item_price, quantity, line_total
-     FROM order_items
-     WHERE order_id = $1
-     ORDER BY id ASC`,
-    [orderId]
-  );
-
-  const model = buildInvoiceModel(orderRows[0], restaurantRows[0], itemRows);
+  const ctx = await loadInvoiceContext(orderId);
+  if (!ctx) return res.status(404).json({ message: 'Order not found' });
+  await ensureRestaurantAccess(req.user, ctx.order.restaurant_id);
+  const model = buildInvoiceModel(ctx.order, ctx.restaurant, ctx.items);
   return res.json({ invoice: model });
 }));
 

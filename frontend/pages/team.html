@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>AutoResto Team Dashboard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@600;700&family=Sora:wght@400;500;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="../assets/css/styles.css" />
+  <link rel="stylesheet" href="../assets/css/superadmin.css" />
+  <script src="../assets/js/config.js"></script>
+  <script src="../assets/js/common.js"></script>
+</head>
+<body class="theme-dark">
+  <div class="admin-shell">
+    <aside class="admin-sidebar panel">
+      <div>
+        <p class="eyebrow admin-eyebrow">AutoResto Team</p>
+        <h1 id="teamUserName">Team Dashboard</h1>
+        <p class="admin-intro" id="teamRoleLabel">Role-specific workspace with least-privilege access.</p>
+      </div>
+      <nav class="admin-nav" id="teamNav"></nav>
+      <div class="admin-sidebar__footer">
+        <button id="teamLogoutBtn" class="btn btn-light" type="button">Logout</button>
+      </div>
+    </aside>
+
+    <main class="admin-main">
+      <header class="panel admin-topbar">
+        <div>
+          <p class="eyebrow">Internal operations</p>
+          <h2 id="teamSectionTitle">Overview</h2>
+        </div>
+      </header>
+
+      <section id="team-overview" class="admin-section">
+        <div id="teamSummaryCards" class="summary-grid"></div>
+        <article class="panel">
+          <div class="section-head"><div><h3>Your permissions</h3><p>Granted capabilities for your role.</p></div></div>
+          <div id="teamPermissions" class="stack"></div>
+        </article>
+      </section>
+
+      <section id="team-reconciliation" class="admin-section hidden">
+        <div class="admin-toolbar" style="margin-bottom:1rem;">
+          <input id="teamReconSearch" class="admin-search" placeholder="Search order, restaurant, Cashfree ID..." />
+          <button id="teamReconRefresh" class="btn btn-light" type="button">Refresh</button>
+        </div>
+        <div id="teamReconSummary" class="summary-grid"></div>
+        <div id="teamReconTable" class="admin-table-wrap panel"></div>
+      </section>
+
+      <section id="team-restaurants" class="admin-section hidden">
+        <div id="teamRestaurantsList" class="admin-list"></div>
+      </section>
+
+      <section id="team-audit" class="admin-section hidden">
+        <div id="teamAuditList" class="admin-list"></div>
+      </section>
+
+      <p id="teamMessage" class="message"></p>
+    </main>
+  </div>
+
+  <script src="../assets/js/team.js"></script>
+</body>
+</html>

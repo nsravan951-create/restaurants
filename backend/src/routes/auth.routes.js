@@ -124,7 +124,7 @@ router.post('/login', authLimiter, asyncHandler(async (req, res) => {
   const data = loginSchema.parse(req.body);
 
   const { rows } = await pool.query(
-    'SELECT id, name, email, password_hash, role, restaurant_id FROM users WHERE email = $1',
+    'SELECT id, name, email, password_hash, role, restaurant_id, is_active FROM users WHERE email = $1',
     [data.email]
   );
 
@@ -133,12 +133,17 @@ router.post('/login', authLimiter, asyncHandler(async (req, res) => {
   }
 
   const user = rows[0];
+  if (user.is_active === false) {
+    return res.status(403).json({ message: 'Account is deactivated. Contact your administrator.' });
+  }
+
   const ok = await bcrypt.compare(data.password, user.password_hash);
 
   if (!ok) {
     return res.status(401).json({ message: 'Invalid credentials' });
   }
 
+  await pool.query('UPDATE users SET last_login_at = CURRENT_TIMESTAMP WHERE id = $1', [user.id]);
   const token = signToken(user);
 
   let restaurant = null;

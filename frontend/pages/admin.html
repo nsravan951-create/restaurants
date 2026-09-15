@@ -31,6 +31,9 @@
         <button data-section="messaging" class="admin-link">💬 Messages</button>
         <button data-section="restaurants" class="admin-link">🏢 Restaurants</button>
         <button data-section="analytics" class="admin-link">📈 Analytics</button>
+        <button data-section="reconciliation" class="admin-link">🧾 Reconciliation</button>
+        <button data-section="team" class="admin-link">👥 Team</button>
+        <button data-section="audit" class="admin-link">📋 Audit Logs</button>
         <button id="logoutButton" class="admin-link admin-link--danger">🚪 Logout</button>
       </nav>
 
@@ -280,6 +283,55 @@
           </form>
         </article>
         <div id="messagesList" class="admin-list"></div>
+      </section>
+
+      <section id="section-reconciliation" class="admin-section hidden">
+        <div class="section-head">
+          <div>
+            <h3>Financial Reconciliation</h3>
+            <p>Online payments, commissions, restaurant net amounts, and Cashfree references.</p>
+          </div>
+        </div>
+        <div class="admin-toolbar" style="margin-bottom:1rem;">
+          <input id="reconSearch" class="admin-search" placeholder="Search order, restaurant, Cashfree ID, invoice..." />
+          <button id="reconRefreshBtn" class="btn btn-light" type="button">Refresh</button>
+        </div>
+        <div id="reconSummaryCards" class="summary-grid"></div>
+        <div id="reconTable" class="admin-table-wrap panel"></div>
+      </section>
+
+      <section id="section-team" class="admin-section hidden">
+        <div class="admin-grid-2">
+          <article class="panel">
+            <div class="section-head"><div><h3>Create team member</h3><p>Internal AutoResto staff with role-based permissions.</p></div></div>
+            <form id="teamCreateForm" class="admin-form">
+              <input name="name" placeholder="Full name" required />
+              <input name="email" type="email" placeholder="Email" required />
+              <input name="password" type="password" placeholder="Password (min 8 chars)" required minlength="8" />
+              <select name="role" required>
+                <option value="">Select role</option>
+                <option value="finance_manager">Finance Manager</option>
+                <option value="restaurant_manager">Restaurant Manager</option>
+                <option value="promotions_manager">Promotions Manager</option>
+                <option value="user_enquiry_manager">User / Enquiry Manager</option>
+                <option value="database_manager">Database Manager</option>
+                <option value="backend_manager">Backend Manager</option>
+                <option value="analytics_manager">Analytics Manager</option>
+              </select>
+              <button class="btn btn-primary" type="submit">Create team member</button>
+            </form>
+          </article>
+          <article class="panel">
+            <div class="section-head"><div><h3>Role permissions</h3><p>Least-privilege access map.</p></div></div>
+            <div id="teamRoleMatrix" class="stack"></div>
+          </article>
+        </div>
+        <div id="teamMembersList" class="admin-list" style="margin-top:1rem;"></div>
+      </section>
+
+      <section id="section-audit" class="admin-section hidden">
+        <div class="section-head"><div><h3>Audit trail</h3><p>Commission, subscription, payment, inventory, and team actions.</p></div></div>
+        <div id="auditLogsList" class="admin-list"></div>
       </section>
 
       <p id="adminMessage" class="message"></p>

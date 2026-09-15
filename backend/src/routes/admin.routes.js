@@ -510,4 +510,30 @@ router.patch('/restaurants/:restaurantId/payment-details', asyncHandler(async (r
   return res.json({ restaurant: rows[0] || null });
 }));
 
+router.get('/audit-logs', asyncHandler(async (req, res) => {
+  const limit = Math.min(Number(req.query.limit || 100), 500);
+  const action = String(req.query.action || '').trim();
+  const params = [limit];
+  let filter = '';
+  if (action) {
+    filter = 'WHERE action = $2';
+    params.push(action);
+  }
+
+  const { rows } = await pool.query(
+    `SELECT id, actor_user_id, actor_role, restaurant_id, action, resource_type,
+            resource_id, metadata, ip_address, created_at
+     FROM audit_logs
+     ${filter}
+     ORDER BY created_at DESC
+     LIMIT $1`,
+    params
+  ).catch((error) => {
+    if (error.code === '42P01') return { rows: [] };
+    throw error;
+  });
+
+  return res.json({ logs: rows });
+}));
+
 module.exports = router;

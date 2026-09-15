@@ -105,4 +105,57 @@ router.get('/orders', requireAuth(['owner', 'super_admin']), asyncHandler(async 
   });
 }));
 
+router.get('/gst-settings', requireAuth(['owner']), asyncHandler(async (req, res) => {
+  const restaurantId = await getRestaurantIdForUser(req.user);
+  if (!restaurantId) return res.status(404).json({ message: 'Restaurant not found' });
+
+  const { rows } = await pool.query(
+    `SELECT id, name, legal_name, gstin, business_address, address, state_name, state_code,
+            default_gst_rate, invoice_prefix, fssai_license, thank_you_message
+     FROM restaurants WHERE id = $1 LIMIT 1`,
+    [restaurantId]
+  );
+  return res.json({ settings: rows[0] || null });
+}));
+
+router.patch('/gst-settings', requireAuth(['owner']), asyncHandler(async (req, res) => {
+  const restaurantId = await getRestaurantIdForUser(req.user);
+  if (!restaurantId) return res.status(404).json({ message: 'Restaurant not found' });
+
+  const body = req.body || {};
+  await pool.query(
+    `UPDATE restaurants SET
+       legal_name = COALESCE($1, legal_name),
+       gstin = COALESCE($2, gstin),
+       business_address = COALESCE($3, business_address),
+       state_name = COALESCE($4, state_name),
+       state_code = COALESCE($5, state_code),
+       default_gst_rate = COALESCE($6, default_gst_rate),
+       invoice_prefix = COALESCE($7, invoice_prefix),
+       fssai_license = COALESCE($8, fssai_license),
+       thank_you_message = COALESCE($9, thank_you_message)
+     WHERE id = $10`,
+    [
+      body.legalName || null,
+      body.gstin || null,
+      body.businessAddress || null,
+      body.stateName || null,
+      body.stateCode || null,
+      body.defaultGstRate != null ? Number(body.defaultGstRate) : null,
+      body.invoicePrefix || null,
+      body.fssaiLicense || null,
+      body.thankYouMessage || null,
+      restaurantId,
+    ]
+  );
+
+  const { rows } = await pool.query(
+    `SELECT id, name, legal_name, gstin, business_address, address, state_name, state_code,
+            default_gst_rate, invoice_prefix, fssai_license, thank_you_message
+     FROM restaurants WHERE id = $1 LIMIT 1`,
+    [restaurantId]
+  );
+  return res.json({ message: 'GST settings updated', settings: rows[0] });
+}));
+
 module.exports = router;

@@ -1,0 +1,56 @@
+AutoResto AI Handoff — Updated 2026-03-16
+==========================================
+
+PRODUCTION URLS
+- Frontend: https://autoresto.in
+- Backend: https://restaurant-backend-rxqz.onrender.com (until api.autoresto.in DNS is set)
+
+MIGRATIONS (apply in order — NOT on production without approval)
+- database/sql/000 through 009
+- Run: cd backend && npm run db:migrate
+- NEW: 009_gst_invoice_team_kot.sql (GST fields, team RBAC, KOT prints)
+
+COMPLETED (verified in repo)
+- Express + PostgreSQL + vanilla JS frontend
+- JWT auth, QR sessions, Cash/Cashfree payments
+- Full GST tax invoice (CGST/SGST/IGST breakdown, GSTIN, invoice numbers)
+- KOT + 80mm thermal bill printing (browser print architecture)
+- Financial reconciliation API + Super Admin UI
+- Platform team RBAC (7 roles, granular permissions)
+- Team dashboard (pages/team.html)
+- Owner GST settings panel
+- Audit log read API
+- 9/9 backend tests passing
+
+KEY NEW APIs
+- GET/PATCH /owner/gst-settings
+- GET /orders/:id/kot (HTML thermal KOT)
+- GET /orders/:id/thermal-bill
+- GET /api/admin/reconciliation/transactions
+- GET /api/admin/reconciliation/ledger
+- GET /api/admin/audit-logs
+- GET/POST/PATCH /api/team/members
+- GET /api/team/me/permissions
+- GET /api/team/restaurants (permission-gated)
+- GET /api/team/audit-logs (permission-gated)
+
+TEAM ROLES
+finance_manager, restaurant_manager, promotions_manager,
+user_enquiry_manager, database_manager, backend_manager, analytics_manager
+
+LOGIN REDIRECTS
+- super_admin → admin.html
+- platform team → team.html
+- owner → owner.html
+
+BLOCKERS
+- Apply migration 009 before GST/KOT/team features work in DB
+- Cashfree sandbox: whitelist https://autoresto.in
+- Local backend needs valid DATABASE_URL (Supabase pooler)
+
+NEXT PRIORITY
+1. Apply migrations to staging DB and verify
+2. Cashfree E2E sandbox payment test
+3. Post-payment review UI on table.html (API exists)
+4. Subscription upgrade Cashfree flow
+5. Hardware printer bridge (optional local agent)

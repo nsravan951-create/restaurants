@@ -10,6 +10,48 @@ body.theme-dark {
 	display: none !important;
 }
 
+.chip {
+	display: inline-flex;
+	align-items: center;
+	padding: 0.2rem 0.55rem;
+	border-radius: 999px;
+	background: rgba(120, 210, 190, 0.14);
+	border: 1px solid rgba(120, 210, 190, 0.35);
+	color: #d8ffea;
+	font-size: 0.78rem;
+	font-weight: 600;
+	margin: 0.15rem;
+}
+
+.admin-table-wrap {
+	overflow: auto;
+}
+
+.admin-table {
+	width: 100%;
+	border-collapse: collapse;
+	font-size: 0.92rem;
+}
+
+.admin-table th,
+.admin-table td {
+	padding: 0.75rem 0.6rem;
+	border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+	text-align: left;
+	vertical-align: top;
+}
+
+.admin-table th {
+	color: #9eb5cc;
+	font-weight: 600;
+}
+
+.admin-table .small,
+.small {
+	font-size: 0.78rem;
+	color: #9eb5cc;
+}
+
 .admin-shell {
 	display: grid;
 	grid-template-columns: 280px minmax(0, 1fr);

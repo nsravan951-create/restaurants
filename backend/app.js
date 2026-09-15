@@ -19,6 +19,8 @@ const couponsRoutes = require('./src/routes/coupons.routes');
 const inventoryRoutes = require('./src/routes/inventory.routes');
 const refundsRoutes = require('./src/routes/refunds.routes');
 const subscriptionsRoutes = require('./src/routes/subscriptions.routes');
+const teamRoutes = require('./src/routes/team.routes');
+const reconciliationRoutes = require('./src/routes/reconciliation.routes');
 const errorHandler = require('./src/middleware/errorHandler');
 
 const app = express();
@@ -127,6 +129,8 @@ app.use('/api/coupons', couponsRoutes);
 app.use('/api/inventory', inventoryRoutes);
 app.use('/api/refunds', refundsRoutes);
 app.use('/api/subscriptions', subscriptionsRoutes);
+app.use('/api/team', teamRoutes);
+app.use('/api/admin/reconciliation', reconciliationRoutes);
 
 
 app.use(errorHandler);

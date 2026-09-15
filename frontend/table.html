@@ -550,6 +550,41 @@
       }
       .checkout-pay-btn small { display: block; margin-top: 0.2rem; opacity: 0.9; font-size: 0.82rem; }
 
+      .review-stars {
+        display: flex;
+        gap: 10px;
+        justify-content: center;
+        margin: 16px 0;
+      }
+      .review-star {
+        width: 48px;
+        height: 48px;
+        border-radius: 12px;
+        border: 2px solid var(--line);
+        background: #fff;
+        font-size: 1.4rem;
+        cursor: pointer;
+        transition: transform .15s ease, border-color .15s ease;
+      }
+      .review-star.active,
+      .review-star:hover {
+        border-color: var(--accent);
+        transform: scale(1.05);
+      }
+      .review-comment {
+        width: 100%;
+        min-height: 88px;
+        border-radius: 12px;
+        border: 1px solid var(--line);
+        padding: 12px;
+        font: inherit;
+        resize: vertical;
+      }
+      .review-actions {
+        display: flex;
+        gap: 10px;
+        margin-top: 16px;
+      }
       .receipt-actions {
         display: flex;
         flex-wrap: wrap;
@@ -700,6 +735,31 @@
         </section>
       </section>
 
+      <section id="reviewState" class="screen hidden">
+        <section class="receipt-hero">
+          <span class="tracking-status" style="background:rgba(26,127,90,.12);color:var(--success);">Payment received</span>
+          <h2 style="margin:0;font-family:'Fraunces',serif;font-size:1.7rem;">How was your food?</h2>
+          <p style="margin:0;color:var(--muted);">Optional — helps the restaurant improve. You can skip anytime.</p>
+        </section>
+        <section class="panel">
+          <div class="section-body">
+            <div id="reviewStars" class="review-stars" role="group" aria-label="Overall rating">
+              <button type="button" class="review-star" data-rating="1" aria-label="1 star">★</button>
+              <button type="button" class="review-star" data-rating="2" aria-label="2 stars">★</button>
+              <button type="button" class="review-star" data-rating="3" aria-label="3 stars">★</button>
+              <button type="button" class="review-star" data-rating="4" aria-label="4 stars">★</button>
+              <button type="button" class="review-star" data-rating="5" aria-label="5 stars">★</button>
+            </div>
+            <textarea id="reviewComment" class="review-comment" maxlength="1000" placeholder="Optional comment (e.g. loved the biryani)"></textarea>
+            <p id="reviewMessage" style="margin:12px 0 0;color:var(--muted);font-size:.92rem;"></p>
+            <div class="review-actions">
+              <button class="btn btn-primary" id="reviewSubmitBtn" type="button">Submit review</button>
+              <button class="btn btn-light" id="reviewSkipBtn" type="button">Skip to bill</button>
+            </div>
+          </div>
+        </section>
+      </section>
+
       <section id="receiptState" class="screen hidden">
         <section class="receipt-hero">
           <span class="tracking-status" style="background:rgba(26,127,90,.12);color:var(--success);">Payment complete</span>
@@ -817,6 +877,12 @@
         trackingText: document.getElementById('trackingText'),
         trackingItems: document.getElementById('trackingItems'),
         trackingStatusPill: document.getElementById('trackingStatusPill'),
+        reviewState: document.getElementById('reviewState'),
+        reviewStars: document.getElementById('reviewStars'),
+        reviewComment: document.getElementById('reviewComment'),
+        reviewMessage: document.getElementById('reviewMessage'),
+        reviewSubmitBtn: document.getElementById('reviewSubmitBtn'),
+        reviewSkipBtn: document.getElementById('reviewSkipBtn'),
         receiptState: document.getElementById('receiptState'),
         receiptMessage: document.getElementById('receiptMessage'),
         receiptBox: document.getElementById('receiptBox'),
@@ -1003,6 +1069,7 @@
         els.errorState.classList.toggle('hidden', view !== 'error');
         els.menuState.classList.toggle('hidden', view !== 'menu');
         els.trackingState.classList.toggle('hidden', view !== 'tracking');
+        els.reviewState.classList.toggle('hidden', view !== 'review');
         els.receiptState.classList.toggle('hidden', view !== 'receipt');
         els.stickyBar.classList.toggle('hidden', view !== 'menu');
         els.receiptActions?.classList.toggle('hidden', view !== 'receipt');
@@ -1322,6 +1389,58 @@
         URL.revokeObjectURL(url);
       }
 
+      function resetReviewForm() {
+        state.selectedReviewRating = 0;
+        els.reviewStars?.querySelectorAll('.review-star').forEach((btn) => btn.classList.remove('active'));
+        if (els.reviewComment) els.reviewComment.value = '';
+        if (els.reviewMessage) els.reviewMessage.textContent = '';
+      }
+
+      function showReviewPrompt(invoicePayload) {
+        state.pendingReviewPayload = invoicePayload;
+        resetReviewForm();
+        setView('review');
+      }
+
+      async function completeReviewFlow() {
+        const payload = state.pendingReviewPayload;
+        state.pendingReviewPayload = null;
+        if (payload) showReceiptView(payload);
+      }
+
+      async function submitReview() {
+        const payload = state.pendingReviewPayload;
+        const rating = Number(state.selectedReviewRating || 0);
+        if (!payload?.orderId || !payload?.sessionToken) {
+          await completeReviewFlow();
+          return;
+        }
+        if (rating < 1 || rating > 5) {
+          if (els.reviewMessage) {
+            els.reviewMessage.textContent = 'Please tap a star rating (1–5) or skip.';
+            els.reviewMessage.style.color = 'var(--danger)';
+          }
+          return;
+        }
+        try {
+          els.reviewSubmitBtn.disabled = true;
+          await apiRequest('/api/reviews', {
+            method: 'POST',
+            body: JSON.stringify({
+              orderId: payload.orderId,
+              sessionToken: payload.sessionToken,
+              rating,
+              comment: els.reviewComment?.value?.trim() || '',
+            }),
+          });
+        } catch (error) {
+          console.warn('Review submit failed:', error.message);
+        } finally {
+          els.reviewSubmitBtn.disabled = false;
+          await completeReviewFlow();
+        }
+      }
+
       function showReceiptView(invoicePayload) {
         state.invoicePayload = invoicePayload;
         setView('receipt');
@@ -1347,6 +1466,7 @@
 
       async function finalizePaidReceipt(order, paymentStatus = 'paid') {
         const invoicePayload = buildInvoicePayload(order, paymentStatus);
+        const sessionToken = invoicePayload.sessionToken;
         await syncInvoiceToOwnerDashboard(invoicePayload);
         await endSession('payment_completed');
         clearCartStorage();
@@ -1355,7 +1475,8 @@
         state.session = null;
         state.activeOrder = null;
         renderCart();
-        showReceiptView(invoicePayload);
+        invoicePayload.sessionToken = sessionToken;
+        showReviewPrompt(invoicePayload);
       }
 
       async function startOrJoinSession(joinExisting = false) {
@@ -1435,15 +1556,11 @@
           if (payload.type === 'status_changed') {
             els.trackingStatusPill.textContent = payload.status;
             if (payload.status === 'delivered') {
-              const invoicePayload = buildInvoicePayload(state.activeOrder, 'paid');
               finalizePaidReceipt(state.activeOrder, 'paid').catch((error) => console.warn(error.message));
-              setTimeout(() => showReceiptView(invoicePayload), 0);
             }
           }
           if (payload.type === 'paid') {
-            const invoicePayload = buildInvoicePayload(state.activeOrder, 'paid');
             finalizePaidReceipt(state.activeOrder, 'paid').catch((error) => console.warn(error.message));
-            setTimeout(() => showReceiptView(invoicePayload), 0);
           }
         });
       }
@@ -1681,6 +1798,18 @@
         });
         els.cashCheckoutBtn?.addEventListener('click', handleCashCheckout);
         els.cashfreeCheckoutBtn?.addEventListener('click', handleCashfreeCheckout);
+
+        els.reviewStars?.querySelectorAll('.review-star').forEach((btn) => {
+          btn.addEventListener('click', () => {
+            const rating = Number(btn.dataset.rating || 0);
+            state.selectedReviewRating = rating;
+            els.reviewStars.querySelectorAll('.review-star').forEach((star) => {
+              star.classList.toggle('active', Number(star.dataset.rating) <= rating);
+            });
+          });
+        });
+        els.reviewSubmitBtn?.addEventListener('click', submitReview);
+        els.reviewSkipBtn?.addEventListener('click', completeReviewFlow);
 
         els.receiptPrintBtn?.addEventListener('click', async () => {
           try {

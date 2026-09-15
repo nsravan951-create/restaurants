@@ -36,7 +36,9 @@ async function loadKitchenBoard() {
       <strong>Order #${order.id} | Table ${order.table_number}</strong>
       <p>${parseOrderItems(order.items)}</p>
       <div class="toolbar">
+        <button class="btn btn-light" data-kot="${order.id}">Print KOT</button>
         <button class="btn btn-light" data-print="${order.id}">Print Bill</button>
+        <button class="btn btn-light" data-thermal="${order.id}">Thermal Bill</button>
         <button class="btn btn-light" data-id="${order.id}" data-status="preparing">Mark Preparing</button>
         <button class="btn btn-primary" data-id="${order.id}" data-status="ready">Mark Ready</button>
       </div>
@@ -59,6 +61,26 @@ async function loadKitchenBoard() {
 
   board.querySelectorAll('button[data-print]').forEach((button) => {
     button.addEventListener('click', () => openInvoice(button.dataset.print));
+  });
+
+  board.querySelectorAll('button[data-kot]').forEach((button) => {
+    button.addEventListener('click', async () => {
+      try {
+        await window.PrintUtils.printKot(button.dataset.kot, false);
+      } catch (error) {
+        setMessage('kitchenMessage', error.message, true);
+      }
+    });
+  });
+
+  board.querySelectorAll('button[data-thermal]').forEach((button) => {
+    button.addEventListener('click', async () => {
+      try {
+        await window.PrintUtils.printThermalBill(button.dataset.thermal);
+      } catch (error) {
+        setMessage('kitchenMessage', error.message, true);
+      }
+    });
   });
 }
 

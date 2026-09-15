@@ -37,6 +37,8 @@
             <button class="btn btn-light sidebar-link" type="button" data-owner-section="features">6. Premium Features</button>
             <button class="btn btn-light sidebar-link" type="button" data-owner-section="kitchen">7. Kitchen Board</button>
             <button class="btn btn-light sidebar-link" type="button" data-owner-section="ready">8. Ready Orders</button>
+            <button class="btn btn-light sidebar-link" type="button" data-owner-section="reviews">9. Reviews</button>
+            <button class="btn btn-light sidebar-link" type="button" data-owner-section="gst">10. GST & Invoice</button>
           </div>
         </aside>
 
@@ -182,6 +184,38 @@
             </div>
             <div id="readyOrders"></div>
           </section>
+
+          <section class="panel dashboard-section hidden" data-owner-section-panel="reviews">
+            <div class="section-head">
+              <div>
+                <h2>Customer Reviews</h2>
+                <p class="hero-copy">Ratings submitted after payment (guests can skip).</p>
+              </div>
+            </div>
+            <div id="reviewsSummary" class="card-row"></div>
+            <div id="reviewsList" class="stack"></div>
+          </section>
+
+          <section class="panel dashboard-section hidden" data-owner-section-panel="gst">
+            <div class="section-head">
+              <div>
+                <h2>GST & Tax Invoice Settings</h2>
+                <p class="hero-copy">Configure legal billing details used on tax invoices and thermal receipts.</p>
+              </div>
+            </div>
+            <form id="gstSettingsForm" class="grid-3">
+              <input name="legalName" placeholder="Legal business name" />
+              <input name="gstin" placeholder="GSTIN (15 chars)" maxlength="15" />
+              <input name="fssaiLicense" placeholder="FSSAI license (optional)" />
+              <input name="stateName" placeholder="State name" />
+              <input name="stateCode" placeholder="State code (e.g. 36)" maxlength="4" />
+              <input name="defaultGstRate" type="number" min="0" max="28" step="0.01" placeholder="Default GST %" />
+              <input name="invoicePrefix" placeholder="Invoice prefix (e.g. AR)" />
+              <textarea name="businessAddress" placeholder="Registered business address" rows="3" style="grid-column:1/-1;"></textarea>
+              <input name="thankYouMessage" placeholder="Bill thank-you message" style="grid-column:1/-1;" />
+              <button class="btn btn-primary" type="submit">Save GST Settings</button>
+            </form>
+          </section>
         </section>
       </div>
 
@@ -254,6 +288,7 @@
     <footer class="brand-footer">Powered by Online Solutionzzz</footer>
     <script src="../assets/js/config.js"></script>
     <script src="../assets/js/common.js"></script>
+    <script src="../assets/js/print.js"></script>
     <script src="../assets/js/owner.js"></script>
   </body>
 </html>

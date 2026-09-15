@@ -350,11 +350,46 @@ async function activateSection(sectionName) {
     analytics: loadAnalytics,
     invoices: loadInvoices,
     features: loadFeatures,
+    reviews: loadReviews,
+    gst: loadGstSettings,
+    kitchen: loadOrders,
+    ready: loadOrders,
   };
 
   if (loaders[sectionName]) {
     await loaders[sectionName]();
   }
+}
+
+async function loadReviews() {
+  if (!ensureRestaurantId()) return;
+  const data = await apiRequest(`/api/reviews/restaurant/${restaurantId}`, {}, true);
+  const reviews = data.reviews || [];
+  const summaryRoot = document.getElementById('reviewsSummary');
+  const listRoot = document.getElementById('reviewsList');
+  if (!summaryRoot || !listRoot) return;
+
+  const count = reviews.length;
+  const average = count
+    ? (reviews.reduce((sum, row) => sum + Number(row.rating || 0), 0) / count).toFixed(1)
+    : '0.0';
+
+  summaryRoot.innerHTML = `
+    <div class="card"><strong>${average}</strong><p>Average rating</p></div>
+    <div class="card"><strong>${count}</strong><p>Total reviews</p></div>
+    <div class="card"><strong>${reviews.filter((r) => r.rating >= 4).length}</strong><p>4★ and above</p></div>
+    <div class="card"><strong>${reviews.filter((r) => r.rating <= 2).length}</strong><p>Needs attention (≤2★)</p></div>
+  `;
+
+  listRoot.innerHTML = reviews.length
+    ? reviews.map((review) => `
+      <div class="card">
+        <strong>${'★'.repeat(review.rating)}${'☆'.repeat(5 - review.rating)} · Order #${review.order_id}</strong>
+        <p>${escapeHtml(review.comment || 'No comment')}</p>
+        <p style="color:var(--muted);font-size:.85rem;">${new Date(review.created_at).toLocaleString()}</p>
+      </div>
+    `).join('')
+    : '<p>No reviews yet. They appear after guests pay and optionally rate their meal.</p>';
 }
 
 async function loadFeatures() {
@@ -601,6 +636,22 @@ function renderAnalytics(orders) {
   }
 }
 
+async function loadGstSettings() {
+  const data = await apiRequest('/owner/gst-settings', {}, true);
+  const form = document.getElementById('gstSettingsForm');
+  if (!form || !data.settings) return;
+  const s = data.settings;
+  form.legalName.value = s.legal_name || '';
+  form.gstin.value = s.gstin || '';
+  form.fssaiLicense.value = s.fssai_license || '';
+  form.stateName.value = s.state_name || '';
+  form.stateCode.value = s.state_code || '';
+  form.defaultGstRate.value = s.default_gst_rate ?? '';
+  form.invoicePrefix.value = s.invoice_prefix || '';
+  form.businessAddress.value = s.business_address || '';
+  form.thankYouMessage.value = s.thank_you_message || '';
+}
+
 async function loadAnalytics() {
   if (!ensureRestaurantId()) return;
 
@@ -625,6 +676,8 @@ async function loadOrders() {
       <strong>Order #${order.id} | Table ${order.table_number}</strong>
       <p>${buildItemsList(order.items)}</p>
       <div class="toolbar">
+        <button class="btn btn-light" data-kot="${order.id}" type="button">Print KOT</button>
+        <button class="btn btn-light" data-thermal="${order.id}" type="button">Thermal Bill</button>
         <button class="btn btn-light" data-status="preparing" data-order="${order.id}" type="button">Mark Preparing</button>
         <button class="btn btn-primary" data-status="ready" data-order="${order.id}" type="button">Mark Ready</button>
       </div>
@@ -639,6 +692,26 @@ async function loadOrders() {
       <button class="btn btn-dark" data-status="delivered" data-order="${order.id}" type="button">Mark Delivered</button>
     </div>
   `).join('') : '<p>No ready orders.</p>';
+
+  document.querySelectorAll('button[data-kot]').forEach((button) => {
+    button.addEventListener('click', async () => {
+      try {
+        await window.PrintUtils.printKot(button.dataset.kot, false);
+      } catch (error) {
+        setMessage('ownerMessage', error.message, true);
+      }
+    });
+  });
+
+  document.querySelectorAll('button[data-thermal]').forEach((button) => {
+    button.addEventListener('click', async () => {
+      try {
+        await window.PrintUtils.printThermalBill(button.dataset.thermal);
+      } catch (error) {
+        setMessage('ownerMessage', error.message, true);
+      }
+    });
+  });
 
   document.querySelectorAll('button[data-status]').forEach((button) => {
     button.addEventListener('click', async () => {
@@ -813,6 +886,30 @@ document.querySelectorAll('[data-owner-section]').forEach((button) => {
       setMessage('ownerMessage', error.message, true);
     }
   });
+});
+
+document.getElementById('gstSettingsForm')?.addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const formData = new FormData(event.target);
+  try {
+    await apiRequest('/owner/gst-settings', {
+      method: 'PATCH',
+      body: JSON.stringify({
+        legalName: formData.get('legalName'),
+        gstin: formData.get('gstin'),
+        fssaiLicense: formData.get('fssaiLicense'),
+        stateName: formData.get('stateName'),
+        stateCode: formData.get('stateCode'),
+        defaultGstRate: formData.get('defaultGstRate'),
+        invoicePrefix: formData.get('invoicePrefix'),
+        businessAddress: formData.get('businessAddress'),
+        thankYouMessage: formData.get('thankYouMessage'),
+      }),
+    }, true);
+    setMessage('ownerMessage', 'GST settings saved.');
+  } catch (error) {
+    setMessage('ownerMessage', error.message, true);
+  }
 });
 
 document.getElementById('menuForm').addEventListener('submit', async (event) => {

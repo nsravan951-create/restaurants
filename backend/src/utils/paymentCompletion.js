@@ -4,6 +4,7 @@ const { recordChargeableOrder } = require('./financial');
 const { endSessionByOrderId } = require('./tableSession');
 const { emitOrderUpdate, emitTableUpdate } = require('../services/socket');
 const { writeAuditLog } = require('./auditLog');
+const { assignInvoiceNumber } = require('./gst');
 
 async function finalizePaidOrder(orderId, {
   method = 'cash',
@@ -97,6 +98,7 @@ async function completeCashPayment(orderId, actorUserId = null) {
       [orderId, order.restaurant_id, order.total_amount]
     );
 
+    await assignInvoiceNumber(conn, orderId, order.restaurant_id);
     await conn.query('COMMIT');
 
     await finalizePaidOrder(orderId, { method: 'cash', provider: 'cash', actorUserId });
@@ -176,6 +178,7 @@ async function completeOnlinePayment(orderId, {
       [provider, orderId]
     );
 
+    await assignInvoiceNumber(conn, orderId, order.restaurant_id);
     await conn.query('COMMIT');
 
     await finalizePaidOrder(orderId, {
