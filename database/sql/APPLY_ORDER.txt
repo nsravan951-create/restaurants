@@ -1,0 +1,32 @@
+AutoResto SQL migrations — apply in this exact order
+====================================================
+
+Prerequisites:
+  1. Base schema already applied: database/schema.sql
+  2. Use a disposable database for testing first
+  3. Do NOT run against production Supabase until reviewed and approved
+
+Apply order (psql examples):
+
+  psql "$DATABASE_URL" -f database/sql/000_schema_migrations.sql
+  psql "$DATABASE_URL" -f database/sql/001_saas_billing_entitlements.sql
+  psql "$DATABASE_URL" -f database/sql/002_platform_orders.sql
+  psql "$DATABASE_URL" -f database/sql/003_ads_media_extensions.sql
+  psql "$DATABASE_URL" -f database/sql/004_restaurant_subscription_columns.sql
+  psql "$DATABASE_URL" -f database/sql/005_audit_logs.sql
+  psql "$DATABASE_URL" -f database/sql/006_performance_indexes.sql
+  psql "$DATABASE_URL" -f database/sql/007_business_features.sql
+  psql "$DATABASE_URL" -f database/sql/008_default_commission_rule.sql
+
+Or apply all at once (after reviewing each file):
+
+  cd backend && npm run db:migrate
+
+Verify:
+
+  SELECT version, applied_at FROM schema_migrations ORDER BY applied_at;
+
+Notes:
+  - 001 is idempotent for constraints (safe re-run on partially migrated DBs)
+  - 000 must run before files that INSERT INTO schema_migrations
+  - Legacy folder database/migrations/ is superseded by database/sql/

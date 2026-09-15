@@ -6,6 +6,9 @@
   "scripts": {
     "dev": "nodemon server.js",
     "start": "node server.js",
+    "test": "node --test tests/**/*.test.js",
+    "db:migrate": "node scripts/apply-sql-migrations.js",
+    "cashfree:verify": "node scripts/verify-cashfree.js",
     "refresh:qrs": "node src/scripts/refreshQrUrls.js"
   },
   "dependencies": {

@@ -127,26 +127,12 @@ function tablePaymentPill(table) {
     if (method === 'cash' || method === 'cod') {
       return '<span class="table-card__pay-pill table-card__pay-pill--cash">CASH</span>';
     }
-    if (method === 'upi' || method === 'online') {
-      return '<span class="table-card__pay-pill table-card__pay-pill--upi">UPI</span>';
-    }
     return '<span class="table-card__pay-pill table-card__pay-pill--upi">PAID</span>';
   }
   if (table.active_order_id && payStatus === 'pending') {
     return '<span class="table-card__pay-pill table-card__pay-pill--bill">BILL OPEN</span>';
   }
   return '';
-}
-
-function buildUpiPayUrl({ vpa, name, amount, note }) {
-  const params = new URLSearchParams({
-    pa: vpa,
-    pn: name || 'Restaurant',
-    am: Number(amount || 0).toFixed(2),
-    cu: 'INR',
-    tn: note || 'Table bill',
-  });
-  return `upi://pay?${params.toString()}`;
 }
 
 function tableStatusClass(status) {
@@ -226,7 +212,6 @@ function renderBillModal(order, tableId) {
     ${logoUrl ? `<img src="${escapeHtml(logoUrl)}" alt="${escapeHtml(restaurantName)} logo" style="max-width:120px;max-height:80px;object-fit:contain;margin-bottom:0.6rem;border-radius:10px;" />` : ''}
     <p><strong>${escapeHtml(restaurantName)}</strong></p>
     <p>${escapeHtml(order.bank_name || restaurantProfile?.bank_name || '')} ${escapeHtml(order.bank_account_name || restaurantProfile?.bank_account_name || '')}</p>
-    <p>UPI: ${escapeHtml(order.upi_vpa || restaurantProfile?.upi_vpa || 'Not set')}</p>
     <p style="margin-top:0.5rem;color:#6b7280;">${escapeHtml(thankYouMessage)}</p>
   `;
 
@@ -364,11 +349,24 @@ async function activateSection(sectionName) {
     menu: loadMenu,
     analytics: loadAnalytics,
     invoices: loadInvoices,
+    features: loadFeatures,
   };
 
   if (loaders[sectionName]) {
     await loaders[sectionName]();
   }
+}
+
+async function loadFeatures() {
+  const data = await apiRequest('/owner/entitlements', {}, true);
+  const root = document.getElementById('ownerFeatureList');
+  if (!root) return;
+  root.innerHTML = (data.features || []).map((feature) => `
+    <div class="card">
+      <strong>${escapeHtml(feature.enabled ? feature.name : `Locked: ${feature.name}`)}</strong>
+      <p>${feature.enabled ? 'Available on your plan.' : 'Upgrade to unlock this feature.'}</p>
+    </div>
+  `).join('') || '<p>No feature entitlements configured.</p>';
 }
 
 async function loadRestaurant() {
@@ -379,7 +377,6 @@ async function loadRestaurant() {
 
   const payForm = document.getElementById('paymentSettingsForm');
   if (payForm) {
-    payForm.upiVpa.value = data.restaurant.upi_vpa || '';
     payForm.bankAccountName.value = data.restaurant.bank_account_name || '';
     payForm.bankName.value = data.restaurant.bank_name || '';
     payForm.logoUrl.value = data.restaurant.logo_url || '';
@@ -737,7 +734,10 @@ async function loadInvoices() {
 
 function initSocket() {
   if (!ensureRestaurantId()) return;
-  const socket = io(window.APP_CONFIG.SOCKET_URL, { transports: ['websocket', 'polling'] });
+  const socket = io(window.APP_CONFIG.SOCKET_URL, {
+    transports: ['websocket', 'polling'],
+    auth: { token: getAuth()?.token },
+  });
   socket.emit('restaurant:join', restaurantId);
 
   socket.on('order:update', (payload) => {
@@ -995,7 +995,6 @@ if (paymentSettingsForm) {
       await apiRequest('/restaurants/owner/payment-settings', {
         method: 'PATCH',
         body: JSON.stringify({
-          upiVpa: fd.get('upiVpa'),
           bankAccountName: fd.get('bankAccountName'),
           bankName: fd.get('bankName'),
           logoUrl: fd.get('logoUrl'),

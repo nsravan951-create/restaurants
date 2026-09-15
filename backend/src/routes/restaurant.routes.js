@@ -24,6 +24,78 @@ const autoTableSchema = z.object({
   totalTables: z.number().int().positive().max(500),
 });
 
+async function buildPublicTableContext({ restaurantId, tableId }) {
+  const { rows: tableRows } = await pool.query(
+    `SELECT
+       t.id,
+       t.table_number,
+       t.restaurant_id,
+       r.name AS restaurant_name,
+       r.phone AS restaurant_phone,
+       r.address AS restaurant_address,
+       r.logo_url AS restaurant_logo,
+       r.thank_you_message
+     FROM restaurant_tables t
+     INNER JOIN restaurants r ON r.id = t.restaurant_id
+     WHERE t.id = $1 AND t.restaurant_id = $2
+     LIMIT 1`,
+    [tableId, restaurantId]
+  );
+
+  if (!tableRows.length) return null;
+
+  const tableData = tableRows[0];
+
+  const { rows: menuRows } = await pool.query(
+    `SELECT id, name, description, price, image_url, category, is_available
+     FROM menu_items
+     WHERE restaurant_id = $1 AND is_available = TRUE
+     ORDER BY category, name`,
+    [restaurantId]
+  );
+
+  const { rows: activeSessionRows } = await pool.query(
+    `SELECT id, expires_at
+     FROM table_sessions
+     WHERE restaurant_id = $1 AND table_id = $2 AND status = 'active'
+     ORDER BY id DESC LIMIT 1`,
+    [restaurantId, tableId]
+  );
+
+  const { rows: activeOrderRows } = await pool.query(
+    `SELECT id, payment_status
+     FROM orders
+     WHERE table_id = $1 AND payment_status = 'pending'
+     ORDER BY id DESC LIMIT 1`,
+    [tableId]
+  );
+
+  const orderPlaced = activeOrderRows.length > 0;
+  const session = activeSessionRows[0] || null;
+
+  return {
+    table: {
+      id: tableData.id,
+      table_number: tableData.table_number,
+    },
+    restaurant: {
+      id: tableData.restaurant_id,
+      name: tableData.restaurant_name,
+      phone: tableData.restaurant_phone,
+      address: tableData.restaurant_address,
+      logo: tableData.restaurant_logo,
+      thank_you_message: tableData.thank_you_message,
+    },
+    lock: {
+      isLocked: orderPlaced || Boolean(session),
+      orderPlaced,
+      expiresAt: session?.expires_at || null,
+      reason: orderPlaced ? 'order_placed' : (session ? 'session_active' : null),
+    },
+    menu: menuRows,
+  };
+}
+
 router.param('restaurantId', (req, res, next, restaurantId) => {
   if (!/^\d+$/.test(String(restaurantId))) {
     return res.status(400).json({ error: 'Invalid restaurant ID' });
@@ -166,100 +238,71 @@ router.get('/:restaurantId/tables/resolve', asyncHandler(async (req, res) => {
   return res.json({ table: rows[0] });
 }));
 
-// Public endpoint: Fetch table context (restaurant, table, menu) by tableId
-// Used by QR code scanning interface
+// Public endpoint: secure QR lookup by non-guessable table token
+router.get('/qr/:qrToken', asyncHandler(async (req, res) => {
+  const qrToken = String(req.params.qrToken || '').trim();
+  if (qrToken.length < 8) {
+    return res.status(400).json({ error: 'Invalid QR token' });
+  }
+
+  const { rows } = await pool.query(
+    `SELECT id, restaurant_id
+     FROM restaurant_tables
+     WHERE qr_token = $1
+     LIMIT 1`,
+    [qrToken]
+  );
+
+  if (!rows.length) {
+    return res.status(404).json({ error: 'Table not found' });
+  }
+
+  const context = await buildPublicTableContext({
+    restaurantId: rows[0].restaurant_id,
+    tableId: rows[0].id,
+  });
+
+  if (!context) {
+    return res.status(404).json({ error: 'Table not found' });
+  }
+
+  return res.json(context);
+}));
+
+// Legacy table-id lookup requires matching QR token query parameter
 router.get('/table/:tableId', asyncHandler(async (req, res) => {
   const tableId = Number(req.params.tableId);
+  const qrToken = String(req.query.t || req.query.token || '').trim();
 
   if (!tableId || tableId <= 0) {
     return res.status(400).json({ error: 'Invalid table ID' });
   }
+  if (qrToken.length < 8) {
+    return res.status(400).json({ error: 'QR token is required' });
+  }
 
-  // Fetch table with restaurant and menu data
-  const { rows: tableRows } = await pool.query(
-    `SELECT 
-       t.id, 
-       t.table_number, 
-       t.restaurant_id,
-       r.name as restaurant_name,
-       r.phone as restaurant_phone,
-       r.address as restaurant_address,
-       r.upi_vpa,
-       r.bank_account_name,
-       r.bank_name,
-       r.logo_url as restaurant_logo
-     FROM restaurant_tables t
-     INNER JOIN restaurants r ON r.id = t.restaurant_id
-     WHERE t.id = $1
+  const { rows } = await pool.query(
+    `SELECT id, restaurant_id
+     FROM restaurant_tables
+     WHERE id = $1 AND qr_token = $2
      LIMIT 1`,
-    [tableId]
+    [tableId, qrToken]
   );
 
-  if (!tableRows.length) {
+  if (!rows.length) {
     return res.status(404).json({ error: 'Table not found' });
   }
 
-  const tableData = tableRows[0];
-
-  // Fetch menu items for this restaurant
-  const { rows: menuRows } = await pool.query(
-    `SELECT 
-       id, 
-       name, 
-       description, 
-       price, 
-       image_url, 
-       category, 
-       is_available
-     FROM menu_items
-     WHERE restaurant_id = $1 AND is_available = TRUE
-     ORDER BY category, name`,
-    [tableData.restaurant_id]
-  );
-
-  const { rows: activeSessionRows } = await pool.query(
-    `SELECT id, expires_at, session_token
-     FROM table_sessions
-     WHERE restaurant_id = $1 AND table_id = $2 AND status = 'active'
-     ORDER BY id DESC LIMIT 1`,
-    [tableData.restaurant_id, tableId]
-  );
-
-  const { rows: activeOrderRows } = await pool.query(
-    `SELECT id, payment_status
-     FROM orders
-     WHERE table_id = $1 AND payment_status = 'pending'
-     ORDER BY id DESC LIMIT 1`,
-    [tableId]
-  );
-
-  const orderPlaced = activeOrderRows.length > 0;
-  const session = activeSessionRows[0] || null;
-
-  return res.json({
-    table: {
-      id: tableData.id,
-      table_number: tableData.table_number,
-    },
-    restaurant: {
-      id: tableData.restaurant_id,
-      name: tableData.restaurant_name,
-      phone: tableData.restaurant_phone,
-      address: tableData.restaurant_address,
-      upi_vpa: tableData.upi_vpa,
-      bank_account_name: tableData.bank_account_name,
-      bank_name: tableData.bank_name,
-      logo: tableData.restaurant_logo,
-      thank_you_message: tableData.thank_you_message,
-    },
-    lock: {
-      isLocked: orderPlaced || Boolean(session),
-      orderPlaced,
-      expiresAt: session?.expires_at || null,
-      reason: orderPlaced ? 'order_placed' : (session ? 'session_active' : null),
-    },
-    menu: menuRows,
+  const context = await buildPublicTableContext({
+    restaurantId: rows[0].restaurant_id,
+    tableId: rows[0].id,
   });
+
+  if (!context) {
+    return res.status(404).json({ error: 'Table not found' });
+  }
+
+  return res.json(context);
 }));
 
 router.post('/:restaurantId/tables', requireAuth(['owner', 'super_admin']), asyncHandler(async (req, res) => {

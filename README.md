@@ -29,6 +29,21 @@ psql -d qr_restaurant -f database/sample_data.sql
 
 Or run both via `database/setup_postgresql.sql` from inside `psql`.
 
+After the base schema, apply versioned SQL migrations from `database/sql/` (in order — see `database/sql/APPLY_ORDER.txt`):
+
+```bash
+cd backend
+npm run db:migrate
+```
+
+Or manually:
+
+```bash
+psql "$DATABASE_URL" -f database/sql/000_schema_migrations.sql
+psql "$DATABASE_URL" -f database/sql/001_saas_billing_entitlements.sql
+# ... continue through 006_performance_indexes.sql
+```
+
 Demo owner: `owner@demo.com` / `password123`
 
 ### 2. Backend
@@ -76,7 +91,23 @@ See `backend/.env.example`.
 
 Required: `DATABASE_URL`, `JWT_SECRET`, `CORS_ORIGIN`, `FRONTEND_PUBLIC_URL`
 
-For online payments: `CASHFREE_CLIENT_ID`, `CASHFREE_CLIENT_SECRET`, `CASHFREE_ENVIRONMENT`, `CASHFREE_API_VERSION`, `CASHFREE_RETURN_URL`, and `CASHFREE_WEBHOOK_URL`
+For online payments (Cashfree):
+
+```env
+CASHFREE_CLIENT_ID=your_sandbox_app_id
+CASHFREE_CLIENT_SECRET=your_sandbox_secret
+CASHFREE_ENVIRONMENT=sandbox
+CASHFREE_API_VERSION=2026-01-01
+CASHFREE_RETURN_URL=http://localhost:5500/table.html
+CASHFREE_WEBHOOK_URL=https://your-ngrok-url/api/payments/cashfree/webhook
+CASHFREE_WEBHOOK_OPTIONAL=true
+```
+
+Verify credentials: `cd backend && npm run cashfree:verify`
+
+- Sandbox keys: [Cashfree Merchant Dashboard](https://merchant.cashfree.com) → Developers → API Keys (Sandbox)
+- Local webhook: use [ngrok](https://ngrok.com) or set `CASHFREE_WEBHOOK_OPTIONAL=true` (return-page status polling handles payment)
+- Webhook endpoint: `POST /api/payments/cashfree/webhook`
 
 ## API highlights
 

@@ -1,3 +1,3 @@
-const API_URL = 'https://restaurant-backend-rxqz.onrender.com';
+const API_URL = window.BACKEND_PUBLIC_URL || 'https://api.autoresto.in';
 
 export default API_URL;

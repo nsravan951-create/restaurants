@@ -3,12 +3,15 @@ const { z } = require('zod');
 
 const pool = require('../config/db');
 const { requireAuth } = require('../middleware/auth');
+const { publicOrderLimiter } = require('../middleware/rateLimit');
 const asyncHandler = require('../utils/asyncHandler');
 const { ensureRestaurantAccess } = require('../utils/access');
 const { emitOrderUpdate, emitTableUpdate } = require('../services/socket');
 const { expireInactiveSessions, getSessionExpiryDate, endSessionByOrderId } = require('../utils/tableSession');
 const { buildInvoiceModel, renderInvoiceHtml, buildInvoicePdf } = require('../utils/invoice');
 const { syncInvoiceForOrder } = require('../utils/invoiceSync');
+const { completeCashPayment } = require('../utils/paymentCompletion');
+const { validateCoupon, recordCouponRedemption } = require('../utils/coupons');
 
 const router = express.Router();
 
@@ -25,9 +28,10 @@ const createOrderSchema = z.object({
     quantity: z.number().int().positive(),
   })).min(1),
   notes: z.string().optional().default(''),
+  couponCode: z.string().optional().default(''),
 });
 
-router.post('/', asyncHandler(async (req, res) => {
+router.post('/', publicOrderLimiter, asyncHandler(async (req, res) => {
   await expireInactiveSessions();
 
   if (req.body && req.body.sessionId && !req.body.tableSessionId) {
@@ -96,6 +100,7 @@ router.post('/', asyncHandler(async (req, res) => {
     restaurantId: Number(req.body.restaurantId),
     tableId: Number(req.body.tableId),
     tableSessionId: Number(req.body.tableSessionId),
+    couponCode: String(req.body.couponCode || '').trim(),
     items: (req.body.items || []).map((item) => ({
       menuItemId: Number(item.menuItemId),
       itemPrice: Number(item.itemPrice),
@@ -178,7 +183,7 @@ router.post('/', asyncHandler(async (req, res) => {
 
     const menuMap = new Map(menuRows.map((row) => [row.id, row]));
 
-    let total = 0;
+    let subtotal = 0;
     const orderItems = data.items.map((item) => {
       const menu = menuMap.get(item.menuItemId);
       if (!menu) {
@@ -186,9 +191,9 @@ router.post('/', asyncHandler(async (req, res) => {
         err.status = 400;
         throw err;
       }
-      const lockedPrice = Number(item.itemPrice);
+      const lockedPrice = Number(menu.price);
       const lineTotal = lockedPrice * item.quantity;
-      total += lineTotal;
+      subtotal += lineTotal;
       return {
         menuItemId: item.menuItemId,
         itemName: menu.name,
@@ -199,12 +204,32 @@ router.post('/', asyncHandler(async (req, res) => {
       };
     });
 
+    let discountAmount = 0;
+    let couponMeta = null;
+    if (data.couponCode) {
+      const couponResult = await validateCoupon({
+        restaurantId: data.restaurantId,
+        code: data.couponCode,
+        subtotal,
+      });
+      if (!couponResult.ok) {
+        const err = new Error(couponResult.message);
+        err.status = 400;
+        throw err;
+      }
+      discountAmount = couponResult.discountAmount;
+      couponMeta = couponResult;
+    }
+
+    const total = Math.max(0, Number((subtotal - discountAmount).toFixed(2)));
+
     const orderResult = await conn.query(
       `INSERT INTO orders (
          restaurant_id, table_id, table_session_id, table_number, customer_name,
-         total_amount, status, payment_method, payment_provider, payment_status, notes, idempotency_key
+         total_amount, discount_amount, coupon_code, status, payment_method, payment_provider,
+         payment_status, notes, idempotency_key
        )
-       VALUES ($1, $2, $3, $4, $5, $6, 'pending', $7, $7, 'pending', $8, $9)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'pending', $9, $9, 'pending', $10, $11)
        RETURNING id`,
       [
         data.restaurantId,
@@ -213,12 +238,23 @@ router.post('/', asyncHandler(async (req, res) => {
         tableRows[0].table_number,
         data.customerName,
         total,
+        discountAmount,
+        couponMeta?.code || null,
         data.paymentMethod,
         data.notes,
         idempotencyKey,
       ]
     );
     const orderId = orderResult.rows[0].id;
+
+    if (couponMeta) {
+      await recordCouponRedemption(conn, {
+        couponId: couponMeta.couponId,
+        orderId,
+        restaurantId: data.restaurantId,
+        discountAmount,
+      });
+    }
 
     for (const item of orderItems) {
       await conn.query(
@@ -256,8 +292,14 @@ router.post('/', asyncHandler(async (req, res) => {
   }
 }));
 
-router.get('/active', asyncHandler(async (req, res) => {
+router.get('/active', requireAuth(['owner', 'super_admin', 'kitchen', 'staff']), asyncHandler(async (req, res) => {
   const restaurantId = req.query.restaurantId ? Number(req.query.restaurantId) : null;
+
+  if (!restaurantId) {
+    return res.status(400).json({ message: 'restaurantId is required' });
+  }
+
+  await ensureRestaurantAccess(req.user, restaurantId);
 
   let query = `
     SELECT o.id, o.restaurant_id, o.table_id, o.table_number, o.status, o.total_amount, o.created_at,
@@ -285,6 +327,13 @@ router.get('/table/:tableId/active', requireAuth(['owner', 'super_admin', 'kitch
   const statusFilter = pendingOnly
     ? "AND o.payment_status = 'pending'"
     : '';
+
+  const { rows: tableRows } = await pool.query(
+    'SELECT restaurant_id FROM restaurant_tables WHERE id = $1 LIMIT 1',
+    [tableId]
+  );
+  if (!tableRows.length) return res.status(404).json({ message: 'Table not found' });
+  await ensureRestaurantAccess(req.user, tableRows[0].restaurant_id);
 
   const { rows } = await pool.query(
     `SELECT o.id, o.restaurant_id, o.table_id, o.table_number, o.customer_name, o.status,
@@ -314,38 +363,17 @@ router.post('/:orderId/mark-paid', requireAuth(['owner', 'super_admin']), asyncH
   }
 
   const { rows } = await pool.query(
-    'SELECT id, restaurant_id, table_id, payment_status FROM orders WHERE id = $1 LIMIT 1',
+    'SELECT id, restaurant_id FROM orders WHERE id = $1 LIMIT 1',
     [orderId]
   );
   if (!rows.length) return res.status(404).json({ message: 'Order not found' });
 
   await ensureRestaurantAccess(req.user, rows[0].restaurant_id);
 
-  if (rows[0].payment_status === 'paid') {
-    return res.json({ message: 'Order already paid', orderId });
-  }
-
-  await pool.query(
-    `UPDATE orders
-     SET payment_status = 'paid', payment_method = 'cash', payment_provider = 'cash'
-     WHERE id = $1`,
-    [orderId]
-  );
-
-  await endSessionByOrderId(orderId, 'payment_completed');
-  await syncInvoiceForOrder(orderId);
-
-  emitOrderUpdate(rows[0].restaurant_id, { type: 'paid', orderId, method: 'cash' });
-  emitTableUpdate(rows[0].restaurant_id, {
-    tableId: rows[0].table_id,
-    status: 'available',
-    paymentMethod,
-    paymentStatus: 'paid',
-  });
-
-  return res.json({
-    message: 'Cash payment recorded',
-    orderId,
+  const result = await completeCashPayment(orderId, req.user.userId);
+  return res.status(result.status).json({
+    message: result.message,
+    orderId: result.orderId,
     paymentMethod: 'cash',
   });
 }));

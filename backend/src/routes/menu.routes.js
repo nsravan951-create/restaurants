@@ -19,14 +19,15 @@ const menuSchema = z.object({
 });
 
 router.get('/', asyncHandler(async (req, res) => {
-  const restaurantId = req.query.restaurantId ? Number(req.query.restaurantId) : null;
+  const restaurantId = Number(req.query.restaurantId || 0);
+  if (!Number.isInteger(restaurantId) || restaurantId <= 0) {
+    return res.status(400).json({ message: 'restaurantId query parameter is required' });
+  }
 
-  const query = restaurantId
-    ? 'SELECT id, restaurant_id, name, description, price, image_url, category, is_available FROM menu_items WHERE restaurant_id = $1 AND is_available = TRUE ORDER BY category, name'
-    : 'SELECT id, restaurant_id, name, description, price, image_url, category, is_available FROM menu_items ORDER BY restaurant_id, category, name';
-  const params = restaurantId ? [restaurantId] : [];
-
-  const { rows } = await pool.query(query, params);
+  const { rows } = await pool.query(
+    'SELECT id, restaurant_id, name, description, price, image_url, category, is_available FROM menu_items WHERE restaurant_id = $1 AND is_available = TRUE ORDER BY category, name',
+    [restaurantId]
+  );
 
   return res.json({ menu: rows });
 }));

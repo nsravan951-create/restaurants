@@ -1,4 +1,5 @@
 const jwt = require('jsonwebtoken');
+const { getJwtSecret } = require('../config/env');
 
 const requireAuth = (roles = []) => (req, res, next) => {
   try {
@@ -9,7 +10,7 @@ const requireAuth = (roles = []) => (req, res, next) => {
       return res.status(401).json({ message: 'Unauthorized: token missing' });
     }
 
-    const payload = jwt.verify(token, process.env.JWT_SECRET || 'dev-secret');
+    const payload = jwt.verify(token, getJwtSecret());
     req.user = payload;
 
     if (roles.length > 0 && !roles.includes(payload.role)) {

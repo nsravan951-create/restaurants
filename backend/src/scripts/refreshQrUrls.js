@@ -30,7 +30,7 @@ async function run() {
 
     const params = [];
     let sql = `
-      SELECT q.id AS qr_id, q.restaurant_id, q.table_id, t.table_number
+      SELECT q.id AS qr_id, q.restaurant_id, q.table_id, t.table_number, t.qr_token
       FROM qr_codes q
       INNER JOIN restaurant_tables t ON t.id = q.table_id
     `;
@@ -53,11 +53,7 @@ async function run() {
     let updated = 0;
 
     for (const row of rows) {
-      const { qrUrl, qrDataUrl } = await buildQrPayload({
-        restaurantId: row.restaurant_id,
-        tableId: row.table_id,
-        tableNumber: row.table_number,
-      });
+      const { qrUrl, qrDataUrl } = await buildQrPayload({ qrToken: row.qr_token });
 
       await conn.query(
         `UPDATE qr_codes

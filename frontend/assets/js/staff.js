@@ -64,7 +64,7 @@ function initStaffSocket() {
   const auth = getStaffAuth();
   if (!auth) return;
 
-  const socket = io(window.APP_CONFIG.SOCKET_URL);
+  const socket = io(window.APP_CONFIG.SOCKET_URL, { auth: { token: auth.token } });
   socket.emit('restaurant:join', auth.restaurant.id);
   socket.on('order:update', () => {
     loadStaffBoard().catch((error) => setMessage('staffMessage', error.message, true));

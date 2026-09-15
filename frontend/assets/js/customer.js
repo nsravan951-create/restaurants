@@ -320,7 +320,7 @@ async function handleOnline() {
     const orderData = await placeOrder('cashfree');
     const paymentData = await apiRequest('/api/payments/cashfree/create-order', {
       method: 'POST',
-      body: JSON.stringify({ orderId: orderData.orderId }),
+      body: JSON.stringify({ orderId: orderData.orderId, sessionToken: activeSession.sessionToken }),
     });
     if (!paymentData.checkoutUrl && !paymentData.paymentSessionId) {
       throw new Error('Cashfree checkout is not ready. No payment was marked as successful.');

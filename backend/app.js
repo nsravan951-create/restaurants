@@ -14,6 +14,11 @@ const platformRoutes = require('./src/routes/platform.routes');
 const messagingRoutes = require('./src/routes/messaging.routes');
 const invoiceRoutes = require('./src/routes/invoice.routes');
 const tableSessionRoutes = require('./src/routes/tableSession.routes');
+const reviewsRoutes = require('./src/routes/reviews.routes');
+const couponsRoutes = require('./src/routes/coupons.routes');
+const inventoryRoutes = require('./src/routes/inventory.routes');
+const refundsRoutes = require('./src/routes/refunds.routes');
+const subscriptionsRoutes = require('./src/routes/subscriptions.routes');
 const errorHandler = require('./src/middleware/errorHandler');
 
 const app = express();
@@ -25,6 +30,7 @@ const allowedOrigins = new Set(
     .filter(Boolean)
 );
 
+allowedOrigins.add('https://autoresto.in');
 allowedOrigins.add('https://restaurants.netlify.app');
 allowedOrigins.add('https://restaurantts.netlify.app');
 allowedOrigins.add('https://restauranttts.netlify.app');
@@ -47,7 +53,13 @@ const corsOptions = {
 
 app.use(cors(corsOptions));
 app.options('*', cors(corsOptions));
-app.use(express.json());
+app.use(express.json({
+  verify(req, res, buffer) {
+    if (req.originalUrl.split('?')[0].endsWith('/cashfree/webhook')) {
+      req.rawBody = Buffer.from(buffer);
+    }
+  },
+}));
 app.use((req, res, next) => {
   if (process.env.NODE_ENV !== 'test') {
     console.log(`[api] ${new Date().toISOString()} ${req.method} ${req.originalUrl}`);
@@ -56,19 +68,36 @@ app.use((req, res, next) => {
 });
 
 
-app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', service: 'qr-restaurant-backend' });
-});
+app.get('/api/health', async (req, res) => {
+  const payload = {
+    status: 'ok',
+    service: 'qr-restaurant-backend',
+    database: 'unknown',
+    timestamp: new Date().toISOString(),
+  };
 
-app.get('/test-db', async (req, res) => {
   try {
-    const result = await pool.query('SELECT NOW()');
-    res.json(result.rows);
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: err.message });
+    await pool.ready();
+    payload.database = 'connected';
+    return res.json(payload);
+  } catch (error) {
+    payload.status = 'degraded';
+    payload.database = 'disconnected';
+    return res.status(503).json(payload);
   }
 });
+
+if (process.env.NODE_ENV !== 'production') {
+  app.get('/test-db', async (req, res) => {
+    try {
+      const result = await pool.query('SELECT NOW()');
+      res.json(result.rows);
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ error: 'Database connection failed' });
+    }
+  });
+}
 
 app.use('/api/auth', authRoutes);
 app.use('/auth', authRoutes);
@@ -93,6 +122,11 @@ app.use('/table-sessions', tableSessionRoutes);
 app.use('/sessions', tableSessionRoutes);
 app.use('/tables', restaurantRoutes);
 app.use('/owner', ownerRoutes);
+app.use('/api/reviews', reviewsRoutes);
+app.use('/api/coupons', couponsRoutes);
+app.use('/api/inventory', inventoryRoutes);
+app.use('/api/refunds', refundsRoutes);
+app.use('/api/subscriptions', subscriptionsRoutes);
 
 
 app.use(errorHandler);

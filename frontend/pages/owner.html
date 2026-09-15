@@ -34,6 +34,9 @@
             <button class="btn btn-light sidebar-link" type="button" data-owner-section="analytics">3. Total Analytics</button>
             <button class="btn btn-light sidebar-link" type="button" data-owner-section="invoices">4. All Invoices History</button>
             <button class="btn btn-light sidebar-link" type="button" data-owner-section="password">5. Password Change</button>
+            <button class="btn btn-light sidebar-link" type="button" data-owner-section="features">6. Premium Features</button>
+            <button class="btn btn-light sidebar-link" type="button" data-owner-section="kitchen">7. Kitchen Board</button>
+            <button class="btn btn-light sidebar-link" type="button" data-owner-section="ready">8. Ready Orders</button>
           </div>
         </aside>
 
@@ -59,7 +62,6 @@
                 <button id="editPaymentDetailsBtn" class="btn btn-light" type="button">Edit</button>
               </div>
               <form id="paymentSettingsForm" class="grid-3 owner-payment-form">
-                <input name="upiVpa" id="upiVpaInput" placeholder="Restaurant UPI ID (e.g. cafe@upi)" disabled />
                 <input name="bankAccountName" placeholder="Account holder name" disabled />
                 <input name="bankName" placeholder="Bank name" disabled />
                 <input name="logoUrl" placeholder="Logo URL (optional)" disabled />
@@ -151,6 +153,16 @@
             </form>
           </section>
 
+          <section class="panel dashboard-section hidden" data-owner-section-panel="features">
+            <div class="section-head">
+              <div>
+                <h2>Premium Features</h2>
+                <p class="hero-copy">Available features are enabled. Locked features require an upgrade.</p>
+              </div>
+            </div>
+            <div id="ownerFeatureList" class="card-row"></div>
+          </section>
+
           <section class="panel dashboard-section hidden" data-owner-section-panel="kitchen">
             <div class="section-head">
               <div>
@@ -218,7 +230,7 @@
           </table>
           <section id="billAddSection" class="bill-add-section hidden">
             <h3>Add extra items to running bill</h3>
-            <p id="billPaymentNote" class="hero-copy">Guest pays with Cash or UPI in their Review &amp; Checkout screen.</p>
+            <p id="billPaymentNote" class="hero-copy">Guest pays with Cash or Cashfree in their Review &amp; Checkout screen.</p>
             <form id="billAddItemForm" class="inline-form" novalidate>
               <select id="billMenuSelect">
                 <option value="">Select menu item</option>

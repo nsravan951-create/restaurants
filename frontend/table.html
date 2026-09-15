@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#bf4e22" />
     <title>Table Order</title>
+    <script src="https://sdk.cashfree.com/js/v3/cashfree.js"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@600;700&family=Sora:wght@400;500;600;700&display=swap" rel="stylesheet" />
@@ -774,9 +775,10 @@
       </div>
     </div>
 
+    <script src="assets/js/config.js"></script>
     <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
     <script>
-      const BACKEND_BASE_URL = window.API_URL || 'https://restaurant-backend-rxqz.onrender.com';
+      const BACKEND_BASE_URL = window.API_URL || window.APP_CONFIG?.API_BASE_URL || 'http://localhost:5000';
       const SOCKET_URL = window.APP_CONFIG?.SOCKET_URL || BACKEND_BASE_URL;
 
       const els = {
@@ -836,7 +838,11 @@
         estimatedMinutes: '15-20',
         checkoutIdempotencyKey: null,
         tableLocked: false,
+        qrToken: null,
+        cashfreeMode: 'sandbox',
       };
+
+      const PENDING_ORDER_KEY = 'qr_pending_cashfree_order';
 
       const CLIENT_ID_KEY = 'qr_customer_client_id';
       const CART_KEY_PREFIX = 'qr_cart_';
@@ -851,18 +857,31 @@
         return id;
       }
 
-      function tableIdFromUrl() {
+      function qrAccessFromUrl() {
         const rawSearch = window.location.search || '';
-        // Legacy malformed QR links: table.html?=71
-        const legacyMatch = rawSearch.match(/^\?=(\d+)/);
-        if (legacyMatch) return Number(legacyMatch[1]);
-
         const params = new URLSearchParams(rawSearch);
-        const fromQuery = params.get('id') || params.get('tableId') || params.get('table');
-        if (fromQuery) return Number(fromQuery);
+        const token = params.get('t') || params.get('token');
+        if (token) {
+          return { mode: 'token', token };
+        }
+
+        const tableId = params.get('id') || params.get('tableId') || params.get('table');
+        const legacyToken = params.get('t') || params.get('token');
+        if (tableId && legacyToken) {
+          return { mode: 'legacy', tableId: Number(tableId), token: legacyToken };
+        }
+
+        const legacyMatch = rawSearch.match(/^\?=(\d+)/);
+        if (legacyMatch) {
+          return { mode: 'legacy-id-only', tableId: Number(legacyMatch[1]) };
+        }
+
         const parts = window.location.pathname.split('/').filter(Boolean);
         const idx = parts.lastIndexOf('table');
-        if (idx !== -1 && parts[idx + 1]) return Number(parts[idx + 1]);
+        if (idx !== -1 && parts[idx + 1]) {
+          return { mode: 'legacy-id-only', tableId: Number(parts[idx + 1]) };
+        }
+
         return null;
       }
 
@@ -1217,6 +1236,7 @@
         const total = Number(order?.totalAmount || items.reduce((sum, item) => sum + Number(item.lineTotal || 0), 0));
         return {
           orderId: order.orderId,
+          sessionToken: state.session?.sessionToken || '',
           tableId: state.context.table.id,
           restaurantId: state.context.restaurant.id,
           tableNumber: state.context.table.table_number,
@@ -1346,6 +1366,7 @@
             body: JSON.stringify({
               restaurantId: state.context.restaurant.id,
               tableId: state.context.table.id,
+              qrToken: state.qrToken,
               clientId: getClientId(),
               joinExisting,
               sessionToken: stored?.sessionToken || '',
@@ -1427,17 +1448,82 @@
         });
       }
 
+      async function loadCashfreeConfig() {
+        try {
+          const cfg = await apiRequest('/api/payments/cashfree/config');
+          if (cfg?.mode) state.cashfreeMode = cfg.mode;
+        } catch (error) {
+          state.cashfreeMode = window.location.hostname === 'autoresto.in' ? 'production' : 'sandbox';
+        }
+      }
+
+      async function verifyCashfreeReturn() {
+        const params = new URLSearchParams(window.location.search);
+        const orderId = Number(params.get('orderId') || 0);
+        if (!orderId) return false;
+
+        let pending = null;
+        try {
+          pending = JSON.parse(sessionStorage.getItem(PENDING_ORDER_KEY) || 'null');
+        } catch (error) {
+          pending = null;
+        }
+
+        const sessionToken = state.session?.sessionToken || pending?.sessionToken || '';
+        if (!sessionToken) return false;
+
+        setCheckoutPayMessage('Verifying your payment...');
+        const statusData = await apiRequest(
+          `/api/payments/cashfree/status/${orderId}?sessionToken=${encodeURIComponent(sessionToken)}`
+        );
+
+        if (statusData.paymentStatus !== 'paid') {
+          setCheckoutPayMessage('Payment is still processing. Please wait a moment and refresh.', true);
+          return false;
+        }
+
+        const order = pending || buildOrderSnapshot({
+          orderId,
+          totalAmount: statusData.providerStatus?.order_amount || 0,
+        });
+
+        sessionStorage.removeItem(PENDING_ORDER_KEY);
+        closeCheckoutModal();
+        clearCartStorage();
+        state.cart.clear();
+        renderCart();
+        await finalizePaidReceipt(order, 'paid');
+        lockTableAfterBooking('Payment received. Your order is confirmed.');
+
+        const cleanParams = new URLSearchParams(window.location.search);
+        cleanParams.delete('orderId');
+        cleanParams.delete('tableId');
+        const query = cleanParams.toString();
+        const nextUrl = `${window.location.pathname}${query ? `?${query}` : ''}`;
+        window.history.replaceState({}, '', nextUrl);
+        return true;
+      }
+
       async function loadTable() {
-        const tableId = tableIdFromUrl();
-        if (!tableId) {
-          setError('Invalid QR URL. Expected table.html?id=72');
+        await loadCashfreeConfig();
+        const access = qrAccessFromUrl();
+        if (!access) {
+          setError('Invalid QR URL. Please scan the table QR code again.');
+          return;
+        }
+        if (access.mode === 'legacy-id-only') {
+          setError('This QR code is outdated. Please ask the restaurant for a refreshed table QR.');
           return;
         }
 
         setLoading();
 
         try {
-          const data = await apiRequest(`/api/restaurants/table/${tableId}`);
+          const endpoint = access.mode === 'token'
+            ? `/api/restaurants/qr/${encodeURIComponent(access.token)}`
+            : `/api/restaurants/table/${access.tableId}?t=${encodeURIComponent(access.token)}`;
+          state.qrToken = access.mode === 'token' ? access.token : access.token;
+          const data = await apiRequest(endpoint);
           state.context = data;
           setHero(data);
           document.title = `${data.restaurant.name} | Table ${data.table.table_number}`;
@@ -1468,7 +1554,8 @@
           renderCart();
           connectSocket();
 
-          setView('menu');
+          const paidOnReturn = await verifyCashfreeReturn();
+          if (!paidOnReturn) setView('menu');
         } catch (error) {
           setError(error.message || 'Unable to load table menu.');
         }
@@ -1544,16 +1631,26 @@
         try {
           setCheckoutPayMessage('Preparing secure Cashfree Checkout...');
           const orderData = await placeOrder('cashfree');
+          const orderSnapshot = buildOrderSnapshot(orderData);
+          sessionStorage.setItem(PENDING_ORDER_KEY, JSON.stringify({
+            ...orderSnapshot,
+            sessionToken: state.session.sessionToken,
+          }));
+
           const paymentData = await apiRequest('/api/payments/cashfree/create-order', {
             method: 'POST',
-            body: JSON.stringify({ orderId: orderData.orderId }),
+            body: JSON.stringify({ orderId: orderData.orderId, sessionToken: state.session.sessionToken }),
           });
 
           if (!paymentData.checkoutUrl && !paymentData.paymentSessionId) {
             throw new Error('Cashfree checkout is not ready. No payment was marked as successful.');
           }
 
-          setCheckoutPayMessage('Cashfree Checkout integration is ready for the official SDK.');
+          const cashfree = Cashfree({ mode: state.cashfreeMode });
+          await cashfree.checkout({
+            paymentSessionId: paymentData.paymentSessionId,
+            redirectTarget: '_self',
+          });
         } catch (error) {
           setCheckoutPayMessage(error.message || 'Cashfree checkout is unavailable', true);
         }

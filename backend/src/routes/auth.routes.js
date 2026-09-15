@@ -7,6 +7,8 @@ const pool = require('../config/db');
 const asyncHandler = require('../utils/asyncHandler');
 const { requireAuth } = require('../middleware/auth');
 const { buildQrPayload } = require('../utils/qr');
+const { getJwtSecret } = require('../config/env');
+const { authLimiter } = require('../middleware/rateLimit');
 
 const router = express.Router();
 
@@ -33,13 +35,12 @@ const passwordChangeSchema = z.object({
 function signToken(user) {
   return jwt.sign(
     { userId: user.id, email: user.email, role: user.role },
-    process.env.JWT_SECRET || 'dev-secret',
+    getJwtSecret(),
     { expiresIn: '7d' }
   );
 }
 
-router.post('/register-owner', asyncHandler(async (req, res) => {
-  console.log('BODY:', req.body);
+router.post('/register-owner', authLimiter, asyncHandler(async (req, res) => {
 
   const { name, email, password } = req.body || {};
   if (!name || !email || !password) {
@@ -54,7 +55,6 @@ router.post('/register-owner', asyncHandler(async (req, res) => {
 
   try {
     const { rows: existing } = await conn.query('SELECT id FROM users WHERE email = $1', [data.email]);
-    console.log('REGISTER existing user count:', existing.length);
     if (existing.length) {
       return res.status(409).json({ error: 'User already exists' });
     }
@@ -67,7 +67,6 @@ router.post('/register-owner', asyncHandler(async (req, res) => {
       [data.name, data.email, hash, 'owner']
     );
     const userId = userResult.rows[0].id;
-    console.log('REGISTER created user id:', userId);
 
     const slugBase = data.restaurantName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
     const slug = `${slugBase}-${Date.now()}`;
@@ -77,7 +76,6 @@ router.post('/register-owner', asyncHandler(async (req, res) => {
       [userId, data.restaurantName, slug, data.phone, data.address]
     );
     const restaurantId = restaurantResult.rows[0].id;
-    console.log('REGISTER created restaurant id:', restaurantId);
 
     for (let i = 1; i <= data.totalTables; i += 1) {
       const tableNumber = `Table ${i}`;
@@ -89,11 +87,7 @@ router.post('/register-owner', asyncHandler(async (req, res) => {
       );
       const tableId = tableResult.rows[0].id;
 
-      const { qrUrl, qrDataUrl } = await buildQrPayload({
-        restaurantId,
-        tableId,
-        tableNumber,
-      });
+      const { qrUrl, qrDataUrl } = await buildQrPayload({ qrToken: token });
 
       await conn.query(
         `INSERT INTO qr_codes (restaurant_id, table_id, qr_url, qr_data_url)
@@ -114,19 +108,19 @@ router.post('/register-owner', asyncHandler(async (req, res) => {
       restaurant: { id: restaurantId, name: data.restaurantName, slug, totalTables: data.totalTables },
     });
   } catch (error) {
-    console.error('REGISTER ERROR:', error);
+    console.error('Owner registration failed:', error.message);
     try {
       await conn.query('ROLLBACK');
     } catch (rollbackError) {
-      console.error('REGISTER ROLLBACK ERROR:', rollbackError);
+      console.error('Owner registration rollback failed:', rollbackError.message);
     }
-    return res.status(500).json({ error: error.message });
+    throw error;
   } finally {
     conn.release();
   }
 }));
 
-router.post('/login', asyncHandler(async (req, res) => {
+router.post('/login', authLimiter, asyncHandler(async (req, res) => {
   const data = loginSchema.parse(req.body);
 
   const { rows } = await pool.query(
@@ -167,7 +161,7 @@ router.post('/login', asyncHandler(async (req, res) => {
   });
 }));
 
-router.post('/bootstrap-super-admin', asyncHandler(async (req, res) => {
+router.post('/bootstrap-super-admin', authLimiter, asyncHandler(async (req, res) => {
   const { name, email, password, setupKey } = req.body;
 
   if (!setupKey || setupKey !== process.env.SUPER_ADMIN_SETUP_KEY) {

@@ -11,8 +11,7 @@ function getSocket() {
 function emitOrderUpdate(restaurantId, payload) {
   if (!ioInstance) return;
   ioInstance.to(`restaurant_${restaurantId}`).emit('order:update', payload);
-  // also emit a global order update for super-admin dashboard
-  try { ioInstance.emit('order:update:global', { ...payload, restaurantId }); } catch (e) {}
+  ioInstance.to('super_admin').emit('order:update:global', { ...payload, restaurantId });
 }
 
 function emitTableUpdate(restaurantId, payload) {

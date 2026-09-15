@@ -28,8 +28,7 @@ router.post('/', asyncHandler(async (req, res) => {
   const message = messageRows[0];
 
   // Add recipients
-  if (recipientType === 'all' && isBroadcast) {
-    // Send to all active restaurants
+  if (recipientType === 'all') {
     await pool.query(
       `INSERT INTO message_recipients (message_id, restaurant_id)
        SELECT $1, id FROM restaurants WHERE is_active = TRUE

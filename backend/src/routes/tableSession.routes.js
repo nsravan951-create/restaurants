@@ -3,6 +3,9 @@ const { z } = require('zod');
 
 const pool = require('../config/db');
 const asyncHandler = require('../utils/asyncHandler');
+const { createRateLimiter } = require('../middleware/rateLimit');
+
+const sessionLimiter = createRateLimiter({ windowMs: 10 * 60 * 1000, max: 40 });
 const {
   SESSION_TIMEOUT_MINUTES,
   generateSessionToken,
@@ -17,6 +20,7 @@ const router = express.Router();
 const startSessionSchema = z.object({
   restaurantId: z.number().int().positive(),
   tableId: z.number().int().positive(),
+  qrToken: z.string().min(8),
   clientId: z.string().min(6),
   joinExisting: z.boolean().optional().default(false),
   sessionToken: z.string().optional().default(''),
@@ -53,11 +57,12 @@ router.post('/start', asyncHandler(async (req, res, next) => {
   return next();
 }));
 
-router.post('/start', asyncHandler(async (req, res) => {
+router.post('/start', sessionLimiter, asyncHandler(async (req, res) => {
   const data = startSessionSchema.parse({
     ...req.body,
     restaurantId: Number(req.body.restaurantId),
     tableId: Number(req.body.tableId),
+    qrToken: String(req.body.qrToken || '').trim(),
   });
 
   await expireInactiveSessions();
@@ -67,13 +72,18 @@ router.post('/start', asyncHandler(async (req, res) => {
     await conn.query('BEGIN');
 
     const { rows: tableRows } = await conn.query(
-      'SELECT id, table_number FROM restaurant_tables WHERE id = $1 AND restaurant_id = $2 LIMIT 1 FOR UPDATE',
+      'SELECT id, table_number, qr_token FROM restaurant_tables WHERE id = $1 AND restaurant_id = $2 LIMIT 1 FOR UPDATE',
       [data.tableId, data.restaurantId]
     );
 
     if (!tableRows.length) {
       await conn.query('ROLLBACK');
       return res.status(404).json({ message: 'Table not found' });
+    }
+
+    if (tableRows[0].qr_token !== data.qrToken) {
+      await conn.query('ROLLBACK');
+      return res.status(403).json({ message: 'Invalid table QR token' });
     }
 
     const { rows: statusRows } = await conn.query(
@@ -139,7 +149,7 @@ router.post('/start', asyncHandler(async (req, res) => {
         });
       }
 
-      if (data.joinExisting && !orderLocked) {
+      if (data.joinExisting && !orderLocked && data.clientId === existing.created_by_client_id) {
         const nextExpiry = getSessionExpiryDate();
         await conn.query(
           'UPDATE table_sessions SET last_activity_at = NOW(), expires_at = $1 WHERE id = $2',
@@ -163,12 +173,7 @@ router.post('/start', asyncHandler(async (req, res) => {
       await conn.query('ROLLBACK');
       return res.status(409).json({
         locked: true,
-        message: 'This table is currently in ordering session. Please wait or join existing order.',
-        session: {
-          id: existing.id,
-          expiresAt: existing.expires_at,
-          timeoutMinutes: SESSION_TIMEOUT_MINUTES,
-        },
+        message: 'This table is currently in ordering session. Please wait or ask staff for help.',
       });
     }
 
@@ -318,8 +323,12 @@ router.post('/:sessionId/end', asyncHandler(async (req, res) => {
 
 router.post('/end', asyncHandler(async (req, res) => {
   const sessionId = Number(req.body.sessionId);
+  const sessionToken = String(req.body.sessionToken || '').trim();
   if (!sessionId) {
     return res.status(400).json({ error: 'sessionId is required' });
+  }
+  if (sessionToken.length < 10) {
+    return res.status(400).json({ error: 'sessionToken is required' });
   }
 
   const conn = await pool.connect();
@@ -329,10 +338,10 @@ router.post('/end', asyncHandler(async (req, res) => {
     const { rows } = await conn.query(
       `SELECT id, table_id, status
        FROM table_sessions
-       WHERE id = $1
+      WHERE id = $1 AND session_token = $2
        LIMIT 1
        FOR UPDATE`,
-      [sessionId]
+          [sessionId, sessionToken]
     );
 
     if (!rows.length) {

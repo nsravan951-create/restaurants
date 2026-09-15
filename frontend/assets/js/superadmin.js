@@ -708,8 +708,22 @@
     });
   }
 
+  function normalizeAd(ad) {
+    return {
+      ...ad,
+      restaurant_id: ad.restaurant_id ?? ad.restaurantId ?? null,
+      target_link: ad.target_link ?? ad.targetLink ?? '',
+      is_active: ad.is_active ?? ad.isActive ?? false,
+      media_type: ad.media_type ?? ad.mediaType ?? 'image',
+      image_url: ad.image_url ?? ad.imageUrl ?? '',
+      video_url: ad.video_url ?? ad.videoUrl ?? '',
+      display_mode: ad.display_mode ?? ad.displayMode ?? 'grid',
+      display_order: ad.display_order ?? ad.displayOrder ?? 0,
+    };
+  }
+
   function renderAdsList() {
-    const ads = getFilteredAds();
+    const ads = getFilteredAds().map(normalizeAd);
     const adsListRoot = el('adsList');
     if (!adsListRoot) return;
 
@@ -718,7 +732,7 @@
         <div class="admin-item__header">
           <div>
             <h4>${escapeHtml(ad.title)}</h4>
-            <p>${ad.restaurant_id ? `Restaurant: ${escapeHtml(ad.restaurant_name)}` : 'Global Ad'} • Target: <a href="${escapeHtml(ad.target_link)}" target="_blank">${escapeHtml(ad.target_link)}</a></p>
+            <p>${ad.restaurant_id ? `Restaurant: ${escapeHtml(ad.restaurant_name || ad.restaurant_id)}` : 'Global Ad'} • Target: <a href="${escapeHtml(ad.target_link)}" target="_blank">${escapeHtml(ad.target_link)}</a></p>
           </div>
           <span class="badge ${ad.is_active ? 'badge--success' : 'badge--muted'}">${ad.is_active ? 'Active' : 'Inactive'}</span>
         </div>
@@ -745,7 +759,7 @@
 
   async function loadAds() {
     try {
-      const data = await apiRequest('/api/ad', {}, true);
+      const data = await apiRequest('/api/ads', {}, true);
       state.dashboard.ads = data.ads || [];
       renderAdsList();
       renderSummary();
@@ -1136,13 +1150,13 @@
 
     try {
       if (adId) {
-        await apiRequest(`/api/ad/${adId}`, {
+        await apiRequest(`/api/ads/${adId}`, {
           method: 'PUT',
           body: JSON.stringify(payload),
         }, true);
         setMessage('Ad updated successfully.');
       } else {
-        await apiRequest('/api/ad', {
+        await apiRequest('/api/ads', {
           method: 'POST',
           body: JSON.stringify(payload),
         }, true);
@@ -1168,18 +1182,19 @@
     const form = el('adForm');
     if (!form) return;
 
-    form.title.value = ad.title;
-    form.imageUrl.value = ad.image_url || '';
-    form.videoUrl.value = ad.video_url || '';
-    form.mediaType.value = ad.media_type || 'image';
-    form.targetLink.value = ad.target_link;
-    form.restaurantId.value = ad.restaurant_id || '';
+    const normalized = normalizeAd(ad);
+    form.title.value = normalized.title;
+    form.imageUrl.value = normalized.image_url || '';
+    form.videoUrl.value = normalized.video_url || '';
+    form.mediaType.value = normalized.media_type || 'image';
+    form.targetLink.value = normalized.target_link;
+    form.restaurantId.value = normalized.restaurant_id || '';
     form.startsAt.value = ad.starts_at ? new Date(ad.starts_at).toISOString().slice(0, 16) : '';
     form.endsAt.value = ad.ends_at ? new Date(ad.ends_at).toISOString().slice(0, 16) : '';
-    form.isActive.checked = ad.is_active;
-    form.adId.value = ad.id;
-    form.displayMode.value = ad.display_mode || 'grid';
-    form.displayOrder.value = ad.display_order || 0;
+    form.isActive.checked = normalized.is_active;
+    form.adId.value = normalized.id;
+    form.displayMode.value = normalized.display_mode || 'grid';
+    form.displayOrder.value = normalized.display_order || 0;
 
     // Manually trigger change to update visibility of imageUrl/videoUrl
     const changeEvent = new Event('change');
@@ -1187,7 +1202,7 @@
 
     el('adSubmitButton').textContent = 'Update ad';
     el('adCancelButton').classList.remove('hidden');
-    setSection('ads'); // Ensure ad section is visible
+    setSection('promotions');
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
@@ -1196,7 +1211,7 @@
     if (!confirm('Are you sure you want to delete this ad?')) return;
 
     try {
-      await apiRequest(`/api/ad/${adId}`, {
+      await apiRequest(`/api/ads/${adId}`, {
         method: 'DELETE',
       }, true);
       setMessage('Ad deleted successfully.');
@@ -1280,7 +1295,7 @@
     if (restaurantForm) restaurantForm.addEventListener('submit', handleRestaurantCreate);
 
     const adForm = el('adForm');
-    if (adForm) adForm.addEventListener('submit', handleAdFormSubmit);
+    if (adForm) adForm.addEventListener('submit', handleAdSubmit);
 
     const adCancelButton = el('adCancelButton');
     if (adCancelButton) adCancelButton.addEventListener('click', clearAdForm);

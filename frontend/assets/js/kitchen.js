@@ -66,7 +66,7 @@ function initKitchenSocket() {
   const auth = getKitchenAuth();
   if (!auth) return;
 
-  const socket = io(window.APP_CONFIG.SOCKET_URL);
+  const socket = io(window.APP_CONFIG.SOCKET_URL, { auth: { token: auth.token } });
   socket.emit('restaurant:join', auth.restaurant.id);
   socket.on('order:update', () => {
     loadKitchenBoard().catch((error) => setMessage('kitchenMessage', error.message, true));
