@@ -14,8 +14,6 @@ const { completeCashPayment } = require('../utils/paymentCompletion');
 const { validateCoupon, recordCouponRedemption } = require('../utils/coupons');
 const { calculateGstBreakdown, getRestaurantGstProfile } = require('../utils/gst');
 const { renderKotHtml, renderThermalBillHtml } = require('../utils/kot');
-const { calculateGstBreakdown, getRestaurantGstProfile } = require('../utils/gst');
-const { renderKotHtml, renderThermalBillHtml } = require('../utils/kot');
 
 const router = express.Router();
 
