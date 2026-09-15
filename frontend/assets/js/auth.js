@@ -7,7 +7,7 @@ if (registerForm) {
     const formData = new FormData(registerForm);
     const payload = Object.fromEntries(formData.entries());
 
-    fetch(`${window.API_URL}/auth/register-owner`, {
+    fetch(`${window.API_URL}/api/auth/register-owner`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -45,7 +45,7 @@ if (loginForm) {
 
     try {
       const payload = Object.fromEntries(formData.entries());
-      const data = await apiRequest('/auth/login', {
+      const data = await apiRequest('/api/auth/login', {
         method: 'POST',
         body: JSON.stringify(payload),
       });
