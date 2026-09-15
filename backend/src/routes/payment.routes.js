@@ -114,6 +114,7 @@ router.post('/cashfree/create-order', paymentLimiter, asyncHandler(async (req, r
     orderId,
     amount,
     currency: 'INR',
+    mode: config.environment === 'production' ? 'production' : 'sandbox',
     paymentSessionId: providerOrder.paymentSessionId,
     checkoutUrl: providerOrder.checkoutUrl,
   });

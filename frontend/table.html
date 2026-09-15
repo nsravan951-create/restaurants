@@ -1451,9 +1451,13 @@
       async function loadCashfreeConfig() {
         try {
           const cfg = await apiRequest('/api/payments/cashfree/config');
+          if (cfg?.configured === false) {
+            throw new Error(cfg.message || 'Cashfree is not configured on the server');
+          }
           if (cfg?.mode) state.cashfreeMode = cfg.mode;
         } catch (error) {
-          state.cashfreeMode = window.location.hostname === 'autoresto.in' ? 'production' : 'sandbox';
+          console.warn('Cashfree config unavailable, defaulting to sandbox mode', error);
+          state.cashfreeMode = 'sandbox';
         }
       }
 
@@ -1630,6 +1634,8 @@
       async function handleCashfreeCheckout() {
         try {
           setCheckoutPayMessage('Preparing secure Cashfree Checkout...');
+          await loadCashfreeConfig();
+
           const orderData = await placeOrder('cashfree');
           const orderSnapshot = buildOrderSnapshot(orderData);
           sessionStorage.setItem(PENDING_ORDER_KEY, JSON.stringify({
@@ -1646,11 +1652,20 @@
             throw new Error('Cashfree checkout is not ready. No payment was marked as successful.');
           }
 
-          const cashfree = Cashfree({ mode: state.cashfreeMode });
-          await cashfree.checkout({
+          const checkoutMode = paymentData.mode || state.cashfreeMode || 'sandbox';
+          const cashfree = Cashfree({ mode: checkoutMode });
+          const checkoutResult = await cashfree.checkout({
             paymentSessionId: paymentData.paymentSessionId,
             redirectTarget: '_self',
           });
+
+          if (checkoutResult?.error) {
+            const checkoutError = checkoutResult.error.message || 'Cashfree checkout failed';
+            if (/auth/i.test(checkoutError)) {
+              throw new Error(`${checkoutError}. Ensure ${window.location.origin} is whitelisted in Cashfree (sandbox) and the SDK mode matches your API keys.`);
+            }
+            throw new Error(checkoutError);
+          }
         } catch (error) {
           setCheckoutPayMessage(error.message || 'Cashfree checkout is unavailable', true);
         }

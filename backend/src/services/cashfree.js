@@ -1,11 +1,27 @@
 const crypto = require('crypto');
 
+function normalizePublicUrl(value) {
+  let url = String(value || '').trim();
+  if (!url) return '';
+  url = url.replace(/^https:\/\/https:\/\//i, 'https://');
+  if (!/^https?:\/\//i.test(url)) url = `https://${url}`;
+  return url.replace(/\/$/, '');
+}
+
+function resolveCashfreeReturnUrl() {
+  const explicit = normalizePublicUrl(process.env.CASHFREE_RETURN_URL);
+  if (explicit) return explicit;
+  const frontend = normalizePublicUrl(process.env.FRONTEND_PUBLIC_URL);
+  if (frontend) return `${frontend}/table.html`;
+  return '';
+}
+
 function getCashfreeConfig() {
   const clientId = String(process.env.CASHFREE_CLIENT_ID || '').trim();
   const clientSecret = String(process.env.CASHFREE_CLIENT_SECRET || '').trim();
   const environment = String(process.env.CASHFREE_ENVIRONMENT || 'sandbox').trim().toLowerCase();
   const apiVersion = String(process.env.CASHFREE_API_VERSION || '').trim();
-  const returnUrl = String(process.env.CASHFREE_RETURN_URL || '').trim();
+  const returnUrl = resolveCashfreeReturnUrl();
   const webhookUrl = String(process.env.CASHFREE_WEBHOOK_URL || '').trim();
 
   return {
@@ -52,7 +68,12 @@ async function cashfreeRequest(path, options = {}) {
   });
   const data = await response.json().catch(() => ({}));
   if (!response.ok) {
-    const error = new Error(data.message || data.type || `Cashfree request failed (${response.status})`);
+    const providerMessage = data.message || data.type || `Cashfree request failed (${response.status})`;
+    let message = providerMessage;
+    if (response.status === 401 || /auth/i.test(String(providerMessage))) {
+      message = `Cashfree authentication failed (${config.environment}). Verify API keys and CASHFREE_API_VERSION on the server match the ${config.environment} environment.`;
+    }
+    const error = new Error(message);
     error.status = response.status >= 500 ? 502 : 400;
     error.code = 'CASHFREE_PROVIDER_ERROR';
     error.providerResponse = data;
