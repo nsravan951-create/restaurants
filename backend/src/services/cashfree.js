@@ -1,5 +1,19 @@
 const crypto = require('crypto');
 
+const DEFAULT_API_VERSION = '2026-01-01';
+const SUPPORTED_API_VERSIONS = new Set([
+  '2026-01-01',
+  '2025-01-01',
+  '2023-08-01',
+  '2022-09-01',
+  '2022-01-01',
+  '2021-05-21',
+]);
+
+function sanitizeEnvValue(value) {
+  return String(value || '').trim().replace(/^['"]|['"]$/g, '');
+}
+
 function normalizePublicUrl(value) {
   let url = String(value || '').trim();
   if (!url) return '';
@@ -16,13 +30,52 @@ function resolveCashfreeReturnUrl() {
   return '';
 }
 
+function maskCredential(value) {
+  const text = String(value || '');
+  if (!text) return '(missing)';
+  if (text.length <= 8) return `${text.slice(0, 2)}***`;
+  return `${text.slice(0, 6)}…${text.slice(-4)}`;
+}
+
+function validateCashfreeCredentialShape({ clientId, clientSecret, environment, apiVersion }) {
+  const issues = [];
+
+  if (!clientId || !clientSecret) {
+    issues.push('Set CASHFREE_CLIENT_ID and CASHFREE_CLIENT_SECRET from Cashfree Dashboard → Developers → API Keys.');
+  }
+
+  if (apiVersion && !SUPPORTED_API_VERSIONS.has(apiVersion)) {
+    issues.push(`CASHFREE_API_VERSION "${apiVersion}" is not supported. Use ${DEFAULT_API_VERSION}.`);
+  }
+
+  const idUpper = clientId.toUpperCase();
+  const secretUpper = clientSecret.toUpperCase();
+
+  if (environment === 'sandbox' && (idUpper.startsWith('PROD_') || secretUpper.startsWith('PROD_'))) {
+    issues.push('Sandbox mode is enabled but production Cashfree keys were detected. Switch to TEST sandbox keys or set CASHFREE_ENVIRONMENT=production.');
+  }
+
+  if (environment === 'production' && (idUpper.startsWith('TEST_') || secretUpper.startsWith('TEST_'))) {
+    issues.push('Production mode is enabled but sandbox TEST_ keys were detected. Use live production keys from Cashfree.');
+  }
+
+  return issues;
+}
+
 function getCashfreeConfig() {
-  const clientId = String(process.env.CASHFREE_CLIENT_ID || '').trim();
-  const clientSecret = String(process.env.CASHFREE_CLIENT_SECRET || '').trim();
-  const environment = String(process.env.CASHFREE_ENVIRONMENT || 'sandbox').trim().toLowerCase();
-  const apiVersion = String(process.env.CASHFREE_API_VERSION || '').trim();
+  const clientId = sanitizeEnvValue(process.env.CASHFREE_CLIENT_ID);
+  const clientSecret = sanitizeEnvValue(process.env.CASHFREE_CLIENT_SECRET);
+  const environment = sanitizeEnvValue(process.env.CASHFREE_ENVIRONMENT || 'sandbox').toLowerCase();
+  const apiVersion = sanitizeEnvValue(process.env.CASHFREE_API_VERSION || DEFAULT_API_VERSION);
   const returnUrl = resolveCashfreeReturnUrl();
-  const webhookUrl = String(process.env.CASHFREE_WEBHOOK_URL || '').trim();
+  const webhookUrl = sanitizeEnvValue(process.env.CASHFREE_WEBHOOK_URL);
+
+  const credentialIssues = validateCashfreeCredentialShape({
+    clientId,
+    clientSecret,
+    environment,
+    apiVersion,
+  });
 
   return {
     clientId,
@@ -31,11 +84,21 @@ function getCashfreeConfig() {
     apiVersion,
     returnUrl,
     webhookUrl,
+    credentialIssues,
     configured: Boolean(
       clientId && clientSecret && apiVersion && returnUrl
       && (webhookUrl || process.env.CASHFREE_WEBHOOK_OPTIONAL === 'true')
+      && credentialIssues.length === 0
     ),
   };
+}
+
+function cashfreeCredentialError(issues) {
+  const error = new Error(issues.join(' '));
+  error.status = 503;
+  error.code = 'CASHFREE_INVALID_CREDENTIALS';
+  error.issues = issues;
+  return error;
 }
 
 function cashfreeNotConfiguredError() {
@@ -53,6 +116,9 @@ function getCashfreeApiBaseUrl(environment) {
 
 async function cashfreeRequest(path, options = {}) {
   const config = getCashfreeConfig();
+  if (config.credentialIssues?.length) {
+    throw cashfreeCredentialError(config.credentialIssues);
+  }
   if (!config.configured) throw cashfreeNotConfiguredError();
 
   const response = await fetch(`${getCashfreeApiBaseUrl(config.environment)}${path}`, {
@@ -71,7 +137,16 @@ async function cashfreeRequest(path, options = {}) {
     const providerMessage = data.message || data.type || `Cashfree request failed (${response.status})`;
     let message = providerMessage;
     if (response.status === 401 || /auth/i.test(String(providerMessage))) {
-      message = `Cashfree authentication failed (${config.environment}). Verify API keys and CASHFREE_API_VERSION on the server match the ${config.environment} environment.`;
+      const hints = [
+        `Cashfree authentication failed (${config.environment}).`,
+        `Use API version ${config.apiVersion || DEFAULT_API_VERSION}.`,
+        config.environment === 'sandbox'
+          ? 'Sandbox keys must come from Cashfree test mode (App ID starts with TEST_).'
+          : 'Use live production keys from Cashfree.',
+        'On Render, re-paste CASHFREE_CLIENT_ID and CASHFREE_CLIENT_SECRET with no quotes or spaces.',
+        `Client ID preview: ${maskCredential(config.clientId)}.`,
+      ];
+      message = hints.join(' ');
     }
     const error = new Error(message);
     error.status = response.status >= 500 ? 502 : 400;
@@ -167,7 +242,11 @@ function getCashfreePublicConfig() {
     configured: config.configured,
     environment: config.environment,
     mode: config.environment === 'production' ? 'production' : 'sandbox',
+    apiVersion: config.apiVersion || DEFAULT_API_VERSION,
     webhookOptional: process.env.CASHFREE_WEBHOOK_OPTIONAL === 'true',
+    returnUrlConfigured: Boolean(config.returnUrl),
+    clientIdPreview: maskCredential(config.clientId),
+    credentialIssues: config.credentialIssues || [],
   };
 }
 

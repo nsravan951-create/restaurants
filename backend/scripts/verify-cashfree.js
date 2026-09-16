@@ -21,7 +21,14 @@ async function main() {
 
   console.log('Environment:', config.environment);
   console.log('API version:', config.apiVersion || '(missing)');
+  console.log('Client ID preview:', config.clientId ? `${config.clientId.slice(0, 6)}…` : '(missing)');
   console.log('Configured:', config.configured);
+  if (config.credentialIssues?.length) {
+    console.error('Credential issues:');
+    config.credentialIssues.forEach((issue) => console.error(' -', issue));
+    process.exitCode = 1;
+    return;
+  }
   if (missing.length) {
     console.log('Missing:', missing.join(', '));
     process.exitCode = 1;

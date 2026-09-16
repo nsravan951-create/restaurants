@@ -26,8 +26,11 @@ router.get('/cashfree/config', asyncHandler(async (req, res) => {
     return res.status(503).json({
       configured: false,
       mode: config.mode,
-      message: 'Cashfree is not configured on the server',
-      code: 'CASHFREE_NOT_CONFIGURED',
+      message: config.credentialIssues?.length
+        ? config.credentialIssues.join(' ')
+        : 'Cashfree is not configured on the server',
+      code: config.credentialIssues?.length ? 'CASHFREE_INVALID_CREDENTIALS' : 'CASHFREE_NOT_CONFIGURED',
+      credentialIssues: config.credentialIssues || [],
     });
   }
   return res.json(config);
