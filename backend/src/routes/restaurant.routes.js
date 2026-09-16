@@ -18,6 +18,7 @@ const {
   orderMenuByCategories,
   filterMenuByActiveCategories,
 } = require('../utils/menuCategories');
+const { fetchActiveInlineAds } = require('../utils/inlineAds');
 
 const router = express.Router();
 
@@ -80,6 +81,7 @@ async function buildPublicTableContext({ restaurantId, tableId }) {
 
   const orderPlaced = activeOrderRows.length > 0;
   const session = activeSessionRows[0] || null;
+  const inlineAds = await fetchActiveInlineAds(pool, restaurantId);
 
   return {
     table: {
@@ -102,6 +104,7 @@ async function buildPublicTableContext({ restaurantId, tableId }) {
     },
     menu: orderedMenu,
     foodCategories,
+    inlineAds,
   };
 }
 

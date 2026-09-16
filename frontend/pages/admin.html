@@ -215,28 +215,44 @@
         <div class="section-head">
           <div>
             <h3>Promotion Studio — Photos &amp; Videos</h3>
-            <p>Upload promotional media. Customers see vertical scroll &amp; video grid on their menu.</p>
+            <p>Upload promotional media. Inline ads appear between food cards on the customer menu.</p>
           </div>
         </div>
         <article class="panel">
           <form id="adForm" class="admin-form">
             <input name="title" placeholder="Promotion title" required />
+            <textarea name="description" rows="2" placeholder="Short description shown on the customer menu"></textarea>
             <select name="mediaType" id="adMediaType">
               <option value="image">📷 Photo</option>
               <option value="video">🎬 Video</option>
             </select>
-            <input name="imageUrl" id="adImageUrl" placeholder="Image URL" />
+            <input name="imageUrl" id="adImageUrl" placeholder="Desktop / primary image URL" />
+            <input name="mobileImageUrl" id="adMobileImageUrl" placeholder="Optional mobile image URL" />
             <input name="videoUrl" id="adVideoUrl" placeholder="Video URL (MP4 or embed)" class="hidden" />
-            <input name="targetLink" placeholder="Target link" required />
-            <select name="displayMode">
-              <option value="grid">Video Grid (side-by-side)</option>
-              <option value="vertical">Vertical Scroll (Reels-style)</option>
-              <option value="inline">Inline in menu</option>
+            <input name="targetLink" placeholder="CTA target link" required />
+            <input name="ctaText" placeholder="CTA button text" value="Order Now" />
+            <select name="displayMode" id="adDisplayMode">
+              <option value="inline">Between food items (inline)</option>
+              <option value="vertical">Vertical scroll</option>
+              <option value="grid">Grid banner</option>
+              <option value="carousel">Carousel banner</option>
             </select>
-            <input name="displayOrder" type="number" placeholder="Display order (lower = first)" value="0" />
-            <select name="restaurantId" id="adRestaurantSelect">
+            <select name="inlineFrequency" id="adInlineFrequency">
+              <option value="2">Show after every 2 food items</option>
+              <option value="3" selected>Show after every 3 food items</option>
+              <option value="4">Show after every 4 food items</option>
+              <option value="5">Show after every 5 food items</option>
+              <option value="6">Show after every 6 food items</option>
+            </select>
+            <input name="displayOrder" type="number" placeholder="Priority / display order (lower = first)" value="0" />
+            <select name="targetScope" id="adTargetScope">
+              <option value="all">All restaurants</option>
+              <option value="selected">Selected restaurants</option>
+            </select>
+            <select name="restaurantId" id="adRestaurantSelect" class="hidden">
               <option value="">Global promotion</option>
             </select>
+            <select name="targetRestaurantIds" id="adTargetRestaurantSelect" multiple size="6" class="hidden"></select>
             <input name="startsAt" type="datetime-local" />
             <input name="endsAt" type="datetime-local" />
             <label class="admin-check">
@@ -251,6 +267,7 @@
           </form>
         </article>
         <div id="promoPreview" class="promo-preview-grid"></div>
+        <div id="inlineAdPreview" class="promo-preview-grid"></div>
         <div id="adsList" class="admin-list"></div>
       </section>
 

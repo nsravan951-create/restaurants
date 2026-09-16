@@ -1084,7 +1084,7 @@ async function loadMenu() {
   await loadMenuCategories();
   const data = await apiRequest(`/menu/${restaurantId}`, {}, true);
   const menuList = document.getElementById('menuList');
-  const items = data.menu || [];
+  const items = (data.menu || []).filter((item) => item.is_available !== false);
   menuItemsCache = items;
 
   menuList.innerHTML = items.length ? items.map((item) => `
@@ -1101,7 +1101,8 @@ async function loadMenu() {
   menuList.querySelectorAll('button[data-delete]').forEach((button) => {
     button.addEventListener('click', async () => {
       try {
-        await apiRequest(`/menu/${button.dataset.delete}`, { method: 'DELETE' }, true);
+        const result = await apiRequest(`/menu/${button.dataset.delete}`, { method: 'DELETE' }, true);
+        setMessage('ownerMessage', result.message || 'Menu item removed.');
         await loadMenu();
       } catch (error) {
         setMessage('ownerMessage', error.message, true);

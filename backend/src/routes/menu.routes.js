@@ -245,13 +245,40 @@ router.put('/:itemId', requireAuth(['owner', 'super_admin']), asyncHandler(async
 router.delete('/:itemId', requireAuth(['owner', 'super_admin']), asyncHandler(async (req, res) => {
   const { itemId } = req.params;
 
-  const { rows: itemRows } = await pool.query('SELECT id, restaurant_id FROM menu_items WHERE id = $1', [itemId]);
+  const { rows: itemRows } = await pool.query(
+    'SELECT id, restaurant_id, is_available FROM menu_items WHERE id = $1',
+    [itemId]
+  );
   if (!itemRows.length) return res.status(404).json({ message: 'Menu item not found' });
 
   await ensureRestaurantAccess(req.user, itemRows[0].restaurant_id);
 
+  const { rows: orderRefs } = await pool.query(
+    'SELECT 1 FROM order_items WHERE menu_item_id = $1 LIMIT 1',
+    [itemId]
+  );
+
+  if (orderRefs.length) {
+    if (!itemRows[0].is_available) {
+      return res.json({
+        message: 'Menu item is already hidden from the customer menu.',
+        softDeleted: true,
+      });
+    }
+
+    await pool.query(
+      'UPDATE menu_items SET is_available = FALSE, updated_at = CURRENT_TIMESTAMP WHERE id = $1',
+      [itemId]
+    );
+
+    return res.json({
+      message: 'Menu item removed from the menu. Past orders and invoices are preserved.',
+      softDeleted: true,
+    });
+  }
+
   await pool.query('DELETE FROM menu_items WHERE id = $1', [itemId]);
-  return res.json({ message: 'Menu item deleted' });
+  return res.json({ message: 'Menu item deleted', softDeleted: false });
 }));
 
 module.exports = router;

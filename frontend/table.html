@@ -10,6 +10,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@600;700&family=Sora:wght@400;500;600;700&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="assets/css/bill-printer.css" />
+    <link rel="stylesheet" href="assets/css/inline-menu.css" />
     <style>
       :root {
         --bg: #f5efe7;
@@ -965,6 +966,7 @@
     <script src="assets/js/socketClient.js?v=4.8.3"></script>
     <script src="assets/js/billHistoryGuard.js"></script>
     <script src="assets/js/billPrinter.js"></script>
+    <script src="assets/js/inlineMenu.js"></script>
     <script>
       const BACKEND_BASE_URL = window.API_URL || window.APP_CONFIG?.API_BASE_URL || window.APP_CONFIG?.BACKEND_PUBLIC_URL || '';
 
@@ -1033,6 +1035,7 @@
         foodCategories: [],
         allMenuItems: [],
         selectedCategory: 'all',
+        inlineAds: [],
       };
 
       const PENDING_ORDER_KEY = 'qr_pending_cashfree_order';
@@ -1248,6 +1251,11 @@
 
       function setView(view) {
         state.view = view;
+        if (view === 'menu') {
+          window.InlineMenu?.resumeAll();
+        } else {
+          window.InlineMenu?.pauseAll();
+        }
         els.loadingState.classList.toggle('hidden', view !== 'loading');
         els.errorState.classList.toggle('hidden', view !== 'error');
         els.welcomeState.classList.toggle('hidden', view !== 'welcome');
@@ -1569,40 +1577,25 @@
           : groups.filter(([category]) => category === state.selectedCategory);
 
         if (!categories.length) {
+          window.InlineMenu?.destroyAll();
           els.menuContainer.innerHTML = '<div class="empty">No menu items available for this category.</div>';
           return;
         }
 
-        els.menuContainer.innerHTML = categories.map(([category, items]) => `
-          <section class="category-card category-section" id="category-section-${slugifyCategory(category)}">
-            <h3 class="category-title">${category}</h3>
-            <div class="items-grid">
-              ${items.map((item) => `
-                <article class="food-card">
-                  ${item.image_url ? `<img class="food-image" src="${normalizeUrl(item.image_url)}" alt="${item.name}" loading="lazy" referrerpolicy="no-referrer" />` : ''}
-                  <div>
-                    <h4 class="food-name">${item.name}</h4>
-                    <div class="food-meta">
-                      <span>${item.category || 'Food'}</span>
-                    </div>
-                  </div>
-                  ${item.description ? `<p class="food-desc">${item.description}</p>` : ''}
-                  <div class="price-chip">INR ${money(item.price)}</div>
-                  <button class="btn btn-primary full" type="button" data-add-item="${item.id}">Add to Cart</button>
-                </article>
-              `).join('')}
-            </div>
-          </section>
-        `).join('');
-
-        els.menuContainer.querySelectorAll('[data-add-item]').forEach((btn) => {
-          btn.addEventListener('click', () => {
-            const item = state.allMenuItems.find((menuItem) => Number(menuItem.id) === Number(btn.dataset.addItem));
-            if (!item) return;
-            btn.classList.add('added');
-            setTimeout(() => btn.classList.remove('added'), 180);
-            addToCart(item);
-          });
+        window.InlineMenu.render({
+          container: els.menuContainer,
+          categories,
+          menuItems: state.allMenuItems,
+          selectedCategory: state.selectedCategory,
+          inlineAds: state.inlineAds,
+          apiBaseUrl: BACKEND_BASE_URL,
+          restaurantId: state.context?.restaurant?.id,
+          onAddToCart: addToCart,
+          helpers: {
+            money,
+            normalizeUrl,
+            slugifyCategory,
+          },
         });
       }
 
@@ -1615,6 +1608,7 @@
       function openCheckoutModal() {
         const { count, subtotal } = cartTotals();
         if (!count) return;
+        window.InlineMenu?.pauseAll();
         setCheckoutPayMessage('');
         els.checkoutSummary.innerHTML = `
           <div class="invoice-box" style="padding:14px;">
@@ -1638,6 +1632,9 @@
         els.checkoutModal.setAttribute('aria-hidden', 'true');
         document.body.style.overflow = '';
         setCheckoutPayMessage('');
+        if (state.view === 'menu') {
+          window.InlineMenu?.resumeAll();
+        }
       }
 
       function buildOrderSnapshot(orderData) {
@@ -2174,6 +2171,7 @@
           }
 
           state.foodCategories = Array.isArray(data.foodCategories) ? data.foodCategories : [];
+          state.inlineAds = Array.isArray(data.inlineAds) ? data.inlineAds : [];
           state.selectedCategory = 'all';
           renderMenu(data.menu || []);
           renderCart();

@@ -562,12 +562,16 @@
   }
 
   function renderPromoPreview() {
-    const ads = getFilteredAds().filter((ad) => ad.isActive && ['vertical', 'grid'].includes(ad.displayMode || ad.display_mode));
+    const ads = getFilteredAds().filter((ad) => {
+      const active = ad.is_active ?? ad.isActive;
+      const mode = ad.display_mode ?? ad.displayMode;
+      return active && ['vertical', 'grid', 'carousel'].includes(mode);
+    });
     const root = el('promoPreview');
     if (!root) return;
 
     root.innerHTML = ads.length ? `
-      <p class="eyebrow">Customer preview — promotions stay in grid, never collapsed</p>
+      <p class="eyebrow">Banner preview</p>
       <div class="promo-preview-grid__inner">
         ${ads.map((ad) => {
           const mediaType = ad.mediaType || ad.media_type || 'image';
@@ -580,6 +584,44 @@
         }).join('')}
       </div>
     ` : '';
+  }
+
+  function renderInlineAdPreview() {
+    const root = el('inlineAdPreview');
+    if (!root) return;
+
+    const ads = getFilteredAds()
+      .map(normalizeAd)
+      .filter((ad) => ad.is_active && ['inline', 'vertical'].includes(ad.display_mode));
+
+    if (!ads.length) {
+      root.innerHTML = '';
+      return;
+    }
+
+    const previewAd = ads[0];
+    const frequency = Number(previewAd.inline_frequency || 3);
+    const sampleFood = ['Chicken Biryani', 'Egg Biryani', 'Veg Biryani', 'Paneer Tikka', 'Chicken 65'];
+
+    root.innerHTML = `
+      <p class="eyebrow">Inline menu preview — how this appears between food cards</p>
+      <div class="inline-preview-shell">
+        <h4>Biryani</h4>
+        <div class="inline-preview-row">
+          ${sampleFood.slice(0, frequency).map((name) => `<div class="inline-preview-food">${escapeHtml(name)}</div>`).join('')}
+        </div>
+        <div class="inline-preview-ad">
+          <span class="inline-preview-badge">Sponsored</span>
+          ${previewAd.image_url ? `<img src="${escapeHtml(previewAd.image_url)}" alt="${escapeHtml(previewAd.title)}" />` : ''}
+          <strong>${escapeHtml(previewAd.title)}</strong>
+          ${previewAd.description ? `<p>${escapeHtml(previewAd.description)}</p>` : ''}
+          <button type="button">${escapeHtml(previewAd.cta_text || 'Order Now')}</button>
+        </div>
+        <div class="inline-preview-row">
+          ${sampleFood.slice(frequency).map((name) => `<div class="inline-preview-food">${escapeHtml(name)}</div>`).join('')}
+        </div>
+      </div>
+    `;
   }
 
   function openPaymentAuthModal() {
@@ -648,15 +690,32 @@
 
   function populateAdRestaurantOptions() {
     const select = el('adRestaurantSelect');
-    if (!select) return;
-
+    const multiSelect = el('adTargetRestaurantSelect');
     const restaurants = getDashboard().restaurants || [];
-    const currentValue = select.value;
-    select.innerHTML = '<option value="">Global ad</option>' + restaurants.map((restaurant) => `
+    const options = restaurants.map((restaurant) => `
       <option value="${restaurant.id}">${escapeHtml(restaurant.name)}</option>
     `).join('');
 
-    if (currentValue) select.value = currentValue;
+    if (select) {
+      const currentValue = select.value;
+      select.innerHTML = '<option value="">Global ad</option>' + options;
+      if (currentValue) select.value = currentValue;
+    }
+
+    if (multiSelect) {
+      const selected = Array.from(multiSelect.selectedOptions).map((option) => option.value);
+      multiSelect.innerHTML = options;
+      selected.forEach((value) => {
+        const option = multiSelect.querySelector(`option[value="${value}"]`);
+        if (option) option.selected = true;
+      });
+    }
+  }
+
+  function toggleAdTargetFields() {
+    const scope = el('adTargetScope')?.value || 'all';
+    el('adTargetRestaurantSelect')?.classList.toggle('hidden', scope !== 'selected');
+    el('adInlineFrequency')?.closest('select')?.classList.remove('hidden');
   }
 
   function resetAdForm() {
@@ -778,9 +837,15 @@
       is_active: ad.is_active ?? ad.isActive ?? false,
       media_type: ad.media_type ?? ad.mediaType ?? 'image',
       image_url: ad.image_url ?? ad.imageUrl ?? '',
+      mobile_image_url: ad.mobile_image_url ?? ad.mobileImageUrl ?? '',
       video_url: ad.video_url ?? ad.videoUrl ?? '',
       display_mode: ad.display_mode ?? ad.displayMode ?? 'grid',
       display_order: ad.display_order ?? ad.displayOrder ?? 0,
+      description: ad.description ?? '',
+      cta_text: ad.cta_text ?? ad.ctaText ?? 'Order Now',
+      inline_frequency: ad.inline_frequency ?? ad.inlineFrequency ?? 3,
+      target_scope: ad.target_scope ?? ad.targetScope ?? 'all',
+      target_restaurant_ids: ad.target_restaurant_ids ?? ad.targetRestaurantIds ?? [],
     };
   }
 
@@ -794,7 +859,12 @@
         <div class="admin-item__header">
           <div>
             <h4>${escapeHtml(ad.title)}</h4>
-            <p>${ad.restaurant_id ? `Restaurant: ${escapeHtml(ad.restaurant_name || ad.restaurant_id)}` : 'Global Ad'} • Target: <a href="${escapeHtml(ad.target_link)}" target="_blank">${escapeHtml(ad.target_link)}</a></p>
+            <p>${ad.target_scope === 'selected'
+              ? `Targeted restaurants: ${(ad.target_restaurant_ids || []).join(', ') || ad.restaurant_id || 'None'}`
+              : (ad.restaurant_id ? `Restaurant: ${escapeHtml(ad.restaurant_name || ad.restaurant_id)}` : 'All restaurants')}
+              • Placement: ${escapeHtml(ad.display_mode)}
+              • Every ${escapeHtml(ad.inline_frequency || 3)} items
+              • <a href="${escapeHtml(ad.target_link)}" target="_blank">${escapeHtml(ad.target_link)}</a></p>
           </div>
           <span class="badge ${ad.is_active ? 'badge--success' : 'badge--muted'}">${ad.is_active ? 'Active' : 'Inactive'}</span>
         </div>
@@ -824,6 +894,8 @@
       const data = await apiRequest('/api/ads', {}, true);
       state.dashboard.ads = data.ads || [];
       renderAdsList();
+      renderPromoPreview();
+      renderInlineAdPreview();
       renderSummary();
     } catch (error) {
       setMessage(error.message, true);
@@ -837,10 +909,12 @@
     renderAnalytics();
     renderOperationsDashboard();
     populateAdRestaurantOptions();
+    toggleAdTargetFields();
     populateRestaurantSelects();
     renderRestaurantList();
     renderAdsList();
     renderPromoPreview();
+    renderInlineAdPreview();
     loadMessages();
     if (state.saasProfits) renderSaasProfits();
     if (state.platformOrders.length) renderPlatformOrders([]);
@@ -1243,18 +1317,28 @@
     const formData = new FormData(form);
     const adId = formData.get('adId');
 
+    const targetRestaurantIds = Array.from(form.querySelectorAll('[name="targetRestaurantIds"] option:checked'))
+      .map((option) => Number(option.value))
+      .filter((id) => Number.isInteger(id) && id > 0);
+
     const payload = {
       title: formData.get('title'),
+      description: formData.get('description') || null,
       imageUrl: formData.get('imageUrl') || null,
+      mobileImageUrl: formData.get('mobileImageUrl') || null,
       videoUrl: formData.get('videoUrl') || null,
       mediaType: formData.get('mediaType'),
       targetLink: formData.get('targetLink'),
+      ctaText: formData.get('ctaText') || 'Order Now',
       restaurantId: formData.get('restaurantId') ? Number(formData.get('restaurantId')) : null,
+      targetScope: formData.get('targetScope') || 'all',
+      targetRestaurantIds,
       isActive: formData.get('isActive') === 'on',
       startsAt: formData.get('startsAt') || null,
       endsAt: formData.get('endsAt') || null,
       displayOrder: formData.get('displayOrder') ? Number(formData.get('displayOrder')) : 0,
-      displayMode: formData.get('displayMode') || 'grid',
+      displayMode: formData.get('displayMode') || 'inline',
+      inlineFrequency: formData.get('inlineFrequency') ? Number(formData.get('inlineFrequency')) : 3,
     };
 
     try {
@@ -1293,17 +1377,31 @@
 
     const normalized = normalizeAd(ad);
     form.title.value = normalized.title;
+    if (form.description) form.description.value = normalized.description || '';
     form.imageUrl.value = normalized.image_url || '';
+    if (form.mobileImageUrl) form.mobileImageUrl.value = normalized.mobile_image_url || '';
     form.videoUrl.value = normalized.video_url || '';
     form.mediaType.value = normalized.media_type || 'image';
     form.targetLink.value = normalized.target_link;
+    if (form.ctaText) form.ctaText.value = normalized.cta_text || 'Order Now';
     form.restaurantId.value = normalized.restaurant_id || '';
+    if (form.targetScope) form.targetScope.value = normalized.target_scope || 'all';
     form.startsAt.value = ad.starts_at ? new Date(ad.starts_at).toISOString().slice(0, 16) : '';
     form.endsAt.value = ad.ends_at ? new Date(ad.ends_at).toISOString().slice(0, 16) : '';
     form.isActive.checked = normalized.is_active;
     form.adId.value = normalized.id;
-    form.displayMode.value = normalized.display_mode || 'grid';
+    form.displayMode.value = normalized.display_mode || 'inline';
     form.displayOrder.value = normalized.display_order || 0;
+    if (form.inlineFrequency) form.inlineFrequency.value = String(normalized.inline_frequency || 3);
+
+    populateAdRestaurantOptions();
+    const targetIds = normalized.target_restaurant_ids || [];
+    if (form.targetRestaurantIds) {
+      Array.from(form.targetRestaurantIds.options).forEach((option) => {
+        option.selected = targetIds.includes(Number(option.value));
+      });
+    }
+    toggleAdTargetFields();
 
     // Manually trigger change to update visibility of imageUrl/videoUrl
     const changeEvent = new Event('change');
@@ -1343,6 +1441,8 @@
       adMediaTypeSelect.value = 'image';
       adMediaTypeSelect.dispatchEvent(new Event('change'));
     }
+    toggleAdTargetFields();
+    renderInlineAdPreview();
   }
 
   function attachEvents() {
@@ -1471,6 +1571,11 @@
 
     const adForm = el('adForm');
     if (adForm) adForm.addEventListener('submit', handleAdSubmit);
+    el('adTargetScope')?.addEventListener('change', toggleAdTargetFields);
+    el('adDisplayMode')?.addEventListener('change', renderInlineAdPreview);
+    adForm?.addEventListener('input', () => {
+      renderInlineAdPreview();
+    });
 
     const adCancelButton = el('adCancelButton');
     if (adCancelButton) adCancelButton.addEventListener('click', clearAdForm);
