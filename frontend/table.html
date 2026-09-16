@@ -9,6 +9,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@600;700&family=Sora:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="assets/css/bill-printer.css" />
     <style>
       :root {
         --bg: #f5efe7;
@@ -772,223 +773,9 @@
         #menuState.menu-reveal { animation: none; }
       }
 
-      .bill-experience {
-        display: grid;
-        gap: 18px;
+      #billExperienceState {
         max-width: 520px;
         margin: 0 auto;
-      }
-
-      .bill-payment-status {
-        display: flex;
-        align-items: center;
-        gap: 14px;
-        padding: 16px 18px;
-        border-radius: 20px;
-        background: linear-gradient(135deg, rgba(26, 127, 90, 0.12), rgba(255, 255, 255, 0.95));
-        border: 1px solid rgba(26, 127, 90, 0.18);
-        box-shadow: var(--shadow-soft);
-      }
-
-      .bill-payment-icon {
-        width: 48px;
-        height: 48px;
-        border-radius: 14px;
-        display: grid;
-        place-items: center;
-        background: rgba(26, 127, 90, 0.14);
-        color: var(--success);
-        font-size: 1.35rem;
-        flex: 0 0 auto;
-      }
-
-      .bill-payment-copy strong {
-        display: block;
-        font-size: 1.05rem;
-        margin-bottom: 4px;
-      }
-
-      .bill-payment-copy p {
-        margin: 0;
-        color: var(--muted);
-        font-size: 0.92rem;
-        line-height: 1.45;
-      }
-
-      .bill-receipt-stage {
-        position: relative;
-        min-height: 300px;
-        display: flex;
-        align-items: flex-end;
-        justify-content: center;
-        padding: 8px 0 4px;
-      }
-
-      .bill-receipt-icon {
-        position: absolute;
-        bottom: 42px;
-        font-size: 2.5rem;
-        opacity: 1;
-        transform: scale(1);
-        transition: opacity 0.28s ease, transform 0.4s ease;
-        filter: drop-shadow(0 8px 16px rgba(72, 44, 19, 0.12));
-      }
-
-      .bill-receipt-stage.is-animating .bill-receipt-icon,
-      .bill-receipt-stage.is-ready .bill-receipt-icon {
-        opacity: 0;
-        transform: scale(0.55) translateY(-18px);
-        pointer-events: none;
-      }
-
-      .bill-receipt-shell {
-        width: min(100%, 400px);
-        opacity: 0;
-        transform: translateY(52px) scale(0.74);
-        transform-origin: bottom center;
-        transition: transform 0.78s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.52s ease;
-      }
-
-      .bill-receipt-stage.is-animating .bill-receipt-shell,
-      .bill-receipt-stage.is-ready .bill-receipt-shell {
-        opacity: 1;
-        transform: translateY(0) scale(1);
-      }
-
-      .bill-receipt-card {
-        background: #fffdf9;
-        border-radius: 14px 14px 6px 6px;
-        border: 1px solid rgba(191, 78, 34, 0.14);
-        box-shadow: 0 22px 48px rgba(34, 26, 20, 0.16);
-        overflow: hidden;
-      }
-
-      .bill-receipt-head {
-        display: flex;
-        align-items: flex-start;
-        gap: 12px;
-        padding: 18px 18px 12px;
-        border-bottom: 1px dashed rgba(191, 78, 34, 0.18);
-        background: linear-gradient(180deg, rgba(255, 252, 247, 1), rgba(255, 248, 239, 0.92));
-      }
-
-      .bill-receipt-logo {
-        width: 52px;
-        height: 52px;
-        object-fit: contain;
-        border-radius: 12px;
-        background: #fff;
-        border: 1px solid rgba(191, 78, 34, 0.1);
-      }
-
-      .bill-receipt-label {
-        margin: 0 0 4px;
-        font-size: 0.72rem;
-        letter-spacing: 0.18em;
-        text-transform: uppercase;
-        color: var(--muted);
-        font-weight: 700;
-      }
-
-      .bill-receipt-head h2 {
-        margin: 0;
-        font-family: 'Fraunces', serif;
-        font-size: 1.35rem;
-        line-height: 1.15;
-      }
-
-      .bill-meta-line {
-        margin: 6px 0 0;
-        color: var(--muted);
-        font-size: 0.86rem;
-        line-height: 1.45;
-      }
-
-      .bill-receipt-body {
-        padding: 14px 18px 18px;
-        opacity: 0;
-        transform: translateY(10px);
-        transition: opacity 0.42s ease 0.36s, transform 0.42s ease 0.36s;
-      }
-
-      .bill-receipt-card.is-content-visible .bill-receipt-body {
-        opacity: 1;
-        transform: translateY(0);
-      }
-
-      .bill-receipt-items {
-        display: grid;
-        gap: 10px;
-        margin-bottom: 12px;
-      }
-
-      .bill-line-item {
-        display: flex;
-        justify-content: space-between;
-        gap: 12px;
-        font-size: 0.94rem;
-      }
-
-      .bill-line-item small {
-        display: block;
-        color: var(--muted);
-        margin-top: 2px;
-      }
-
-      .bill-receipt-totals {
-        display: grid;
-        gap: 8px;
-        padding-top: 12px;
-        border-top: 1px dashed rgba(191, 78, 34, 0.18);
-      }
-
-      .bill-total-row {
-        display: flex;
-        justify-content: space-between;
-        gap: 10px;
-        font-size: 0.92rem;
-        color: var(--muted);
-      }
-
-      .bill-total-row strong {
-        color: var(--ink);
-      }
-
-      .bill-total-row.grand {
-        margin-top: 4px;
-        padding-top: 10px;
-        border-top: 1px solid rgba(191, 78, 34, 0.14);
-        font-size: 1rem;
-        color: var(--ink);
-      }
-
-      .bill-receipt-payline {
-        margin-top: 12px;
-        padding-top: 10px;
-        border-top: 1px dashed rgba(191, 78, 34, 0.14);
-        font-size: 0.88rem;
-        color: var(--muted);
-      }
-
-      .bill-actions {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 10px;
-      }
-
-      .bill-actions .btn {
-        min-height: 48px;
-      }
-
-      .bill-feedback-panel {
-        margin-top: 4px;
-      }
-
-      .bill-feedback-title {
-        margin: 0 0 4px;
-        font-family: 'Fraunces', serif;
-        font-size: 1.2rem;
-        text-align: center;
       }
 
       .cash-waiting-pulse {
@@ -1011,24 +798,10 @@
       }
 
       @media (prefers-reduced-motion: reduce) {
-        .bill-receipt-icon,
-        .bill-receipt-shell,
-        .bill-receipt-body,
         .cash-waiting-dot {
           transition: none !important;
           animation: none !important;
         }
-
-        .bill-receipt-stage.is-ready .bill-receipt-icon { display: none; }
-        .bill-receipt-shell,
-        .bill-receipt-card.is-content-visible .bill-receipt-body {
-          opacity: 1;
-          transform: none;
-        }
-      }
-
-      @media (max-width: 480px) {
-        .bill-actions { grid-template-columns: 1fr; }
       }
     </style>
   </head>
@@ -1133,57 +906,7 @@
       </section>
 
       <section id="billExperienceState" class="screen hidden">
-        <div class="bill-experience">
-          <div id="billPaymentStatus" class="bill-payment-status" aria-live="polite">
-            <span id="billPaymentIcon" class="bill-payment-icon" aria-hidden="true">✓</span>
-            <div class="bill-payment-copy">
-              <strong id="billPaymentTitle">Payment received</strong>
-              <p id="billPaymentSubtitle">Your bill is ready.</p>
-            </div>
-          </div>
-
-          <div id="billReceiptStage" class="bill-receipt-stage">
-            <div id="billReceiptIcon" class="bill-receipt-icon" aria-hidden="true">🧾</div>
-            <div id="billReceiptShell" class="bill-receipt-shell">
-              <article id="billReceiptCard" class="bill-receipt-card">
-                <header class="bill-receipt-head">
-                  <img id="billRestaurantLogo" class="bill-receipt-logo hidden" alt="" />
-                  <div>
-                    <p class="bill-receipt-label">Bill</p>
-                    <h2 id="billRestaurantName">Restaurant</h2>
-                    <p id="billMetaLine" class="bill-meta-line"></p>
-                  </div>
-                </header>
-                <div class="bill-receipt-body">
-                  <div id="billItems" class="bill-receipt-items"></div>
-                  <div id="billTotals" class="bill-receipt-totals"></div>
-                  <div id="billPaymentMethod" class="bill-receipt-payline"></div>
-                </div>
-              </article>
-            </div>
-          </div>
-
-          <div class="bill-actions">
-            <button class="btn btn-light" id="billDownloadBtn" type="button">Download Bill</button>
-            <button class="btn btn-primary" id="billViewBtn" type="button">View Bill</button>
-          </div>
-
-          <section class="panel bill-feedback-panel">
-            <div class="section-body">
-              <h3 class="bill-feedback-title">How was your experience?</h3>
-              <div id="reviewStars" class="review-stars" role="group" aria-label="Overall rating">
-                <button type="button" class="review-star" data-rating="1" aria-label="1 star">★</button>
-                <button type="button" class="review-star" data-rating="2" aria-label="2 stars">★</button>
-                <button type="button" class="review-star" data-rating="3" aria-label="3 stars">★</button>
-                <button type="button" class="review-star" data-rating="4" aria-label="4 stars">★</button>
-                <button type="button" class="review-star" data-rating="5" aria-label="5 stars">★</button>
-              </div>
-              <textarea id="reviewComment" class="review-comment" maxlength="1000" placeholder="Optional written feedback"></textarea>
-              <p id="reviewMessage" style="margin:12px 0 0;color:var(--muted);font-size:.92rem;"></p>
-              <button class="btn btn-primary full" id="reviewSubmitBtn" type="button">Give Feedback</button>
-            </div>
-          </section>
-        </div>
+        <div id="billPrinterRoot"></div>
       </section>
     </main>
 
@@ -1238,6 +961,8 @@
     </div>
 
     <script src="assets/js/config.js"></script>
+    <script src="assets/js/billHistoryGuard.js"></script>
+    <script src="assets/js/billPrinter.js"></script>
     <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
     <script>
       const BACKEND_BASE_URL = window.API_URL || window.APP_CONFIG?.API_BASE_URL || 'http://localhost:5000';
@@ -1283,24 +1008,7 @@
         trackingItems: document.getElementById('trackingItems'),
         trackingStatusPill: document.getElementById('trackingStatusPill'),
         billExperienceState: document.getElementById('billExperienceState'),
-        billPaymentIcon: document.getElementById('billPaymentIcon'),
-        billPaymentTitle: document.getElementById('billPaymentTitle'),
-        billPaymentSubtitle: document.getElementById('billPaymentSubtitle'),
-        billReceiptStage: document.getElementById('billReceiptStage'),
-        billReceiptIcon: document.getElementById('billReceiptIcon'),
-        billReceiptCard: document.getElementById('billReceiptCard'),
-        billRestaurantLogo: document.getElementById('billRestaurantLogo'),
-        billRestaurantName: document.getElementById('billRestaurantName'),
-        billMetaLine: document.getElementById('billMetaLine'),
-        billItems: document.getElementById('billItems'),
-        billTotals: document.getElementById('billTotals'),
-        billPaymentMethod: document.getElementById('billPaymentMethod'),
-        billDownloadBtn: document.getElementById('billDownloadBtn'),
-        billViewBtn: document.getElementById('billViewBtn'),
-        reviewStars: document.getElementById('reviewStars'),
-        reviewComment: document.getElementById('reviewComment'),
-        reviewMessage: document.getElementById('reviewMessage'),
-        reviewSubmitBtn: document.getElementById('reviewSubmitBtn'),
+        billPrinterRoot: document.getElementById('billPrinterRoot'),
       };
 
       const state = {
@@ -1613,8 +1321,29 @@
         }
       }
 
+      function lockTablePaidBillHistory(orderId) {
+        const params = new URLSearchParams(window.location.search);
+        const extra = {};
+        const token = params.get('token') || state.qrToken;
+        const tableId = params.get('id') || state.context?.table?.id;
+        if (token) extra.token = token;
+        if (tableId) extra.id = tableId;
+
+        window.AutoRestoBillHistoryGuard?.lockPaidBillHistory({
+          orderId,
+          pathname: window.location.pathname,
+          stateExtras: { autorestoView: 'bill' },
+          extraParams: extra,
+          onBackBlocked: () => setView('bill'),
+        });
+      }
+
       function setupHistoryNavigation() {
         window.addEventListener('popstate', (event) => {
+          if (window.AutoRestoBillHistoryGuard?.isLocked()) {
+            setView('bill');
+            return;
+          }
           if (state.menuEntering) return;
           const nextView = event.state?.autorestoView;
           if (nextView === 'welcome' && ['menu', 'welcome'].includes(state.view)) {
@@ -2051,144 +1780,6 @@
         `).join('');
       }
 
-      function renderBillPaymentStatus(paymentMethod) {
-        const isCash = paymentMethod === 'cash';
-        els.billPaymentIcon.textContent = isCash ? '💵' : '✓';
-        els.billPaymentTitle.textContent = isCash ? 'Cash Collected' : 'Online Payment Successful';
-        els.billPaymentSubtitle.textContent = isCash
-          ? 'Payment received by restaurant'
-          : 'Payment completed successfully';
-      }
-
-      function renderBillDetails(invoice) {
-        state.invoicePayload = invoice;
-        const restaurantName = invoice.restaurant?.name || state.context?.restaurant?.name || 'Restaurant';
-        const logoUrl = normalizeUrl(invoice.restaurant?.logoUrl || state.context?.restaurant?.logo_url || '');
-        els.billRestaurantName.textContent = restaurantName;
-
-        if (logoUrl) {
-          els.billRestaurantLogo.src = logoUrl;
-          els.billRestaurantLogo.alt = `${restaurantName} logo`;
-          els.billRestaurantLogo.classList.remove('hidden');
-        } else {
-          els.billRestaurantLogo.classList.add('hidden');
-          els.billRestaurantLogo.removeAttribute('src');
-        }
-
-        const orderDate = new Date(invoice.order?.createdAt || Date.now()).toLocaleString();
-        els.billMetaLine.textContent = `Order #${invoice.order?.id} · Table ${invoice.order?.tableNumber} · ${orderDate}`;
-
-        els.billItems.innerHTML = (invoice.items || []).map((item) => `
-          <div class="bill-line-item">
-            <div>
-              <strong>${item.name}</strong>
-              <small>Qty ${item.quantity} · INR ${money(item.price)} each</small>
-            </div>
-            <strong>INR ${money(item.lineTotal)}</strong>
-          </div>
-        `).join('');
-
-        const taxRows = [];
-        taxRows.push(`<div class="bill-total-row"><span>Subtotal</span><strong>INR ${money(invoice.subtotal)}</strong></div>`);
-        if (Number(invoice.discountAmount) > 0) {
-          taxRows.push(`<div class="bill-total-row"><span>Discount</span><strong>-INR ${money(invoice.discountAmount)}</strong></div>`);
-        }
-        if (Number(invoice.gstRate) > 0) {
-          if (Number(invoice.igstAmount) > 0) {
-            taxRows.push(`<div class="bill-total-row"><span>IGST (${invoice.gstRate}%)</span><strong>INR ${money(invoice.igstAmount)}</strong></div>`);
-          } else {
-            taxRows.push(`<div class="bill-total-row"><span>CGST (${money(invoice.gstRate / 2)}%)</span><strong>INR ${money(invoice.cgstAmount)}</strong></div>`);
-            taxRows.push(`<div class="bill-total-row"><span>SGST (${money(invoice.gstRate / 2)}%)</span><strong>INR ${money(invoice.sgstAmount)}</strong></div>`);
-          }
-        }
-        taxRows.push(`<div class="bill-total-row grand"><span>Total</span><strong>INR ${money(invoice.grandTotal)}</strong></div>`);
-        els.billTotals.innerHTML = taxRows.join('');
-
-        const paymentMethod = (invoice.order?.paymentMethod || 'paid').toUpperCase();
-        const paymentStatus = (invoice.order?.paymentStatus || 'paid').toUpperCase();
-        els.billPaymentMethod.innerHTML = `
-          <div><strong>Payment method:</strong> ${paymentMethod}</div>
-          <div><strong>Payment status:</strong> ${paymentStatus}</div>
-          ${invoice.order?.invoiceNumber ? `<div><strong>Invoice:</strong> ${invoice.order.invoiceNumber}</div>` : ''}
-        `;
-      }
-
-      async function playBillAnimation({ skipAnimation = false } = {}) {
-        els.billReceiptStage.classList.remove('is-animating', 'is-ready');
-        els.billReceiptCard.classList.remove('is-content-visible');
-
-        if (skipAnimation || prefersReducedMotion()) {
-          els.billReceiptStage.classList.add('is-ready');
-          els.billReceiptCard.classList.add('is-content-visible');
-          return;
-        }
-
-        await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
-        els.billReceiptStage.classList.add('is-animating');
-        await waitForTransition(els.billReceiptShell, 900);
-        els.billReceiptStage.classList.add('is-ready');
-        els.billReceiptCard.classList.add('is-content-visible');
-        await waitForTransition(els.billReceiptCard.querySelector('.bill-receipt-body'), 500);
-      }
-
-      function resetReviewForm() {
-        state.selectedReviewRating = 0;
-        state.reviewSubmitted = false;
-        els.reviewStars?.querySelectorAll('.review-star').forEach((btn) => btn.classList.remove('active'));
-        if (els.reviewComment) els.reviewComment.value = '';
-        if (els.reviewMessage) els.reviewMessage.textContent = '';
-        if (els.reviewSubmitBtn) els.reviewSubmitBtn.disabled = false;
-      }
-
-      async function submitReview() {
-        const credentials = getBillCredentials();
-        const rating = Number(state.selectedReviewRating || 0);
-        if (!credentials?.orderId || !credentials?.sessionToken) {
-          if (els.reviewMessage) els.reviewMessage.textContent = 'Unable to submit feedback for this order.';
-          return;
-        }
-        if (state.reviewSubmitted) {
-          if (els.reviewMessage) els.reviewMessage.textContent = 'Thank you — your feedback was already submitted.';
-          return;
-        }
-        if (rating < 1 || rating > 5) {
-          if (els.reviewMessage) {
-            els.reviewMessage.textContent = 'Please choose a star rating between 1 and 5.';
-            els.reviewMessage.style.color = 'var(--danger)';
-          }
-          return;
-        }
-        try {
-          els.reviewSubmitBtn.disabled = true;
-          await apiRequest('/api/reviews', {
-            method: 'POST',
-            body: JSON.stringify({
-              orderId: credentials.orderId,
-              sessionToken: credentials.sessionToken,
-              rating,
-              comment: els.reviewComment?.value?.trim() || '',
-            }),
-          });
-          state.reviewSubmitted = true;
-          if (els.reviewMessage) {
-            els.reviewMessage.textContent = 'Thank you for your feedback!';
-            els.reviewMessage.style.color = 'var(--success)';
-          }
-        } catch (error) {
-          if (error.status === 409) {
-            state.reviewSubmitted = true;
-            if (els.reviewMessage) {
-              els.reviewMessage.textContent = 'Thank you — your feedback was already submitted.';
-              els.reviewMessage.style.color = 'var(--success)';
-            }
-          } else if (els.reviewMessage) {
-            els.reviewMessage.textContent = error.message || 'Unable to submit feedback right now.';
-            els.reviewMessage.style.color = 'var(--danger)';
-            els.reviewSubmitBtn.disabled = false;
-          }
-        }
-      }
-
       async function viewBill() {
         const credentials = getBillCredentials();
         if (!credentials) throw new Error('Bill is not available for this order.');
@@ -2255,11 +1846,34 @@
           renderCart();
           lockTableAfterBooking('Payment received. Your bill is ready.');
 
-          resetReviewForm();
-          renderBillPaymentStatus(paymentMethod);
-          renderBillDetails(invoice);
+          state.invoicePayload = invoice;
           setView('bill');
-          await playBillAnimation({ skipAnimation });
+          const playedKey = `ar_printer_played_${orderId}`;
+          const skipPrinterAnimation = skipAnimation || sessionStorage.getItem(playedKey) === '1';
+          await window.AutoRestoBillPrinter.mount(els.billPrinterRoot, {
+            invoice,
+            paymentMethod,
+            orderId,
+            skipAnimation: skipPrinterAnimation,
+            onDownload: () => downloadBill().catch((error) => {
+              setCheckoutPayMessage(error.message || 'Unable to download bill', true);
+            }),
+            onShare: (inv, sections) => {
+              window.AutoRestoBillPrinter.shareBill(inv, sections);
+            },
+            onSubmitReview: async ({ rating, comment }) => {
+              await apiRequest('/api/reviews', {
+                method: 'POST',
+                body: JSON.stringify({
+                  orderId,
+                  sessionToken,
+                  rating,
+                  comment,
+                }),
+              });
+            },
+          });
+          lockTablePaidBillHistory(orderId);
         } catch (error) {
           console.warn('Bill experience failed:', error.message);
           setCheckoutPayMessage(error.message || 'Unable to load your bill. Please refresh shortly.', true);
@@ -2480,7 +2094,7 @@
 
         const order = pending || buildOrderSnapshot({
           orderId,
-          totalAmount: statusData.providerStatus?.order_amount || 0,
+          totalAmount: statusData.totalAmount || 0,
         });
 
         sessionStorage.removeItem(PENDING_ORDER_KEY);
@@ -2493,13 +2107,6 @@
           sessionToken,
           paymentMethod: 'online',
         });
-
-        const cleanParams = new URLSearchParams(window.location.search);
-        cleanParams.delete('orderId');
-        cleanParams.delete('tableId');
-        const query = cleanParams.toString();
-        const nextUrl = `${window.location.pathname}${query ? `?${query}` : ''}`;
-        window.history.replaceState({}, '', nextUrl);
         return true;
       }
 
@@ -2695,32 +2302,6 @@
         els.cashCheckoutBtn?.addEventListener('click', handleCashCheckout);
         els.cashfreeCheckoutBtn?.addEventListener('click', handleCashfreeCheckout);
 
-        els.reviewStars?.querySelectorAll('.review-star').forEach((btn) => {
-          btn.addEventListener('click', () => {
-            const rating = Number(btn.dataset.rating || 0);
-            state.selectedReviewRating = rating;
-            els.reviewStars.querySelectorAll('.review-star').forEach((star) => {
-              star.classList.toggle('active', Number(star.dataset.rating) <= rating);
-            });
-          });
-        });
-        els.reviewSubmitBtn?.addEventListener('click', submitReview);
-
-        els.billViewBtn?.addEventListener('click', async () => {
-          try {
-            await viewBill();
-          } catch (error) {
-            setCheckoutPayMessage(error.message || 'Unable to open bill', true);
-          }
-        });
-
-        els.billDownloadBtn?.addEventListener('click', async () => {
-          try {
-            await downloadBill();
-          } catch (error) {
-            setCheckoutPayMessage(error.message || 'Unable to download bill', true);
-          }
-        });
       }
 
       setupHistoryNavigation();

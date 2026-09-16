@@ -338,11 +338,11 @@
   async function ensureAuth() {
     const auth = getAuth();
     if (!auth?.token) {
-      window.location.href = './auth.html';
+      goToPage('./auth.html');
       return null;
     }
     if (auth.user.role === 'super_admin') {
-      window.location.href = './admin.html';
+      goToPage('./admin.html');
       return null;
     }
     if (RESTAURANT_ROLES.has(auth.user.role) || !isPlatformTeamUser(auth.user)) {
@@ -350,7 +350,7 @@
         sessionStorage.setItem('owner_auth_message', 'Sign in with Team Staff using your admin-allocated email and password.');
         sessionStorage.setItem('prefer_team_tab', '1');
       } catch (_) {}
-      window.location.href = './auth.html';
+      goToPage('./auth.html');
       return null;
     }
     el('teamUserName').textContent = auth.user.name || 'Team Member';
@@ -361,7 +361,7 @@
     if (!(await ensureAuth())) return;
     el('teamLogoutBtn')?.addEventListener('click', () => {
       clearAuth();
-      window.location.href = './auth.html';
+      goToPage('./auth.html');
     });
     el('teamReconRefresh')?.addEventListener('click', loadReconciliation);
     el('teamReconSearch')?.addEventListener('input', () => {
@@ -385,7 +385,7 @@
       setSection('overview');
     } catch (error) {
       if (error.status === 403 || error.status === 401) {
-        window.location.href = './auth.html';
+        goToPage('./auth.html');
         return;
       }
       setMessage(error.message, true);

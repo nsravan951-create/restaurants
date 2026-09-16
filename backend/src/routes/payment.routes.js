@@ -10,6 +10,9 @@ const {
   verifyCashfreeWebhookSignature,
   fetchCashfreePaymentOrder,
   buildCashfreeReturnUrl,
+  buildCustomerPaymentSuccessUrl,
+  parseOrderIdFromReturnQuery,
+  resolveCustomerPaymentSuccessUrl,
   createPaymentReference,
 } = require('../services/cashfree');
 const {
@@ -19,6 +22,105 @@ const {
 const { upsertCashfreeTransaction } = require('../utils/paymentTransaction');
 
 const router = express.Router();
+
+function mapCashfreePaymentState(providerStatus, dbPaymentStatus) {
+  const providerOrderStatus = String(providerStatus?.order_status || '').toUpperCase();
+  if (dbPaymentStatus === 'paid' || providerOrderStatus === 'PAID') return 'paid';
+  if (dbPaymentStatus === 'failed' || ['FAILED', 'CANCELLED', 'USER_DROPPED', 'VOID'].includes(providerOrderStatus)) {
+    return 'failed';
+  }
+  return 'pending';
+}
+
+async function loadCashfreeReturnContext(orderId) {
+  const { rows } = await pool.query(
+    `SELECT o.id, o.payment_status, o.payment_provider, o.table_id, o.total_amount,
+            s.session_token, pt.provider_order_id, t.qr_token
+     FROM orders o
+     INNER JOIN table_sessions s ON s.id = o.table_session_id
+     LEFT JOIN payment_transactions pt ON pt.order_id = o.id AND pt.payment_provider = 'cashfree'
+     LEFT JOIN restaurant_tables t ON t.id = o.table_id
+     WHERE o.id = $1
+     LIMIT 1`,
+    [orderId]
+  );
+  return rows[0] || null;
+}
+
+async function verifyCashfreeOrderOnReturn(orderId) {
+  const context = await loadCashfreeReturnContext(orderId);
+  if (!context) return { ok: false, status: 'error', message: 'Order not found' };
+
+  let providerStatus = null;
+  if (context.provider_order_id) {
+    try {
+      providerStatus = await fetchCashfreePaymentOrder(context.provider_order_id);
+    } catch (error) {
+      console.error('[cashfree/return] provider status lookup failed:', error.message);
+    }
+  }
+
+  const providerOrderStatus = String(providerStatus?.order_status || '').toUpperCase();
+  if (providerOrderStatus === 'PAID' && context.payment_status !== 'paid') {
+    try {
+      await completeOnlinePayment(orderId, {
+        provider: 'cashfree',
+        providerPayload: providerStatus,
+      });
+    } catch (error) {
+      console.error('[cashfree/return] completeOnlinePayment failed:', error.message);
+    }
+  } else if (['FAILED', 'CANCELLED', 'USER_DROPPED', 'VOID'].includes(providerOrderStatus)
+    && context.payment_status === 'pending') {
+    await markOnlinePaymentFailed(orderId, 'cashfree', providerStatus);
+  }
+
+  const { rows: latestRows } = await pool.query(
+    'SELECT payment_status FROM orders WHERE id = $1 LIMIT 1',
+    [orderId]
+  );
+  const latestStatus = latestRows[0]?.payment_status || context.payment_status;
+  const paymentState = mapCashfreePaymentState(providerStatus, latestStatus);
+
+  return {
+    ok: true,
+    orderId,
+    sessionToken: context.session_token,
+    tableId: context.table_id,
+    qrToken: context.qr_token,
+    paymentStatus: latestStatus,
+    status: paymentState,
+  };
+}
+
+async function handleCashfreeBrowserReturn(req, res) {
+  const successBase = resolveCustomerPaymentSuccessUrl();
+  if (!successBase) {
+    return res.status(503).send('Payment success page is not configured on the server.');
+  }
+
+  const query = { ...(req.query || {}), ...(req.body || {}) };
+  const orderId = parseOrderIdFromReturnQuery(query);
+  if (!orderId) {
+    return res.redirect(302, buildCustomerPaymentSuccessUrl({ status: 'error' }));
+  }
+
+  const result = await verifyCashfreeOrderOnReturn(orderId);
+  if (!result.ok) {
+    return res.redirect(302, buildCustomerPaymentSuccessUrl({ status: 'error' }));
+  }
+
+  const destination = buildCustomerPaymentSuccessUrl({
+    orderId: result.orderId,
+    sessionToken: result.sessionToken,
+    status: result.status,
+    tableId: result.tableId,
+    qrToken: result.qrToken,
+  });
+
+  // 303 See Other: browser should follow with GET and replace the Cashfree/return entry.
+  return res.redirect(303, destination);
+}
 
 router.get('/cashfree/config', asyncHandler(async (req, res) => {
   const config = getCashfreePublicConfig();
@@ -174,7 +276,8 @@ router.get('/cashfree/status/:orderId', paymentLimiter, asyncHandler(async (req,
     return res.status(400).json({ message: 'orderId and sessionToken are required' });
   }
   const { rows } = await pool.query(
-    `SELECT o.id, o.payment_status, o.payment_provider, o.restaurant_id, o.table_id, pt.provider_order_id
+    `SELECT o.id, o.payment_status, o.payment_provider, o.restaurant_id, o.table_id,
+            o.total_amount, pt.provider_order_id
      FROM orders o
      INNER JOIN table_sessions s ON s.id = o.table_session_id AND s.session_token = $2
      LEFT JOIN payment_transactions pt ON pt.order_id = o.id AND pt.payment_provider = 'cashfree'
@@ -199,7 +302,6 @@ router.get('/cashfree/status/:orderId', paymentLimiter, asyncHandler(async (req,
         message: 'Payment was received but bill finalization failed. Please ask staff to refresh your table.',
         orderId,
         paymentStatus: rows[0].payment_status,
-        providerStatus,
       });
     }
   }
@@ -212,31 +314,12 @@ router.get('/cashfree/status/:orderId', paymentLimiter, asyncHandler(async (req,
   return res.json({
     orderId,
     paymentStatus: latest[0]?.payment_status || rows[0].payment_status,
-    providerStatus,
+    totalAmount: Number(rows[0].total_amount),
   });
 }));
 
-router.get('/cashfree/return', asyncHandler(async (req, res) => {
-  const orderId = Number(req.query.orderId || 0);
-  if (!Number.isInteger(orderId) || orderId <= 0) {
-    return res.status(400).json({ message: 'orderId is required' });
-  }
-
-  const { rows } = await pool.query(
-    `SELECT id, payment_status, payment_provider FROM orders WHERE id = $1 LIMIT 1`,
-    [orderId]
-  );
-  if (!rows.length) return res.status(404).json({ message: 'Order not found' });
-
-  return res.json({
-    orderId,
-    paymentStatus: rows[0].payment_status,
-    paymentProvider: rows[0].payment_provider,
-    message: rows[0].payment_status === 'paid'
-      ? 'Payment verified'
-      : 'Payment is still being verified. Do not retry until the payment status is confirmed.',
-  });
-}));
+router.get('/cashfree/return', asyncHandler(handleCashfreeBrowserReturn));
+router.post('/cashfree/return', asyncHandler(handleCashfreeBrowserReturn));
 
 router.post('/cashfree/verify', paymentLimiter, asyncHandler(async (req, res) => {
   const orderId = Number(req.body?.orderId || 0);
@@ -268,8 +351,6 @@ router.post('/cashfree/verify', paymentLimiter, asyncHandler(async (req, res) =>
         message: 'Payment was received but bill finalization failed. Please ask staff to refresh your table.',
         orderId,
         paymentStatus: rows[0].payment_status,
-        providerOrderId: rows[0].provider_order_id,
-        providerStatus,
       });
     }
   }
@@ -282,8 +363,7 @@ router.post('/cashfree/verify', paymentLimiter, asyncHandler(async (req, res) =>
   return res.json({
     orderId,
     paymentStatus: latest[0]?.payment_status,
-    providerOrderId: rows[0].provider_order_id,
-    providerStatus,
+    totalAmount: Number(rows[0].amount),
   });
 }));
 

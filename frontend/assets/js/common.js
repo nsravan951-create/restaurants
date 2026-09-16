@@ -90,3 +90,13 @@ async function downloadExport(path, filename) {
   link.remove();
   URL.revokeObjectURL(url);
 }
+
+function goToPage(url, options = {}) {
+  if (window.AutoRestoTransition?.navigate) {
+    return window.AutoRestoTransition.navigate(url, options).catch(() => {
+      window.location.href = url;
+    });
+  }
+  window.location.href = url;
+  return Promise.resolve();
+}

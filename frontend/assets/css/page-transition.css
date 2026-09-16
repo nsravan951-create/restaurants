@@ -1,0 +1,194 @@
+/* AutoResto — reusable page-to-page transition */
+:root {
+  --ar-orange: #bf4e22;
+  --ar-orange-soft: #e66a3d;
+  --ar-ink: #1a1a1a;
+  --ar-muted: #6b6b6b;
+  --ar-overlay: rgba(255, 255, 255, 0.97);
+}
+
+.ar-transition-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 99999;
+  display: grid;
+  place-items: center;
+  background: var(--ar-overlay);
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity 0.2s ease, visibility 0.2s ease;
+}
+
+.ar-transition-overlay.is-active {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+}
+
+.ar-transition-overlay.is-blocking {
+  pointer-events: auto;
+}
+
+.ar-transition-stage {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  transform: scale(0.96);
+  opacity: 0;
+  transition: opacity 0.22s ease, transform 0.22s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.ar-transition-overlay.is-brand .ar-transition-stage {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.ar-transition-overlay.is-dissolve .ar-transition-stage {
+  opacity: 0;
+  transform: scale(1.03);
+  transition-duration: 0.28s;
+}
+
+.ar-transition-icon {
+  width: 44px;
+  height: 44px;
+  color: var(--ar-ink);
+}
+
+.ar-transition-wordmark {
+  margin: 0;
+  font-family: 'Fraunces', 'Georgia', serif;
+  font-size: 1.45rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1;
+}
+
+.ar-transition-wordmark .ar-auto {
+  color: var(--ar-ink);
+}
+
+.ar-transition-wordmark .ar-resto {
+  color: var(--ar-orange);
+}
+
+.ar-transition-ring-wrap {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 118px;
+  height: 118px;
+  margin: -59px 0 0 -59px;
+  opacity: 0;
+  transform: scale(0.92);
+  transition: opacity 0.2s ease, transform 0.2s ease;
+  pointer-events: none;
+}
+
+.ar-transition-overlay.is-loading .ar-transition-ring-wrap {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.ar-transition-ring {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  background: conic-gradient(
+    from 0deg,
+    var(--ar-orange) 0deg,
+    var(--ar-orange-soft) 90deg,
+    transparent 120deg,
+    transparent 360deg
+  );
+  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 3px), #000 calc(100% - 2px));
+  mask: radial-gradient(farthest-side, transparent calc(100% - 3px), #000 calc(100% - 2px));
+  animation: ar-ring-spin 0.65s linear infinite;
+}
+
+@keyframes ar-ring-spin {
+  to { transform: rotate(360deg); }
+}
+
+.ar-transition-status {
+  margin: 8px 0 0;
+  min-height: 1.1em;
+  font-family: 'Sora', system-ui, sans-serif;
+  font-size: 0.78rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ar-muted);
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.ar-transition-overlay.is-loading .ar-transition-status {
+  opacity: 1;
+}
+
+.ar-transition-dots {
+  display: flex;
+  gap: 4px;
+  margin-top: 6px;
+  opacity: 0;
+  transition: opacity 0.25s ease;
+}
+
+.ar-transition-overlay.is-dissolve .ar-transition-dots {
+  opacity: 0.5;
+}
+
+.ar-transition-dots span {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--ar-muted);
+  animation: ar-dot-fade 0.5s ease infinite alternate;
+}
+
+.ar-transition-dots span:nth-child(2) { animation-delay: 0.12s; }
+.ar-transition-dots span:nth-child(3) { animation-delay: 0.24s; }
+
+@keyframes ar-dot-fade {
+  from { opacity: 0.25; transform: translateY(0); }
+  to { opacity: 0.85; transform: translateY(-2px); }
+}
+
+/* Destination page entrance (lightweight) */
+body.ar-page-enter-pending > *:not(.ar-transition-overlay) {
+  opacity: 0;
+  transform: translateY(10px) scale(0.99);
+}
+
+body.ar-page-enter-active > *:not(.ar-transition-overlay) {
+  transition: opacity 0.38s ease, transform 0.38s cubic-bezier(0.22, 1, 0.36, 1);
+  opacity: 1;
+  transform: none;
+}
+
+body.ar-page-enter-history > *:not(.ar-transition-overlay) {
+  animation: ar-page-enter-history 0.28s ease both;
+}
+
+@keyframes ar-page-enter-history {
+  from { opacity: 0.72; transform: translateY(4px); }
+  to { opacity: 1; transform: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ar-transition-stage,
+  .ar-transition-overlay,
+  .ar-transition-ring,
+  .ar-transition-dots span,
+  body.ar-page-enter-pending > *:not(.ar-transition-overlay),
+  body.ar-page-enter-active > *:not(.ar-transition-overlay) {
+    transition: none !important;
+    animation: none !important;
+  }
+
+  .ar-transition-ring { animation: none; }
+}

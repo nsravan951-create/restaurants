@@ -25,9 +25,51 @@ function normalizePublicUrl(value) {
 function resolveCashfreeReturnUrl() {
   const explicit = normalizePublicUrl(process.env.CASHFREE_RETURN_URL);
   if (explicit) return explicit;
+  const backend = normalizePublicUrl(process.env.BACKEND_PUBLIC_URL);
+  if (backend) return `${backend}/api/payments/cashfree/return`;
   const frontend = normalizePublicUrl(process.env.FRONTEND_PUBLIC_URL);
   if (frontend) return `${frontend}/table.html`;
   return '';
+}
+
+function resolveCustomerPaymentSuccessUrl() {
+  const explicit = normalizePublicUrl(process.env.CASHFREE_PAYMENT_SUCCESS_URL);
+  if (explicit) return explicit;
+  const frontend = normalizePublicUrl(process.env.FRONTEND_PUBLIC_URL);
+  if (frontend) return `${frontend}/payment-success.html`;
+  return '';
+}
+
+function parseOrderIdFromReturnQuery(query = {}) {
+  const direct = Number(query.orderId || 0);
+  if (Number.isInteger(direct) && direct > 0) return direct;
+
+  const providerOrderId = String(query.order_id || query.cf_order_id || '').trim();
+  const match = providerOrderId.match(/^ar_order_(\d+)$/i);
+  if (match) {
+    const parsed = Number(match[1]);
+    if (Number.isInteger(parsed) && parsed > 0) return parsed;
+  }
+  return null;
+}
+
+function buildCustomerPaymentSuccessUrl({
+  orderId,
+  sessionToken,
+  status,
+  tableId = null,
+  qrToken = null,
+} = {}) {
+  const base = resolveCustomerPaymentSuccessUrl();
+  if (!base) return '';
+  const params = new URLSearchParams();
+  if (orderId) params.set('orderId', String(orderId));
+  if (sessionToken) params.set('sessionToken', sessionToken);
+  if (status) params.set('status', status);
+  if (tableId) params.set('tableId', String(tableId));
+  if (qrToken) params.set('token', qrToken);
+  const query = params.toString();
+  return query ? `${base}?${query}` : base;
 }
 
 function maskCredential(value) {
@@ -257,6 +299,9 @@ module.exports = {
   fetchCashfreePaymentOrder,
   verifyCashfreeWebhookSignature,
   buildCashfreeReturnUrl,
+  buildCustomerPaymentSuccessUrl,
+  parseOrderIdFromReturnQuery,
+  resolveCustomerPaymentSuccessUrl,
   createPaymentReference,
   buildProviderOrderId,
 };

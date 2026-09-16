@@ -1462,7 +1462,7 @@
     if (logoutButton) {
       logoutButton.addEventListener('click', () => {
         clearAuth();
-        window.location.href = './auth.html';
+        goToPage('./auth.html');
       });
     }
 
@@ -2742,7 +2742,7 @@
     const auth = getAuth();
     if (!auth || !auth.token || auth.user.role !== 'super_admin') {
       setMessage('Please login as super admin from the auth page.', true);
-      window.location.href = './auth.html';
+      goToPage('./auth.html');
       return null;
     }
 

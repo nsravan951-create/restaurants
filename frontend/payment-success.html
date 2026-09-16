@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#111111" />
+    <title>Payment Status | AutoResto</title>
+    <link rel="icon" href="favicon.svg" type="image/svg+xml" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="assets/css/bill-printer.css" />
+    <link rel="stylesheet" href="assets/css/payment-success.css" />
+  </head>
+  <body>
+    <main class="page">
+      <section id="loadingState" class="state-card">
+        <div class="spinner" aria-hidden="true"></div>
+        <h1>Loading payment details</h1>
+        <p>Please wait while we confirm your payment.</p>
+      </section>
+
+      <section id="errorState" class="state-card hidden">
+        <div class="status-icon status-icon--error" aria-hidden="true">!</div>
+        <h1>Unable to load payment</h1>
+        <p id="errorText">This payment link is invalid or has expired.</p>
+      </section>
+
+      <section id="pendingState" class="state-card hidden">
+        <div class="status-icon status-icon--pending" aria-hidden="true">…</div>
+        <h1>Payment Processing</h1>
+        <p>Your payment is being verified. This usually takes a few seconds.</p>
+        <button id="checkStatusBtn" class="btn btn-primary" type="button">Check Payment Status</button>
+      </section>
+
+      <section id="failedState" class="state-card hidden">
+        <div class="status-icon status-icon--error" aria-hidden="true">×</div>
+        <h1>Payment Failed</h1>
+        <p>Your payment was not completed. You can try again from your table.</p>
+        <button id="retryPaymentBtn" class="btn btn-primary" type="button">Retry Payment</button>
+      </section>
+
+      <section id="successState" class="hidden">
+        <div id="billPrinterRoot"></div>
+      </section>
+    </main>
+    <footer class="brand-footer">Powered by AutoResto</footer>
+    <script src="assets/js/config.js"></script>
+    <script src="assets/js/billHistoryGuard.js"></script>
+    <script src="assets/js/billPrinter.js"></script>
+    <script src="assets/js/payment-success.js"></script>
+  </body>
+</html>

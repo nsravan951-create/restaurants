@@ -84,9 +84,7 @@ async function handleOwnerLogin(event) {
       ? 'Welcome back. Opening Admin Control Center...'
       : 'Login successful. Opening owner dashboard...');
     setAuth(data);
-    setTimeout(() => {
-      window.location.href = redirectAfterLogin(data.user);
-    }, 350);
+    await goToPage(redirectAfterLogin(data.user), { statusText: 'Loading...' });
   } catch (error) {
     setMessage('authMessage', error.message, true);
   }
@@ -107,7 +105,7 @@ async function handleTeamLogin(event) {
     if (role === 'super_admin') {
       setMessage('authMessage', 'Super Admin detected. Opening Admin Control Center...');
       setAuth(data);
-      setTimeout(() => { window.location.href = './admin.html'; }, 350);
+      await goToPage('./admin.html', { statusText: 'Loading...' });
       return;
     }
     if (!isPlatformTeamUser(data.user)) {
@@ -118,9 +116,7 @@ async function handleTeamLogin(event) {
     const roleLabel = role.replace(/_/g, ' ');
     setMessage('authMessage', `Welcome! Opening your ${roleLabel} workspace...`);
     setAuth(data);
-    setTimeout(() => {
-      window.location.href = './team.html';
-    }, 350);
+    await goToPage('./team.html', { statusText: 'Loading...' });
   } catch (error) {
     setMessage('authMessage', error.message, true);
   }
@@ -134,9 +130,7 @@ async function handleLogin(event) {
     const data = await performLogin(formData);
     setMessage('authMessage', 'Login successful. Redirecting...');
     setAuth(data);
-    setTimeout(() => {
-      window.location.href = redirectAfterLogin(data.user);
-    }, 400);
+    await goToPage(redirectAfterLogin(data.user), { statusText: 'Loading...' });
   } catch (error) {
     setMessage('authMessage', error.message, true);
   }

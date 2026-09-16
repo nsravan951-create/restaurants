@@ -462,7 +462,7 @@ function redirectToOwnerLogin(message = '') {
       sessionStorage.setItem('owner_auth_message', message);
     } catch (_) {}
   }
-  window.location.href = './auth.html';
+  goToPage('./auth.html');
 }
 
 function mustOwnerAuth() {
@@ -1726,7 +1726,7 @@ document.getElementById('passwordForm').addEventListener('submit', async (event)
 
 document.getElementById('logoutBtn').addEventListener('click', () => {
   clearAuth();
-  window.location.href = './auth.html';
+  goToPage('./auth.html');
 });
 
 document.getElementById('refreshInvoicesBtn').addEventListener('click', async () => {

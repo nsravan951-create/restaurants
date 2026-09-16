@@ -1,0 +1,450 @@
+/* AutoResto — black & white receipt printer experience */
+:root {
+  --bp-bg: #ffffff;
+  --bp-ink: #111111;
+  --bp-muted: #666666;
+  --bp-line: #d4d4d4;
+  --bp-paper: #fafafa;
+  --bp-printer: #2b2b2b;
+  --bp-printer-dark: #1a1a1a;
+  --bp-shadow: 0 18px 40px rgba(0, 0, 0, 0.14);
+}
+
+.bp-experience {
+  color: var(--bp-ink);
+  background: var(--bp-bg);
+  min-height: 100%;
+}
+
+.bp-experience * { box-sizing: border-box; }
+
+.bp-hidden { display: none !important; }
+
+/* Step 1 — Payment success splash */
+.bp-success-splash {
+  text-align: center;
+  padding: 28px 16px 20px;
+  opacity: 1;
+  transition: opacity 0.35s ease;
+}
+
+.bp-success-splash.bp-fade-out {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.bp-success-check {
+  width: 56px;
+  height: 56px;
+  margin: 0 auto 14px;
+  border: 2px solid var(--bp-ink);
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: 1.5rem;
+  font-weight: 700;
+}
+
+.bp-success-splash h1 {
+  margin: 0;
+  font-size: 1.35rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.bp-success-splash p {
+  margin: 8px 0 0;
+  color: var(--bp-muted);
+  font-size: 0.92rem;
+  line-height: 1.45;
+}
+
+.bp-success-ref {
+  margin-top: 14px !important;
+  font-size: 0.88rem !important;
+  color: var(--bp-ink) !important;
+  font-weight: 600;
+}
+
+/* Printer scene */
+.bp-scene {
+  position: relative;
+  max-width: 420px;
+  margin: 0 auto;
+  padding: 0 12px 24px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s ease;
+}
+
+.bp-scene.bp-visible {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.bp-printer-wrap {
+  position: relative;
+  z-index: 3;
+  transform: translateY(-130%);
+  transition: transform 0.78s cubic-bezier(0.22, 1, 0.36, 1);
+  will-change: transform;
+}
+
+.bp-scene.bp-printer-entered .bp-printer-wrap {
+  transform: translateY(0);
+}
+
+.bp-scene.bp-printer-settled .bp-printer-wrap {
+  transform: translateY(2px);
+  transition-duration: 0.18s;
+}
+
+.bp-printer {
+  width: min(100%, 320px);
+  margin: 0 auto;
+  background: linear-gradient(180deg, #3a3a3a 0%, var(--bp-printer) 35%, var(--bp-printer-dark) 100%);
+  border-radius: 14px 14px 8px 8px;
+  box-shadow: var(--bp-shadow);
+  padding: 14px 16px 10px;
+  border: 1px solid #0d0d0d;
+}
+
+.bp-printer-face {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.bp-printer-label {
+  font-size: 0.62rem;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: #b0b0b0;
+  font-weight: 600;
+}
+
+.bp-printer-led {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #555;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.15);
+}
+
+.bp-scene.bp-printer-active .bp-printer-led {
+  animation: bp-led-blink 0.9s ease-in-out 2;
+}
+
+@keyframes bp-led-blink {
+  0%, 100% { background: #555; box-shadow: none; }
+  50% { background: #e8e8e8; box-shadow: 0 0 6px rgba(255, 255, 255, 0.55); }
+}
+
+.bp-printer-slot {
+  height: 6px;
+  margin: 8px auto 0;
+  width: 72%;
+  background: #0a0a0a;
+  border-radius: 0 0 4px 4px;
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.8);
+}
+
+.bp-status {
+  text-align: center;
+  margin: 12px 0 0;
+  font-size: 0.82rem;
+  color: var(--bp-muted);
+  min-height: 1.2em;
+  letter-spacing: 0.02em;
+}
+
+/* Paper track */
+.bp-paper-track {
+  position: relative;
+  z-index: 2;
+  width: min(100%, 300px);
+  margin: -2px auto 0;
+  display: flex;
+  justify-content: center;
+}
+
+.bp-paper {
+  width: 100%;
+  height: 10px;
+  overflow: hidden;
+  background: var(--bp-paper);
+  border-left: 1px solid var(--bp-line);
+  border-right: 1px solid var(--bp-line);
+  border-bottom: 1px solid var(--bp-line);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.08);
+  transition: height 2.8s cubic-bezier(0.25, 0.9, 0.35, 1);
+  will-change: height;
+}
+
+.bp-scene.bp-printing .bp-paper {
+  height: var(--bp-paper-height, 320px);
+}
+
+.bp-scene.bp-settled .bp-paper {
+  transition-duration: 0.22s;
+  transform: translateY(3px);
+}
+
+.bp-paper-inner {
+  padding: 16px 14px 20px;
+  font-size: 0.84rem;
+  line-height: 1.4;
+}
+
+.bp-receipt-brand {
+  text-align: center;
+  font-size: 0.72rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--bp-muted);
+  margin-bottom: 6px;
+}
+
+.bp-receipt-logo {
+  display: block;
+  width: 44px;
+  height: 44px;
+  margin: 0 auto 8px;
+  object-fit: contain;
+  filter: grayscale(100%);
+}
+
+.bp-receipt-title {
+  text-align: center;
+  font-size: 1rem;
+  font-weight: 700;
+  margin: 0 0 4px;
+}
+
+.bp-receipt-meta {
+  text-align: center;
+  color: var(--bp-muted);
+  font-size: 0.78rem;
+  margin: 0 0 12px;
+}
+
+.bp-rule {
+  border: 0;
+  border-top: 1px dashed var(--bp-line);
+  margin: 10px 0;
+}
+
+.bp-item-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 5px 0;
+}
+
+.bp-item-row small {
+  display: block;
+  color: var(--bp-muted);
+  font-size: 0.74rem;
+  margin-top: 2px;
+}
+
+.bp-total-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 4px 0;
+  color: var(--bp-muted);
+  font-size: 0.82rem;
+}
+
+.bp-total-row.bp-grand {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--bp-ink);
+  padding-top: 8px;
+  margin-top: 4px;
+  border-top: 1px solid var(--bp-ink);
+}
+
+.bp-payline {
+  margin-top: 10px;
+  font-size: 0.78rem;
+  color: var(--bp-muted);
+  text-align: center;
+}
+
+.bp-thanks {
+  text-align: center;
+  margin-top: 12px;
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
+/* Final bill */
+.bp-final {
+  max-width: 420px;
+  margin: 0 auto;
+  padding: 0 12px 32px;
+  opacity: 0;
+  transform: translateY(8px);
+  transition: opacity 0.4s ease, transform 0.4s ease;
+}
+
+.bp-final.bp-visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.bp-final-card {
+  border: 1px solid var(--bp-line);
+  background: var(--bp-bg);
+  padding: 18px 16px;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.06);
+  max-height: min(70vh, 640px);
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.bp-ready-label {
+  text-align: center;
+  font-size: 0.78rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--bp-muted);
+  margin-bottom: 12px;
+}
+
+.bp-actions {
+  display: grid;
+  gap: 10px;
+  margin-top: 18px;
+  opacity: 0;
+  transform: translateY(6px);
+  transition: opacity 0.35s ease 0.1s, transform 0.35s ease 0.1s;
+}
+
+.bp-actions.bp-visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.bp-btn {
+  width: 100%;
+  min-height: 48px;
+  border-radius: 10px;
+  border: 1px solid var(--bp-ink);
+  background: var(--bp-bg);
+  color: var(--bp-ink);
+  font-size: 0.92rem;
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.bp-btn-primary {
+  background: var(--bp-ink);
+  color: #fff;
+  border-color: var(--bp-ink);
+}
+
+.bp-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.bp-feedback {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px dashed var(--bp-line);
+}
+
+.bp-feedback h3 {
+  margin: 0 0 10px;
+  font-size: 1rem;
+  text-align: center;
+}
+
+.bp-stars {
+  display: flex;
+  justify-content: center;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+.bp-star {
+  border: 0;
+  background: transparent;
+  font-size: 1.7rem;
+  color: #c8c8c8;
+  cursor: pointer;
+  padding: 0;
+  line-height: 1;
+}
+
+.bp-star.bp-active { color: var(--bp-ink); }
+
+.bp-comment {
+  width: 100%;
+  min-height: 80px;
+  border: 1px solid var(--bp-line);
+  border-radius: 8px;
+  padding: 10px;
+  font: inherit;
+  resize: vertical;
+  background: #fff;
+  color: var(--bp-ink);
+}
+
+.bp-feedback-msg {
+  min-height: 1.2em;
+  margin: 8px 0 0;
+  font-size: 0.85rem;
+  color: var(--bp-muted);
+  text-align: center;
+}
+
+body.ar-bill-printer-active .hero,
+body.ar-bill-printer-active #stickyBar {
+  display: none !important;
+}
+
+body.ar-bill-printer-active .app {
+  padding-bottom: 40px;
+}
+
+@media (max-width: 390px) {
+  .bp-printer { width: 100%; }
+  .bp-paper-track { width: 92%; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bp-printer-wrap,
+  .bp-paper,
+  .bp-success-splash,
+  .bp-final,
+  .bp-actions,
+  .bp-printer-led {
+    transition: none !important;
+    animation: none !important;
+  }
+
+  .bp-scene.bp-printer-entered .bp-printer-wrap,
+  .bp-scene.bp-printer-settled .bp-printer-wrap {
+    transform: none;
+  }
+
+  .bp-scene.bp-printing .bp-paper {
+    height: auto !important;
+    max-height: none;
+  }
+
+  .bp-scene.bp-settled .bp-paper {
+    transform: none;
+  }
+}
