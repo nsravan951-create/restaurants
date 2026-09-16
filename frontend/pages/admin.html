@@ -9,6 +9,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@600;700&family=Sora:wght@400;500;600&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="../assets/css/styles.css" />
   <link rel="stylesheet" href="../assets/css/superadmin.css" />
+  <link rel="stylesheet" href="../assets/css/master-admin.css" />
   <script src="../assets/js/config.js"></script>
   <script src="../assets/js/common.js"></script>
 </head>
@@ -16,24 +17,46 @@
   <div class="admin-shell">
     <aside class="admin-sidebar panel">
       <div>
-        <p class="eyebrow admin-eyebrow">SaaS Platform</p>
-        <h1>Restaurant Control Center</h1>
-        <p class="admin-intro">Online + offline profits, aggregator orders, promotions &amp; payments — all in one place.</p>
+        <p class="eyebrow admin-eyebrow">Master Admin</p>
+        <h1>Control Center</h1>
+        <p class="admin-intro">Platform command center for restaurants, finance, teams, and operations.</p>
       </div>
 
       <nav class="admin-nav">
-        <button data-section="overview" class="admin-link active">📊 Overview</button>
-        <button data-section="profits" class="admin-link">💰 SaaS Profits</button>
-        <button data-section="platform" class="admin-link">🛵 Swiggy / Zomato</button>
-        <button data-section="operations" class="admin-link">🏪 Operations</button>
-        <button data-section="promotions" class="admin-link">🎬 Promotions</button>
-        <button data-section="payments" class="admin-link">🔐 Payment Vault</button>
-        <button data-section="messaging" class="admin-link">💬 Messages</button>
-        <button data-section="restaurants" class="admin-link">🏢 Restaurants</button>
-        <button data-section="analytics" class="admin-link">📈 Analytics</button>
-        <button data-section="reconciliation" class="admin-link">🧾 Reconciliation</button>
-        <button data-section="team" class="admin-link">👥 Team</button>
-        <button data-section="audit" class="admin-link">📋 Audit Logs</button>
+        <button data-section="overview" class="admin-link active">📊 Dashboard</button>
+        <div class="ma-nav-group">
+          <p class="ma-nav-group__label">Finance</p>
+          <button data-section="reconciliation" class="admin-link">💳 Payments</button>
+          <button data-section="settlements" class="admin-link">🏦 Settlements</button>
+          <button data-section="profits" class="admin-link">💰 SaaS Profits</button>
+        </div>
+        <div class="ma-nav-group">
+          <p class="ma-nav-group__label">Restaurants</p>
+          <button data-section="restaurant-hub" class="admin-link">🏢 Restaurant Hub</button>
+          <button data-section="upgrade-queue" class="admin-link">✨ Upgrade Queue</button>
+          <button data-section="restaurants" class="admin-link">➕ Create Restaurant</button>
+          <button data-section="operations" class="admin-link">🏪 Operations</button>
+          <button data-section="platform" class="admin-link">🛵 Aggregators</button>
+        </div>
+        <div class="ma-nav-group">
+          <p class="ma-nav-group__label">Growth</p>
+          <button data-section="promotions" class="admin-link">🎬 Promotions</button>
+          <button data-section="analytics" class="admin-link">📈 Analytics</button>
+          <button data-section="messaging" class="admin-link">💬 Messages</button>
+        </div>
+        <div class="ma-nav-group">
+          <p class="ma-nav-group__label">Support &amp; Data</p>
+          <button data-section="support" class="admin-link">🎫 Support Tickets</button>
+          <button data-section="exports" class="admin-link">📥 CSV Exports</button>
+        </div>
+        <div class="ma-nav-group">
+          <p class="ma-nav-group__label">Teams &amp; System</p>
+          <button data-section="team" class="admin-link">👥 Team</button>
+          <button data-section="roles" class="admin-link">🛡️ Roles</button>
+          <button data-section="activity" class="admin-link">📋 Activity</button>
+          <button data-section="system" class="admin-link">⚙️ System Health</button>
+          <button data-section="payments" class="admin-link">🔐 Payment Vault</button>
+        </div>
         <button id="logoutButton" class="admin-link admin-link--danger">🚪 Logout</button>
       </nav>
 
@@ -56,6 +79,13 @@
       </header>
 
       <section id="section-overview" class="admin-section">
+        <div class="ma-filter-bar" id="dashboardRangeFilters">
+          <button type="button" class="ma-filter-btn" data-range="today">Today</button>
+          <button type="button" class="ma-filter-btn" data-range="7d">7 Days</button>
+          <button type="button" class="ma-filter-btn active" data-range="30d">30 Days</button>
+          <button type="button" class="ma-filter-btn" data-range="month">This Month</button>
+        </div>
+        <div id="masterMetrics" class="summary-grid"></div>
         <div id="summaryCards" class="summary-grid"></div>
         <div class="admin-grid-2">
           <article class="panel">
@@ -215,8 +245,37 @@
         </article>
       </section>
 
+      <section id="section-restaurant-hub" class="admin-section hidden">
+        <div class="section-head">
+          <div>
+            <h3>Restaurant Hub</h3>
+            <p>Manage features, financial details, upgrade payments, and payouts per restaurant.</p>
+          </div>
+          <div class="admin-toolbar">
+            <input id="hubSearch" class="admin-search" placeholder="Search restaurant, owner, GSTIN..." />
+            <button id="hubRefreshBtn" class="btn btn-light" type="button">Refresh</button>
+          </div>
+        </div>
+        <div id="restaurantHubTable" class="admin-table-wrap panel"></div>
+      </section>
+
+      <section id="section-upgrade-queue" class="admin-section hidden">
+        <div class="section-head">
+          <div>
+            <h3>Upgrade payment queue</h3>
+            <p>Restaurants that paid for upgrades — verify payment and enable features.</p>
+          </div>
+          <div class="ma-filter-bar" id="upgradeQueueFilters">
+            <button type="button" class="ma-filter-btn active" data-upgrade-status="pending">Pending</button>
+            <button type="button" class="ma-filter-btn" data-upgrade-status="activated">Activated</button>
+            <button type="button" class="ma-filter-btn" data-upgrade-status="rejected">Rejected</button>
+          </div>
+        </div>
+        <div id="upgradeQueueTable" class="admin-table-wrap panel"></div>
+      </section>
+
       <section id="section-restaurants" class="admin-section hidden">
-        <div class="section-head"><div><h3>Restaurant management</h3><p>Create owners, toggle activation, and manage subscriptions.</p></div></div>
+        <div class="section-head"><div><h3>Create restaurant</h3><p>Onboard a new owner and restaurant.</p></div></div>
         <article class="panel">
           <form id="restaurantForm" class="admin-form">
             <input name="name" placeholder="Owner name" required />
@@ -301,32 +360,160 @@
       </section>
 
       <section id="section-team" class="admin-section hidden">
-        <div class="admin-grid-2">
-          <article class="panel">
-            <div class="section-head"><div><h3>Create team member</h3><p>Internal AutoResto staff with role-based permissions.</p></div></div>
+        <div class="section-head">
+          <div>
+            <h3>Team &amp; role allocation</h3>
+            <p>Create internal staff with email + password. Super Admin keeps full access to everything.</p>
+          </div>
+        </div>
+        <article class="panel ma-hover-card">
+          <div class="section-head"><div><h3>Platform roles</h3><p>Click a role to pre-fill the form. Each role has limited permissions.</p></div></div>
+          <div id="teamRoleCatalog" class="ma-role-catalog"></div>
+        </article>
+        <div class="admin-grid-2" style="margin-top:1rem;">
+          <article class="panel ma-hover-card">
+            <div class="section-head"><div><h3>Create team member</h3><p>Allocate username, email, password, and role.</p></div></div>
             <form id="teamCreateForm" class="admin-form">
               <input name="name" placeholder="Full name" required />
-              <input name="email" type="email" placeholder="Email" required />
+              <input name="username" placeholder="Username (optional, for login display)" pattern="[a-zA-Z0-9._-]{3,80}" />
+              <input name="email" type="email" placeholder="Login email" required />
               <input name="password" type="password" placeholder="Password (min 8 chars)" required minlength="8" />
-              <select name="role" required>
+              <select name="role" id="teamRoleSelect" required>
                 <option value="">Select role</option>
-                <option value="finance_manager">Finance Manager</option>
-                <option value="restaurant_manager">Restaurant Manager</option>
-                <option value="promotions_manager">Promotions Manager</option>
-                <option value="user_enquiry_manager">User / Enquiry Manager</option>
-                <option value="database_manager">Database Manager</option>
-                <option value="backend_manager">Backend Manager</option>
-                <option value="analytics_manager">Analytics Manager</option>
               </select>
-              <button class="btn btn-primary" type="submit">Create team member</button>
+              <p id="teamRoleDescription" class="muted" style="margin:0;"></p>
+              <select name="scopeType" id="teamScopeType">
+                <option value="global">Scope: Global (all restaurants)</option>
+                <option value="restaurant">Scope: Single restaurant only</option>
+                <option value="department">Scope: Department</option>
+                <option value="own_records">Scope: Own records only</option>
+              </select>
+              <select name="scopeRestaurantId" id="teamScopeRestaurant" class="hidden">
+                <option value="">Select restaurant for scope</option>
+              </select>
+              <input name="phone" placeholder="Phone (optional)" />
+              <button class="btn btn-primary" type="submit">Create &amp; allocate role</button>
             </form>
           </article>
-          <article class="panel">
-            <div class="section-head"><div><h3>Role permissions</h3><p>Least-privilege access map.</p></div></div>
-            <div id="teamRoleMatrix" class="stack"></div>
+          <article class="panel ma-hover-card">
+            <div class="section-head"><div><h3>Role permissions map</h3><p>What each role can access.</p></div></div>
+            <div id="teamRoleMatrix" class="ma-role-matrix"></div>
           </article>
         </div>
-        <div id="teamMembersList" class="admin-list" style="margin-top:1rem;"></div>
+        <div class="section-head" style="margin-top:1.25rem;"><div><h3>Active team members</h3><p>Deactivate, change role, or reset password.</p></div></div>
+        <div id="teamMembersList" class="admin-list"></div>
+      </section>
+
+      <section id="section-settlements" class="admin-section hidden">
+        <div class="section-head"><div><h3>Settlements</h3><p>Restaurant payout workflow and settlement status.</p></div></div>
+        <article class="panel ma-hover-card">
+          <form id="settlementCreateForm" class="admin-form">
+            <select name="restaurantId" id="settlementRestaurantSelect" required><option value="">Restaurant</option></select>
+            <input name="periodStart" type="datetime-local" required />
+            <input name="periodEnd" type="datetime-local" required />
+            <input name="grossAmount" type="number" step="0.01" placeholder="Gross amount" required />
+            <input name="commissionAmount" type="number" step="0.01" placeholder="Commission" value="0" />
+            <input name="refundAmount" type="number" step="0.01" placeholder="Refunds" value="0" />
+            <input name="adjustmentAmount" type="number" step="0.01" placeholder="Adjustments" value="0" />
+            <textarea name="notes" placeholder="Notes" rows="2"></textarea>
+            <button class="btn btn-primary" type="submit">Create settlement</button>
+          </form>
+        </article>
+        <div id="settlementsList" class="admin-list" style="margin-top:1rem;"></div>
+      </section>
+
+      <section id="section-support" class="admin-section hidden">
+        <div class="section-head">
+          <div>
+            <h3>Support tickets</h3>
+            <p>Restaurant and platform enquiries — assign, reply, and resolve.</p>
+          </div>
+          <div class="ma-filter-bar" id="supportStatusFilters">
+            <button type="button" class="ma-filter-btn active" data-support-status="">All</button>
+            <button type="button" class="ma-filter-btn" data-support-status="open">Open</button>
+            <button type="button" class="ma-filter-btn" data-support-status="in_progress">In progress</button>
+            <button type="button" class="ma-filter-btn" data-support-status="resolved">Resolved</button>
+          </div>
+        </div>
+        <div class="admin-grid-2">
+          <article class="panel ma-hover-card">
+            <div class="section-head"><div><h3>Create ticket</h3></div></div>
+            <form id="supportCreateForm" class="admin-form">
+              <select name="restaurantId" id="supportRestaurantSelect"><option value="">No restaurant (platform)</option></select>
+              <input name="subject" placeholder="Subject" required />
+              <select name="category">
+                <option value="general">General</option>
+                <option value="billing">Billing</option>
+                <option value="technical">Technical</option>
+                <option value="features">Features</option>
+                <option value="payout">Payout</option>
+              </select>
+              <select name="priority">
+                <option value="normal">Normal</option>
+                <option value="high">High</option>
+                <option value="urgent">Urgent</option>
+              </select>
+              <textarea name="description" placeholder="Description" rows="3"></textarea>
+              <button class="btn btn-primary" type="submit">Create ticket</button>
+            </form>
+          </article>
+          <article class="panel ma-hover-card">
+            <div class="section-head"><div><h3>Ticket detail</h3><p id="supportDetailHint">Select a ticket to view thread.</p></div></div>
+            <div id="supportTicketDetail" class="stack"></div>
+            <form id="supportReplyForm" class="admin-form hidden">
+              <textarea name="message" placeholder="Reply to customer..." rows="3" required></textarea>
+              <label class="admin-check"><input name="isInternal" type="checkbox" /><span>Internal note (hidden from owner)</span></label>
+              <button class="btn btn-primary" type="submit">Send reply</button>
+            </form>
+          </article>
+        </div>
+        <div id="supportTicketsTable" class="admin-table-wrap panel" style="margin-top:1rem;"></div>
+      </section>
+
+      <section id="section-exports" class="admin-section hidden">
+        <div class="section-head">
+          <div>
+            <h3>CSV exports</h3>
+            <p>Download orders, reconciliation, settlements, restaurants, upgrades, and tickets.</p>
+          </div>
+        </div>
+        <div class="ma-export-grid panel">
+          <button class="btn btn-light ma-export-btn" type="button" data-export="orders">📦 Orders (30 days)</button>
+          <button class="btn btn-light ma-export-btn" type="button" data-export="reconciliation">💳 Reconciliation</button>
+          <button class="btn btn-light ma-export-btn" type="button" data-export="settlements">🏦 Settlements</button>
+          <button class="btn btn-light ma-export-btn" type="button" data-export="restaurants">🏢 Restaurants</button>
+          <button class="btn btn-light ma-export-btn" type="button" data-export="upgrade-queue">✨ Upgrade queue</button>
+          <button class="btn btn-light ma-export-btn" type="button" data-export="support-tickets">🎫 Support tickets</button>
+        </div>
+      </section>
+
+      <section id="section-roles" class="admin-section hidden">
+        <div class="admin-grid-2">
+          <article class="panel ma-hover-card">
+            <div class="section-head"><div><h3>Create role</h3><p>Dynamic roles without code changes.</p></div></div>
+            <form id="roleCreateForm" class="admin-form">
+              <input name="roleKey" placeholder="role_key (e.g. payment_manager)" required pattern="[a-z][a-z0-9_]*" />
+              <input name="name" placeholder="Display name" required />
+              <input name="description" placeholder="Description" />
+              <div id="rolePermissionsPicker" class="ma-perm-grid"></div>
+              <button class="btn btn-primary" type="submit">Create role</button>
+            </form>
+          </article>
+          <article class="panel ma-hover-card">
+            <div class="section-head"><div><h3>Platform roles</h3><p>System and custom roles.</p></div></div>
+            <div id="rolesList" class="stack"></div>
+          </article>
+        </div>
+      </section>
+
+      <section id="section-activity" class="admin-section hidden">
+        <div class="section-head"><div><h3>Activity center</h3><p>Audit trail and login activity.</p></div></div>
+        <div id="activityFeed" class="admin-list"></div>
+      </section>
+
+      <section id="section-system" class="admin-section hidden">
+        <div class="section-head"><div><h3>System health</h3><p>Backend, database, Cashfree, and migrations.</p></div></div>
+        <div id="systemHealthGrid" class="ma-health-grid"></div>
       </section>
 
       <section id="section-audit" class="admin-section hidden">
@@ -336,6 +523,33 @@
 
       <p id="adminMessage" class="message"></p>
     </main>
+  </div>
+
+  <div id="restaurantProfileModal" class="bill-modal hidden" aria-hidden="true">
+    <div class="bill-modal__sheet ma-profile-sheet" role="dialog">
+      <header class="bill-modal__head">
+        <div>
+          <p class="eyebrow">Restaurant profile</p>
+          <h2 id="profileRestaurantName">Restaurant</h2>
+          <p id="profileRestaurantMeta" class="admin-intro"></p>
+        </div>
+        <button id="closeProfileModal" class="btn btn-light" type="button">✕ Close</button>
+      </header>
+      <div class="ma-tabs" id="profileTabs">
+        <button type="button" class="ma-tab active" data-profile-tab="overview">Overview</button>
+        <button type="button" class="ma-tab" data-profile-tab="features">Features</button>
+        <button type="button" class="ma-tab" data-profile-tab="financial">Financial</button>
+        <button type="button" class="ma-tab" data-profile-tab="upgrades">Upgrades</button>
+        <button type="button" class="ma-tab" data-profile-tab="payouts">Payouts</button>
+      </div>
+      <div class="bill-modal__body ma-profile-body">
+        <div id="profileTabOverview" class="ma-tab-panel" data-profile-panel="overview"></div>
+        <div id="profileTabFeatures" class="ma-tab-panel hidden" data-profile-panel="features"></div>
+        <div id="profileTabFinancial" class="ma-tab-panel hidden" data-profile-panel="financial"></div>
+        <div id="profileTabUpgrades" class="ma-tab-panel hidden" data-profile-panel="upgrades"></div>
+        <div id="profileTabPayouts" class="ma-tab-panel hidden" data-profile-panel="payouts"></div>
+      </div>
+    </div>
   </div>
 
   <div id="paymentAuthModal" class="bill-modal hidden" aria-hidden="true">

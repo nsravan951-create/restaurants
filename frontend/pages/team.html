@@ -9,6 +9,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@600;700&family=Sora:wght@400;500;600&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="../assets/css/styles.css" />
   <link rel="stylesheet" href="../assets/css/superadmin.css" />
+  <link rel="stylesheet" href="../assets/css/master-admin.css" />
   <script src="../assets/js/config.js"></script>
   <script src="../assets/js/common.js"></script>
 </head>
@@ -35,6 +36,10 @@
       </header>
 
       <section id="team-overview" class="admin-section">
+        <article class="team-welcome-hero ma-hover-card">
+          <h3>Welcome to your workspace</h3>
+          <p id="teamWelcomeText">You have access only to the data required for your role.</p>
+        </article>
         <div id="teamSummaryCards" class="summary-grid"></div>
         <article class="panel">
           <div class="section-head"><div><h3>Your permissions</h3><p>Granted capabilities for your role.</p></div></div>
@@ -52,7 +57,46 @@
       </section>
 
       <section id="team-restaurants" class="admin-section hidden">
-        <div id="teamRestaurantsList" class="admin-list"></div>
+        <div id="teamRestaurantsList" class="admin-table-wrap panel"></div>
+      </section>
+
+      <section id="team-upgrades" class="admin-section hidden">
+        <div class="section-head">
+          <div>
+            <h3>Upgrade payment queue</h3>
+            <p>Verify paid upgrades and enable restaurant features.</p>
+          </div>
+        </div>
+        <div id="teamUpgradeQueue" class="admin-table-wrap panel"></div>
+      </section>
+
+      <section id="team-financial" class="admin-section hidden">
+        <div class="section-head">
+          <div>
+            <h3>Restaurant financial details</h3>
+            <p>GSTIN, bank account, IFSC, and UPI for Cashfree payouts.</p>
+          </div>
+          <select id="teamFinancialRestaurant" class="admin-select">
+            <option value="">Select restaurant</option>
+          </select>
+        </div>
+        <div id="teamFinancialPanel" class="panel"></div>
+      </section>
+
+      <section id="team-settlements" class="admin-section hidden">
+        <div id="teamSettlementsList" class="admin-list"></div>
+      </section>
+
+      <section id="team-support" class="admin-section hidden">
+        <div id="teamSupportTable" class="admin-table-wrap panel"></div>
+      </section>
+
+      <section id="team-exports" class="admin-section hidden">
+        <div class="ma-export-grid panel">
+          <button class="btn btn-light ma-export-btn" type="button" data-team-export="orders">📦 Orders</button>
+          <button class="btn btn-light ma-export-btn" type="button" data-team-export="reconciliation">💳 Reconciliation</button>
+          <button class="btn btn-light ma-export-btn" type="button" data-team-export="settlements">🏦 Settlements</button>
+        </div>
       </section>
 
       <section id="team-audit" class="admin-section hidden">

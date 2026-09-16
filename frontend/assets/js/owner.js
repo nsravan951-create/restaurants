@@ -10,6 +10,7 @@ let ownerSubscription = null;
 let ownerPlans = [];
 let activeNavSection = 'dashboard';
 let latestTablesCache = [];
+let ownerNavLayout = null;
 
 const OWNER_NAV = [
   { group: 'Overview', section: 'dashboard', label: 'Dashboard', icon: 'grid', featureKey: null },
@@ -89,13 +90,81 @@ function getUpgradePlan() {
   return ownerPlans.find((plan) => plan.code !== 'starter') || null;
 }
 
+function getOrderedOwnerNav() {
+  if (!ownerNavLayout || !Array.isArray(ownerNavLayout)) return OWNER_NAV;
+  const map = new Map(OWNER_NAV.map((item) => [item.section, item]));
+  const ordered = [];
+  for (const section of ownerNavLayout) {
+    if (map.has(section)) ordered.push(map.get(section));
+  }
+  for (const item of OWNER_NAV) {
+    if (!ownerNavLayout.includes(item.section)) ordered.push(item);
+  }
+  return ordered;
+}
+
+async function loadDashboardLayout() {
+  try {
+    const data = await apiRequest('/owner/dashboard-layout', {}, true);
+    ownerNavLayout = data.sections || null;
+  } catch (_) {
+    ownerNavLayout = null;
+  }
+}
+
+function renderLayoutCustomizer() {
+  const root = document.getElementById('ownerLayoutList');
+  if (!root) return;
+  const nav = getOrderedOwnerNav();
+  root.innerHTML = nav.map((item, index) => `
+    <div class="od-layout-row" data-layout-section="${item.section}">
+      <span class="od-layout-row__pos">${index + 1}</span>
+      <span class="od-layout-row__label">${escapeHtml(item.label)}</span>
+      <span class="od-layout-row__group">${escapeHtml(item.group)}</span>
+      <div class="od-layout-row__actions">
+        <button type="button" class="btn btn-light btn-sm" data-layout-up="${item.section}" ${index === 0 ? 'disabled' : ''}>↑</button>
+        <button type="button" class="btn btn-light btn-sm" data-layout-down="${item.section}" ${index === nav.length - 1 ? 'disabled' : ''}>↓</button>
+      </div>
+    </div>
+  `).join('');
+
+  root.querySelectorAll('[data-layout-up]').forEach((btn) => {
+    btn.addEventListener('click', () => moveLayoutSection(btn.dataset.layoutUp, -1));
+  });
+  root.querySelectorAll('[data-layout-down]').forEach((btn) => {
+    btn.addEventListener('click', () => moveLayoutSection(btn.dataset.layoutDown, 1));
+  });
+}
+
+function moveLayoutSection(section, direction) {
+  const current = getOrderedOwnerNav().map((item) => item.section);
+  const index = current.indexOf(section);
+  if (index < 0) return;
+  const target = index + direction;
+  if (target < 0 || target >= current.length) return;
+  [current[index], current[target]] = [current[target], current[index]];
+  ownerNavLayout = current;
+  renderLayoutCustomizer();
+  buildOwnerSidebar();
+}
+
+async function saveDashboardLayout() {
+  const sections = getOrderedOwnerNav().map((item) => item.section);
+  await apiRequest('/owner/dashboard-layout', {
+    method: 'PATCH',
+    body: JSON.stringify({ sections }),
+  }, true);
+  ownerNavLayout = sections;
+  setMessage('ownerMessage', 'Dashboard order saved.');
+}
+
 function buildOwnerSidebar() {
   const nav = document.getElementById('ownerNav');
   if (!nav) return;
 
   let html = '';
   let lastGroup = '';
-  OWNER_NAV.forEach((item) => {
+  getOrderedOwnerNav().forEach((item) => {
     if (item.group !== lastGroup) {
       html += `<p class="owner-sidebar__group-label">${escapeHtml(item.group)}</p>`;
       lastGroup = item.group;
@@ -170,8 +239,13 @@ function closeSidebarDrawer() {
 }
 
 async function loadEntitlements() {
-  const data = await apiRequest('/owner/entitlements', {}, true);
-  ownerEntitlements = new Map((data.features || []).map((row) => [row.feature_key, Boolean(row.enabled)]));
+  try {
+    const data = await apiRequest('/owner/entitlements', {}, true);
+    ownerEntitlements = new Map((data.features || []).map((row) => [row.feature_key, Boolean(row.enabled)]));
+  } catch (error) {
+    if (handleOwnerApiError(error, 'Unable to load entitlements')) return;
+    ownerEntitlements = new Map();
+  }
 }
 
 async function loadSubscriptionData() {
@@ -381,13 +455,63 @@ function ensureRestaurantId() {
   return true;
 }
 
+function redirectToOwnerLogin(message = '') {
+  clearAuth();
+  if (message) {
+    try {
+      sessionStorage.setItem('owner_auth_message', message);
+    } catch (_) {}
+  }
+  window.location.href = './auth.html';
+}
+
 function mustOwnerAuth() {
   const auth = getAuth();
-  if (!auth || !auth.token || auth.user.role !== 'owner') {
-    window.location.href = './auth.html';
+  if (!auth || !auth.token || auth.user?.role !== 'owner') {
+    redirectToOwnerLogin();
     return null;
   }
   return auth;
+}
+
+async function ensureOwnerSession() {
+  const auth = mustOwnerAuth();
+  if (!auth) return null;
+
+  try {
+    const data = await apiRequest('/api/auth/me', {}, true);
+    const role = data.user?.role;
+    if (role !== 'owner') {
+      redirectToOwnerLogin('This page is only for restaurant owners. Please sign in with an owner account.');
+      return null;
+    }
+    setAuth({
+      ...auth,
+      token: auth.token,
+      user: {
+        id: data.user.id,
+        name: data.user.name,
+        email: data.user.email,
+        role: data.user.role,
+      },
+    });
+    return getAuth();
+  } catch (error) {
+    if (error.authFailure || error.status === 401 || error.status === 403) {
+      redirectToOwnerLogin(error.message || 'Session expired. Please sign in again.');
+      return null;
+    }
+    throw error;
+  }
+}
+
+function handleOwnerApiError(error, fallbackMessage) {
+  if (error?.authFailure || error?.status === 401 || error?.status === 403) {
+    redirectToOwnerLogin(error.message || 'Session expired. Please sign in again.');
+    return true;
+  }
+  console.warn(fallbackMessage, error?.message || error);
+  return false;
 }
 
 function parseOrderItems(items) {
@@ -712,7 +836,7 @@ function setActiveSection(sectionName) {
 }
 
 async function activateSection(sectionName) {
-  const navItem = OWNER_NAV.find((item) => item.section === sectionName);
+  const navItem = getOrderedOwnerNav().find((item) => item.section === sectionName);
   if (navItem?.featureKey && !isFeatureEnabled(navItem.featureKey)) {
     showUpgradeGate(sectionName);
     return;
@@ -788,6 +912,26 @@ async function loadFeatures() {
   root.querySelectorAll('[data-open-upgrade]').forEach((btn) => {
     btn.addEventListener('click', openUpgradeModal);
   });
+  renderLayoutCustomizer();
+  loadOwnerSupportTickets().catch(() => {});
+}
+
+async function loadOwnerSupportTickets() {
+  const root = document.getElementById('ownerSupportTickets');
+  if (!root) return;
+  try {
+    const data = await apiRequest('/owner/support-tickets', {}, true);
+    const tickets = data.tickets || [];
+    root.innerHTML = tickets.map((t) => `
+      <div class="od-widget">
+        <strong>#${t.id} · ${escapeHtml(t.subject)}</strong>
+        <p>${escapeHtml(t.category)} · ${escapeHtml(t.status)} · ${escapeHtml(t.priority)}</p>
+        <small>${new Date(t.created_at).toLocaleString()}</small>
+      </div>
+    `).join('') || '<p class="hero-copy">No support tickets yet.</p>';
+  } catch (_) {
+    root.innerHTML = '<p class="hero-copy">Support tickets will appear here after migration 014.</p>';
+  }
 }
 
 async function loadRestaurant() {
@@ -1155,7 +1299,13 @@ function renderAnalytics(orders) {
 }
 
 async function loadGstSettings() {
-  const data = await apiRequest('/owner/gst-settings', {}, true);
+  let data;
+  try {
+    data = await apiRequest('/owner/gst-settings', {}, true);
+  } catch (error) {
+    if (handleOwnerApiError(error, 'Unable to load GST settings')) return;
+    throw error;
+  }
   const form = document.getElementById('gstSettingsForm');
   if (!form || !data.settings) return;
   const s = data.settings;
@@ -1372,7 +1522,8 @@ function initSocket() {
 }
 
 async function initOwner() {
-  if (!mustOwnerAuth()) return;
+  const auth = await ensureOwnerSession();
+  if (!auth) return;
 
   hideBillModal();
   initOwnerDashboardUi();
@@ -1382,6 +1533,7 @@ async function initOwner() {
     await Promise.all([
       loadEntitlements(),
       loadSubscriptionData(),
+      loadDashboardLayout(),
       loadMenu(),
       loadTables(),
       loadInvoices(),
@@ -1733,6 +1885,34 @@ document.getElementById('billPrintInvoice')?.addEventListener('click', async () 
   if (!activeBillOrder) return;
   try {
     await printInvoiceForOrder(activeBillOrder.id);
+  } catch (error) {
+    setMessage('ownerMessage', error.message, true);
+  }
+});
+
+document.getElementById('ownerSupportForm')?.addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const formData = new FormData(event.target);
+  try {
+    await apiRequest('/owner/support-tickets', {
+      method: 'POST',
+      body: JSON.stringify({
+        subject: formData.get('subject'),
+        category: formData.get('category'),
+        description: formData.get('description'),
+      }),
+    }, true);
+    event.target.reset();
+    setMessage('ownerMessage', 'Support ticket submitted. Our team will respond soon.');
+    await loadOwnerSupportTickets();
+  } catch (error) {
+    setMessage('ownerMessage', error.message, true);
+  }
+});
+
+document.getElementById('saveLayoutBtn')?.addEventListener('click', async () => {
+  try {
+    await saveDashboardLayout();
   } catch (error) {
     setMessage('ownerMessage', error.message, true);
   }

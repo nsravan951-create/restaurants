@@ -1,17 +1,12 @@
 const pool = require('../config/db');
+const {
+  isPlatformRole,
+  getUserProfile,
+  userHasPermission,
+} = require('../utils/rbac');
+const { PLATFORM_ROLES } = require('../config/platformRoleCatalog');
 
-const PLATFORM_ROLES = new Set([
-  'super_admin',
-  'finance_manager',
-  'restaurant_manager',
-  'promotions_manager',
-  'user_enquiry_manager',
-  'database_manager',
-  'backend_manager',
-  'analytics_manager',
-]);
-
-async function userHasPermission(role, permissionKey) {
+async function userHasPermissionLegacy(role, permissionKey) {
   if (role === 'super_admin') return true;
   const { rows } = await pool.query(
     `SELECT 1 FROM platform_role_permissions WHERE role = $1 AND permission_key = $2 LIMIT 1`,
@@ -24,14 +19,32 @@ function requirePlatformPermission(permissionKey) {
   return async (req, res, next) => {
     try {
       const role = req.user?.role;
-      if (!role) return res.status(401).json({ message: 'Unauthorized' });
+      const userId = req.user?.userId;
+      if (!role || !userId) return res.status(401).json({ message: 'Unauthorized' });
+
       if (role === 'super_admin') return next();
-      if (!PLATFORM_ROLES.has(role)) {
+
+      const platform = await isPlatformRole(role);
+      if (!platform && !PLATFORM_ROLES.has(role)) {
         return res.status(403).json({ message: 'Forbidden: platform access required' });
       }
-      const allowed = await userHasPermission(role, permissionKey);
+
+      const profile = await getUserProfile(userId);
+      if (!profile?.is_active) {
+        return res.status(403).json({ message: 'Account is deactivated' });
+      }
+
+      const tokenVersion = Number(req.user.tokenVersion || 0);
+      if (Number(profile.token_version || 0) > tokenVersion) {
+        return res.status(401).json({ message: 'Session revoked. Please sign in again.' });
+      }
+
+      const allowed = await userHasPermission(userId, role, permissionKey);
       if (!allowed) {
-        return res.status(403).json({ message: 'Forbidden: insufficient permission', permission: permissionKey });
+        return res.status(403).json({
+          message: 'Forbidden: insufficient permission',
+          permission: permissionKey,
+        });
       }
       return next();
     } catch (error) {
@@ -41,17 +54,19 @@ function requirePlatformPermission(permissionKey) {
 }
 
 function requirePlatformAccess() {
-  return (req, res, next) => {
+  return async (req, res, next) => {
     const role = req.user?.role;
     if (!role) return res.status(401).json({ message: 'Unauthorized' });
-    if (role === 'super_admin' || PLATFORM_ROLES.has(role)) return next();
+    if (role === 'super_admin') return next();
+    const platform = await isPlatformRole(role);
+    if (platform || PLATFORM_ROLES.has(role)) return next();
     return res.status(403).json({ message: 'Forbidden: platform access required' });
   };
 }
 
 module.exports = {
   PLATFORM_ROLES,
-  userHasPermission,
+  userHasPermission: userHasPermissionLegacy,
   requirePlatformPermission,
   requirePlatformAccess,
 };

@@ -1,12 +1,28 @@
 const pool = require('../config/db');
 
 async function getRestaurantIdForUser(user) {
+  if (!user?.userId) return null;
   if (user.role === 'super_admin') return null;
+
   const { rows } = await pool.query(
-    'SELECT restaurant_id FROM users WHERE id = $1 LIMIT 1',
+    'SELECT restaurant_id, role FROM users WHERE id = $1 LIMIT 1',
     [user.userId]
   );
-  return rows[0]?.restaurant_id ? Number(rows[0].restaurant_id) : null;
+  if (!rows.length) return null;
+
+  if (rows[0].restaurant_id) {
+    return Number(rows[0].restaurant_id);
+  }
+
+  if (rows[0].role === 'owner') {
+    const { rows: ownedRows } = await pool.query(
+      'SELECT id FROM restaurants WHERE owner_user_id = $1 LIMIT 1',
+      [user.userId]
+    );
+    return ownedRows[0]?.id ? Number(ownedRows[0].id) : null;
+  }
+
+  return null;
 }
 
 async function hasFeature(restaurantId, featureKey) {

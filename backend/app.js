@@ -21,6 +21,9 @@ const refundsRoutes = require('./src/routes/refunds.routes');
 const subscriptionsRoutes = require('./src/routes/subscriptions.routes');
 const teamRoutes = require('./src/routes/team.routes');
 const reconciliationRoutes = require('./src/routes/reconciliation.routes');
+const masterAdminRoutes = require('./src/routes/masterAdmin.routes');
+const exportsRoutes = require('./src/routes/exports.routes');
+const { teamRouter: supportTeamRouter, ownerRouter: supportOwnerRouter } = require('./src/routes/supportTickets.routes');
 const errorHandler = require('./src/middleware/errorHandler');
 
 const app = express();
@@ -131,6 +134,10 @@ app.use('/api/refunds', refundsRoutes);
 app.use('/api/subscriptions', subscriptionsRoutes);
 app.use('/api/team', teamRoutes);
 app.use('/api/admin/reconciliation', reconciliationRoutes);
+app.use('/api/master-admin', masterAdminRoutes);
+app.use('/api/master-admin/exports', exportsRoutes);
+app.use('/api/master-admin/support-tickets', supportTeamRouter);
+app.use('/owner/support-tickets', supportOwnerRouter);
 
 
 app.use(errorHandler);

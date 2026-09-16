@@ -211,6 +211,37 @@
               </div>
             </div>
             <div id="ownerFeatureList" class="card-row"></div>
+            <article class="panel od-layout-panel" style="margin-top:1.25rem;">
+              <div class="section-head">
+                <div>
+                  <h3>Customize sidebar order</h3>
+                  <p class="hero-copy">Move sections up or down — for example, move Kitchen from position 1 to 4.</p>
+                </div>
+                <button id="saveLayoutBtn" class="btn btn-primary" type="button">Save order</button>
+              </div>
+              <div id="ownerLayoutList" class="od-layout-list"></div>
+            </article>
+            <article class="panel" style="margin-top:1.25rem;">
+              <div class="section-head">
+                <div>
+                  <h3>Support</h3>
+                  <p class="hero-copy">Raise a ticket for billing, payouts, or technical help.</p>
+                </div>
+              </div>
+              <form id="ownerSupportForm" class="inline-form">
+                <input name="subject" placeholder="Subject" required />
+                <select name="category">
+                  <option value="billing">Billing</option>
+                  <option value="payout">Payout / bank details</option>
+                  <option value="technical">Technical</option>
+                  <option value="features">Features / upgrade</option>
+                  <option value="general">General</option>
+                </select>
+                <textarea name="description" placeholder="Describe your issue" rows="3" required></textarea>
+                <button class="btn btn-primary" type="submit">Submit ticket</button>
+              </form>
+              <div id="ownerSupportTickets" class="stack" style="margin-top:1rem;"></div>
+            </article>
           </section>
 
           <section class="panel dashboard-section hidden" data-owner-section-panel="kitchen">

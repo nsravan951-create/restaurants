@@ -1,6 +1,14 @@
 const registerForm = document.getElementById('registerForm');
 const loginForm = document.getElementById('loginForm');
 
+try {
+  const authMessage = sessionStorage.getItem('owner_auth_message');
+  if (authMessage) {
+    setMessage('authMessage', authMessage, true);
+    sessionStorage.removeItem('owner_auth_message');
+  }
+} catch (_) {}
+
 if (registerForm) {
   registerForm.addEventListener('submit', (event) => {
     event.preventDefault();
@@ -54,13 +62,9 @@ if (loginForm) {
       setMessage('authMessage', 'Login successful. Redirecting...');
 
       const role = data.user.role;
-      const teamRoles = new Set([
-        'finance_manager', 'restaurant_manager', 'promotions_manager',
-        'user_enquiry_manager', 'database_manager', 'backend_manager', 'analytics_manager',
-      ]);
       if (role === 'owner') window.location.href = './owner.html';
       else if (role === 'super_admin') window.location.href = './admin.html';
-      else if (teamRoles.has(role)) window.location.href = './team.html';
+      else if (data.user.isPlatformTeam || String(role).endsWith('_manager')) window.location.href = './team.html';
       else if (role === 'kitchen') window.location.href = './kitchen.html';
       else if (role === 'staff') window.location.href = './staff.html';
       else window.location.href = '../index.html';

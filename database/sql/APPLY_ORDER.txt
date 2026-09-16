@@ -19,6 +19,11 @@ Apply order (psql examples):
   psql "$DATABASE_URL" -f database/sql/008_default_commission_rule.sql
   psql "$DATABASE_URL" -f database/sql/009_gst_invoice_team_kot.sql
   psql "$DATABASE_URL" -f database/sql/010_menu_categories.sql
+  psql "$DATABASE_URL" -f database/sql/011_owner_restaurant_id_backfill.sql
+  psql "$DATABASE_URL" -f database/sql/012_master_admin_rbac.sql
+  psql "$DATABASE_URL" -f database/sql/013_restaurant_hub_features.sql
+  psql "$DATABASE_URL" -f database/sql/014_exports_support_tickets.sql
+  psql "$DATABASE_URL" -f database/sql/015_platform_roles_catalog.sql
 
 Or apply all at once (after reviewing each file):
 

@@ -4,6 +4,8 @@ const jwt = require('jsonwebtoken');
 const { z } = require('zod');
 
 const pool = require('../config/db');
+const { isKnownPlatformTeamRole } = require('../config/platformRoleCatalog');
+const { isPlatformRole } = require('../utils/rbac');
 const asyncHandler = require('../utils/asyncHandler');
 const { requireAuth } = require('../middleware/auth');
 const { buildQrPayload } = require('../utils/qr');
@@ -34,10 +36,27 @@ const passwordChangeSchema = z.object({
 
 function signToken(user) {
   return jwt.sign(
-    { userId: user.id, email: user.email, role: user.role },
+    {
+      userId: user.id,
+      email: user.email,
+      role: user.role,
+      tokenVersion: Number(user.token_version || 0),
+    },
     getJwtSecret(),
     { expiresIn: '7d' }
   );
+}
+
+async function recordLoginActivity({ userId, email, success, ipAddress, userAgent, failureReason }) {
+  try {
+    await pool.query(
+      `INSERT INTO login_activity (user_id, email, success, ip_address, user_agent, failure_reason)
+       VALUES ($1, $2, $3, $4, $5, $6)`,
+      [userId || null, email || null, Boolean(success), ipAddress || null, userAgent || null, failureReason || null]
+    );
+  } catch (error) {
+    if (error.code !== '42P01') console.warn('[login_activity]', error.message);
+  }
 }
 
 router.post('/register-owner', authLimiter, asyncHandler(async (req, res) => {
@@ -124,26 +143,58 @@ router.post('/login', authLimiter, asyncHandler(async (req, res) => {
   const data = loginSchema.parse(req.body);
 
   const { rows } = await pool.query(
-    'SELECT id, name, email, password_hash, role, restaurant_id, is_active FROM users WHERE email = $1',
+    `SELECT id, name, email, password_hash, role, restaurant_id, is_active,
+            COALESCE(token_version, 0) AS token_version
+     FROM users WHERE email = $1`,
     [data.email]
   );
 
   if (!rows.length) {
+    await recordLoginActivity({
+      email: data.email,
+      success: false,
+      ipAddress: req.ip,
+      userAgent: req.get('user-agent'),
+      failureReason: 'invalid_credentials',
+    });
     return res.status(401).json({ message: 'Invalid credentials' });
   }
 
   const user = rows[0];
   if (user.is_active === false) {
+    await recordLoginActivity({
+      userId: user.id,
+      email: user.email,
+      success: false,
+      ipAddress: req.ip,
+      userAgent: req.get('user-agent'),
+      failureReason: 'account_deactivated',
+    });
     return res.status(403).json({ message: 'Account is deactivated. Contact your administrator.' });
   }
 
   const ok = await bcrypt.compare(data.password, user.password_hash);
 
   if (!ok) {
+    await recordLoginActivity({
+      userId: user.id,
+      email: user.email,
+      success: false,
+      ipAddress: req.ip,
+      userAgent: req.get('user-agent'),
+      failureReason: 'invalid_password',
+    });
     return res.status(401).json({ message: 'Invalid credentials' });
   }
 
   await pool.query('UPDATE users SET last_login_at = CURRENT_TIMESTAMP WHERE id = $1', [user.id]);
+  await recordLoginActivity({
+    userId: user.id,
+    email: user.email,
+    success: true,
+    ipAddress: req.ip,
+    userAgent: req.get('user-agent'),
+  });
   const token = signToken(user);
 
   let restaurant = null;
@@ -158,10 +209,19 @@ router.post('/login', authLimiter, asyncHandler(async (req, res) => {
     restaurant = restaurantRows[0] || null;
   }
 
+  const platformTeam = user.role !== 'super_admin'
+    && (isKnownPlatformTeamRole(user.role) || await isPlatformRole(user.role));
+
   return res.json({
     message: 'Login successful',
     token,
-    user: { id: user.id, name: user.name, email: user.email, role: user.role },
+    user: {
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      role: user.role,
+      isPlatformTeam: platformTeam,
+    },
     restaurant,
   });
 }));

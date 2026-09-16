@@ -10,6 +10,15 @@
     platformOrders: [],
     saasProfits: null,
     paymentVaultUnlocked: false,
+    hubRestaurants: [],
+    hubQuery: '',
+    profileRestaurantId: null,
+    profileData: null,
+    profileTab: 'overview',
+    upgradeStatus: 'pending',
+    featureRegistry: [],
+    supportStatus: '',
+    selectedTicketId: null,
   };
 
   const currencyFormatter = new Intl.NumberFormat('en-IN', {
@@ -56,8 +65,16 @@
     if (section === 'profits') loadSaasProfits();
     if (section === 'platform') loadPlatformOrders();
     if (section === 'reconciliation') loadReconciliation();
+    if (section === 'settlements') loadSettlements();
     if (section === 'team') loadTeamPanel();
+    if (section === 'roles') loadRolesPanel();
+    if (section === 'activity') loadActivityCenter();
+    if (section === 'system') loadSystemHealth();
     if (section === 'audit') loadAuditLogs();
+    if (section === 'restaurant-hub') loadRestaurantHub();
+    if (section === 'upgrade-queue') loadUpgradeQueue();
+    if (section === 'support') loadSupportTickets();
+    if (section === 'exports') { /* static panel */ }
   }
 
   function setMessage(message, isError = false) {
@@ -1270,6 +1287,38 @@
       loadInvoicesForRestaurant(el('platformInvoiceRestaurantSelect')?.value);
     });
 
+    el('hubRefreshBtn')?.addEventListener('click', () => loadRestaurantHub().catch((e) => setMessage(e.message, true)));
+    el('hubSearch')?.addEventListener('input', (e) => {
+      state.hubQuery = e.target.value;
+      renderRestaurantHubTable();
+    });
+    el('closeProfileModal')?.addEventListener('click', closeRestaurantProfile);
+    document.querySelectorAll('[data-profile-tab]').forEach((btn) => {
+      btn.addEventListener('click', () => setProfileTab(btn.dataset.profileTab));
+    });
+    document.querySelectorAll('#upgradeQueueFilters .ma-filter-btn').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('#upgradeQueueFilters .ma-filter-btn').forEach((b) => b.classList.remove('active'));
+        btn.classList.add('active');
+        state.upgradeStatus = btn.dataset.upgradeStatus;
+        loadUpgradeQueue().catch((e) => setMessage(e.message, true));
+      });
+    });
+
+    document.querySelectorAll('#supportStatusFilters .ma-filter-btn').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('#supportStatusFilters .ma-filter-btn').forEach((b) => b.classList.remove('active'));
+        btn.classList.add('active');
+        state.supportStatus = btn.dataset.supportStatus || '';
+        loadSupportTickets().catch((e) => setMessage(e.message, true));
+      });
+    });
+    el('supportCreateForm')?.addEventListener('submit', handleSupportCreate);
+    el('supportReplyForm')?.addEventListener('submit', handleSupportReply);
+    document.querySelectorAll('[data-export]').forEach((btn) => {
+      btn.addEventListener('click', () => handleExportClick(btn.dataset.export));
+    });
+
     const searchInput = el('dashboardSearch');
     if (searchInput) {
       searchInput.addEventListener('input', () => {
@@ -1311,9 +1360,176 @@
     el('teamCreateForm')?.addEventListener('submit', (e) => {
       handleTeamCreate(e).catch((error) => setMessage(error.message, true));
     });
+    el('teamScopeType')?.addEventListener('change', (e) => {
+      el('teamScopeRestaurant')?.classList.toggle('hidden', e.target.value !== 'restaurant');
+    });
+    el('settlementCreateForm')?.addEventListener('submit', (e) => {
+      handleSettlementCreate(e).catch((error) => setMessage(error.message, true));
+    });
+    el('roleCreateForm')?.addEventListener('submit', (e) => {
+      handleRoleCreate(e).catch((error) => setMessage(error.message, true));
+    });
+    document.querySelectorAll('#dashboardRangeFilters .ma-filter-btn').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('#dashboardRangeFilters .ma-filter-btn').forEach((b) => b.classList.remove('active'));
+        btn.classList.add('active');
+        loadMasterMetrics(btn.dataset.range).catch(() => {});
+      });
+    });
 
     // Attach messaging events
     attachMessageEvents();
+  }
+
+  async function loadMasterMetrics(range = '30d') {
+    const data = await apiRequest(`/api/master-admin/dashboard?range=${encodeURIComponent(range)}`, {}, true);
+    const m = data.metrics || {};
+    const root = el('masterMetrics');
+    if (!root) return;
+    const cards = [
+      ['Restaurants', m.total_restaurants],
+      ['Active', m.active_restaurants],
+      ['Suspended', m.suspended_restaurants],
+      ['Period orders', m.period_orders],
+      ['Today orders', m.today_orders],
+      ['Period GMV', formatMoney(m.period_gmv)],
+      ['Today GMV', formatMoney(m.today_gmv)],
+      ['Commission', formatMoney(m.period_commission)],
+      ['Pending settlements', m.pending_settlements],
+      ['Open refunds', m.open_refunds],
+      ['Team members', m.active_team_members],
+    ];
+    root.innerHTML = cards.map(([label, value]) => `
+      <article class="summary-card ma-hover-card"><p>${escapeHtml(label)}</p><strong>${escapeHtml(value)}</strong></article>
+    `).join('');
+  }
+
+  async function loadSettlements() {
+    const data = await apiRequest('/api/master-admin/settlements', {}, true);
+    const list = el('settlementsList');
+    if (!list) return;
+    list.innerHTML = (data.settlements || []).map((s) => `
+      <article class="admin-list-item ma-hover-card">
+        <div>
+          <strong>${escapeHtml(s.restaurant_name)}</strong>
+          <p>Net ${formatMoney(s.net_payable)} · ${escapeHtml(s.status)}</p>
+          <small>${formatDate(s.period_start)} → ${formatDate(s.period_end)}</small>
+        </div>
+        <span class="ma-badge ma-badge--${s.status === 'paid' ? 'success' : 'warn'}">${escapeHtml(s.status)}</span>
+      </article>
+    `).join('') || '<p>No settlements yet.</p>';
+
+    const select = el('settlementRestaurantSelect');
+    if (select && select.options.length <= 1) {
+      const dash = getDashboard();
+      select.innerHTML = '<option value="">Restaurant</option>' + (dash.restaurants || []).map((r) =>
+        `<option value="${r.id}">${escapeHtml(r.name)}</option>`
+      ).join('');
+    }
+  }
+
+  async function handleSettlementCreate(event) {
+    event.preventDefault();
+    const form = event.target;
+    const payload = Object.fromEntries(new FormData(form).entries());
+    await apiRequest('/api/master-admin/settlements', {
+      method: 'POST',
+      body: JSON.stringify({
+        restaurantId: Number(payload.restaurantId),
+        periodStart: payload.periodStart,
+        periodEnd: payload.periodEnd,
+        grossAmount: Number(payload.grossAmount),
+        commissionAmount: Number(payload.commissionAmount || 0),
+        refundAmount: Number(payload.refundAmount || 0),
+        adjustmentAmount: Number(payload.adjustmentAmount || 0),
+        notes: payload.notes || '',
+      }),
+    }, true);
+    form.reset();
+    setMessage('Settlement created.');
+    await loadSettlements();
+  }
+
+  async function loadRolesPanel() {
+    const data = await apiRequest('/api/master-admin/roles', {}, true);
+    const picker = el('rolePermissionsPicker');
+    if (picker) {
+      picker.innerHTML = (data.permissions || []).map((p) => `
+        <label><input type="checkbox" name="permissions" value="${escapeHtml(p.permission_key)}" /> ${escapeHtml(p.permission_key)}</label>
+      `).join('');
+    }
+    const list = el('rolesList');
+    if (list) {
+      list.innerHTML = (data.roles || []).map((r) => `
+        <article class="admin-list-item ma-hover-card">
+          <div>
+            <strong>${escapeHtml(r.name)}</strong>
+            <p>${escapeHtml(r.role_key)} · ${escapeHtml(r.department_name || 'No department')}</p>
+            <small>${(r.permissions || []).map((p) => `<span class="chip">${escapeHtml(p)}</span>`).join(' ')}</small>
+          </div>
+          <span class="ma-badge ma-badge--muted">${r.is_system ? 'System' : 'Custom'}</span>
+        </article>
+      `).join('') || '<p>No roles found. Run migration 012.</p>';
+    }
+  }
+
+  async function handleRoleCreate(event) {
+    event.preventDefault();
+    const form = event.target;
+    const fd = new FormData(form);
+    const permissions = [...form.querySelectorAll('input[name="permissions"]:checked')].map((n) => n.value);
+    await apiRequest('/api/master-admin/roles', {
+      method: 'POST',
+      body: JSON.stringify({
+        roleKey: fd.get('roleKey'),
+        name: fd.get('name'),
+        description: fd.get('description') || '',
+        permissions,
+      }),
+    }, true);
+    form.reset();
+    setMessage('Role created.');
+    await loadRolesPanel();
+    await loadTeamPanel();
+  }
+
+  async function loadActivityCenter() {
+    const data = await apiRequest('/api/master-admin/activity?limit=120', {}, true);
+    const root = el('activityFeed');
+    if (!root) return;
+    const audit = (data.auditLogs || []).map((log) => `
+      <article class="admin-list-item ma-hover-card">
+        <div>
+          <strong>${escapeHtml(log.action)}</strong>
+          <p>${escapeHtml(log.actor_name || 'System')} · ${escapeHtml(log.resource_type)} ${escapeHtml(log.resource_id || '')}</p>
+          <small>${formatDate(log.created_at)}</small>
+        </div>
+      </article>
+    `).join('');
+    const logins = (data.loginActivity || []).slice(0, 20).map((row) => `
+      <article class="admin-list-item ma-hover-card">
+        <div>
+          <strong>${row.success ? 'Login success' : 'Login failed'}</strong>
+          <p>${escapeHtml(row.user_name || row.email || '—')}</p>
+          <small>${formatDate(row.created_at)}</small>
+        </div>
+        <span class="ma-badge ma-badge--${row.success ? 'success' : 'danger'}">${row.success ? 'OK' : 'Fail'}</span>
+      </article>
+    `).join('');
+    root.innerHTML = audit + logins || '<p>No activity recorded.</p>';
+  }
+
+  async function loadSystemHealth() {
+    const data = await apiRequest('/api/master-admin/system/health', {}, true);
+    const root = el('systemHealthGrid');
+    if (!root) return;
+    root.innerHTML = `
+      <article class="ma-health-card ma-hover-card"><h4>Backend</h4><strong class="ma-badge ma-badge--success">${escapeHtml(data.backend)}</strong></article>
+      <article class="ma-health-card ma-hover-card"><h4>Database</h4><strong class="ma-badge ma-badge--${data.database === 'connected' ? 'success' : 'danger'}">${escapeHtml(data.database)}</strong></article>
+      <article class="ma-health-card ma-hover-card"><h4>Cashfree</h4><strong class="ma-badge ma-badge--${data.cashfree?.status === 'connected' ? 'success' : 'warn'}">${escapeHtml(data.cashfree?.status || 'unknown')}</strong></article>
+      <article class="ma-health-card ma-hover-card"><h4>Socket.IO</h4><strong>${escapeHtml(data.socketIo || '—')}</strong></article>
+      <article class="ma-health-card ma-hover-card"><h4>Last migration</h4><strong>${escapeHtml(data.migrations?.[0]?.version || '—')}</strong></article>
+    `;
   }
 
   async function loadReconciliation() {
@@ -1356,36 +1572,171 @@
       </table>`;
   }
 
+  function updateTeamRoleDescription(roleKey, roleMeta) {
+    const desc = el('teamRoleDescription');
+    if (!desc) return;
+    const meta = (roleMeta || []).find((r) => r.role_key === roleKey);
+    desc.textContent = meta?.description || '';
+  }
+
+  function selectTeamRole(roleKey, roleMeta) {
+    const roleSelect = el('teamRoleSelect');
+    if (roleSelect) roleSelect.value = roleKey;
+    updateTeamRoleDescription(roleKey, roleMeta);
+    document.querySelectorAll('.ma-role-card').forEach((card) => {
+      card.classList.toggle('is-selected', card.dataset.roleKey === roleKey);
+    });
+  }
+
   async function loadTeamPanel() {
     const rolesData = await apiRequest('/api/team/roles', {}, true);
     const membersData = await apiRequest('/api/team/members', {}, true);
+    const roleMeta = rolesData.roleMeta || [];
+
+    const catalogRoot = el('teamRoleCatalog');
+    if (catalogRoot) {
+      const byDept = rolesData.rolesByDepartment || {};
+      const deptKeys = Object.keys(byDept).length ? Object.keys(byDept) : ['All'];
+      catalogRoot.innerHTML = deptKeys.flatMap((dept) => {
+        const rows = byDept[dept] || roleMeta;
+        return rows.map((r) => `
+          <button type="button" class="ma-role-card" data-role-key="${escapeHtml(r.role_key)}">
+            <span class="ma-role-card__dept">${escapeHtml(dept)}</span>
+            <strong>${escapeHtml(r.name || r.role_key)}</strong>
+            <small>${escapeHtml(r.description || '')}</small>
+          </button>
+        `);
+      }).join('');
+
+      catalogRoot.querySelectorAll('.ma-role-card').forEach((btn) => {
+        btn.addEventListener('click', () => selectTeamRole(btn.dataset.roleKey, roleMeta));
+      });
+    }
+
+    const roleSelect = el('teamRoleSelect');
+    if (roleSelect) {
+      const grouped = rolesData.rolesByDepartment || {};
+      let optionsHtml = '';
+      if (Object.keys(grouped).length) {
+        optionsHtml = Object.entries(grouped).map(([dept, rows]) => `
+          <optgroup label="${escapeHtml(dept)}">
+            ${rows.map((r) => `<option value="${escapeHtml(r.role_key)}">${escapeHtml(r.name)}</option>`).join('')}
+          </optgroup>
+        `).join('');
+      } else {
+        optionsHtml = roleMeta.map((r) => `<option value="${escapeHtml(r.role_key)}">${escapeHtml(r.name)}</option>`).join('');
+      }
+      roleSelect.innerHTML = '<option value="">Select role</option>' + optionsHtml;
+      roleSelect.onchange = () => {
+        selectTeamRole(roleSelect.value, roleMeta);
+      };
+    }
 
     const matrix = el('teamRoleMatrix');
     if (matrix) {
-      const grouped = {};
+      const permMap = {};
       (rolesData.mappings || []).forEach((row) => {
-        if (!grouped[row.role]) grouped[row.role] = [];
-        grouped[row.role].push(row.permission_key);
+        if (!permMap[row.role]) permMap[row.role] = [];
+        permMap[row.role].push(row.permission_key);
       });
-      matrix.innerHTML = Object.entries(grouped).map(([role, perms]) => `
-        <article class="admin-list-item">
-          <strong>${escapeHtml(role.replace(/_/g, ' '))}</strong>
-          <p>${perms.map((p) => `<span class="chip">${escapeHtml(p)}</span>`).join(' ')}</p>
-        </article>
-      `).join('');
+      matrix.innerHTML = roleMeta.map((r) => {
+        const perms = permMap[r.role_key] || [];
+        return `
+          <article>
+            <strong>${escapeHtml(r.name)}</strong>
+            <p class="muted" style="margin:0.2rem 0 0.45rem;">${escapeHtml(r.description || '')}</p>
+            <p>${perms.map((p) => `<span class="chip">${escapeHtml(p)}</span>`).join('') || '<span class="muted">No permissions mapped</span>'}</p>
+          </article>
+        `;
+      }).join('');
+    }
+
+    const scopeRestaurant = el('teamScopeRestaurant');
+    if (scopeRestaurant && scopeRestaurant.options.length <= 1) {
+      const restaurants = state.hubRestaurants.length
+        ? state.hubRestaurants
+        : (getDashboard().restaurants || []);
+      scopeRestaurant.innerHTML = '<option value="">Select restaurant for scope</option>' + restaurants.map((r) => (
+        `<option value="${r.id}">${escapeHtml(r.name)}</option>`
+      )).join('');
     }
 
     const list = el('teamMembersList');
     if (list) {
+      const roleOptions = roleMeta.map((r) => `<option value="${escapeHtml(r.role_key)}">${escapeHtml(r.name)}</option>`).join('');
       list.innerHTML = (membersData.members || []).map((m) => `
-        <article class="admin-list-item">
+        <article class="admin-list-item ma-hover-card">
           <div>
             <strong>${escapeHtml(m.name)}</strong>
-            <p>${escapeHtml(m.email)} · ${escapeHtml(m.role.replace(/_/g, ' '))}</p>
+            <p>${escapeHtml(m.email)}${m.username ? ` · @${escapeHtml(m.username)}` : ''}</p>
+            <p>${escapeHtml(m.role.replace(/_/g, ' '))} · Scope: ${escapeHtml(m.scope_type || 'global')}</p>
+            <small>Last login: ${formatDate(m.last_login_at)}</small>
           </div>
-          <span class="chip">${m.is_active ? 'Active' : 'Inactive'}</span>
+          <div class="ma-member-actions">
+            <span class="ma-badge ma-badge--${m.is_active ? 'success' : 'danger'}">${m.is_active ? 'Active' : 'Inactive'}</span>
+            <select class="admin-select" data-member-role="${m.id}" style="max-width:180px;">
+              ${roleOptions}
+            </select>
+            <button class="btn btn-light btn-sm" type="button" data-save-role="${m.id}">Save role</button>
+            <button class="btn btn-light btn-sm" type="button" data-toggle-active="${m.id}" data-active="${m.is_active ? '1' : '0'}">
+              ${m.is_active ? 'Deactivate' : 'Activate'}
+            </button>
+            <button class="btn btn-light btn-sm" type="button" data-reset-pw="${m.id}">Reset password</button>
+          </div>
         </article>
-      `).join('') || '<p>No team members yet.</p>';
+      `).join('') || '<p>No team members yet. Create one above.</p>';
+
+      list.querySelectorAll('[data-member-role]').forEach((select) => {
+        const member = (membersData.members || []).find((row) => String(row.id) === select.dataset.memberRole);
+        if (member) select.value = member.role;
+      });
+
+      list.querySelectorAll('[data-save-role]').forEach((btn) => {
+        btn.addEventListener('click', async () => {
+          const userId = btn.dataset.saveRole;
+          const role = list.querySelector(`[data-member-role="${userId}"]`)?.value;
+          try {
+            await apiRequest(`/api/team/members/${userId}`, { method: 'PATCH', body: JSON.stringify({ role }) }, true);
+            setMessage('Role updated.');
+            await loadTeamPanel();
+          } catch (error) {
+            setMessage(error.message, true);
+          }
+        });
+      });
+
+      list.querySelectorAll('[data-toggle-active]').forEach((btn) => {
+        btn.addEventListener('click', async () => {
+          const userId = btn.dataset.toggleActive;
+          const isActive = btn.dataset.active === '1';
+          try {
+            await apiRequest(`/api/team/members/${userId}`, {
+              method: 'PATCH',
+              body: JSON.stringify({ isActive: !isActive, forceLogout: isActive }),
+            }, true);
+            setMessage(isActive ? 'Member deactivated.' : 'Member activated.');
+            await loadTeamPanel();
+          } catch (error) {
+            setMessage(error.message, true);
+          }
+        });
+      });
+
+      list.querySelectorAll('[data-reset-pw]').forEach((btn) => {
+        btn.addEventListener('click', async () => {
+          const password = prompt('Enter new password (min 8 characters):');
+          if (!password || password.length < 8) return;
+          try {
+            await apiRequest(`/api/team/members/${btn.dataset.resetPw}`, {
+              method: 'PATCH',
+              body: JSON.stringify({ password, forceLogout: true }),
+            }, true);
+            setMessage('Password reset.');
+          } catch (error) {
+            setMessage(error.message, true);
+          }
+        });
+      });
     }
   }
 
@@ -1393,9 +1744,11 @@
     event.preventDefault();
     const form = event.target;
     const payload = Object.fromEntries(new FormData(form).entries());
+    if (!payload.scopeRestaurantId) delete payload.scopeRestaurantId;
+    if (!payload.username) delete payload.username;
     await apiRequest('/api/team/members', { method: 'POST', body: JSON.stringify(payload) }, true);
     form.reset();
-    setMessage('Team member created.');
+    setMessage('Team member created with allocated role.');
     await loadTeamPanel();
   }
 
@@ -1412,6 +1765,545 @@
         </div>
       </article>
     `).join('') || '<p>No audit logs recorded yet.</p>';
+  }
+
+  function statusBadge(active, labelOn = 'Active', labelOff = 'Inactive') {
+    return `<span class="ma-badge ${active ? 'ma-badge--success' : 'ma-badge--muted'}">${active ? labelOn : labelOff}</span>`;
+  }
+
+  async function loadFeatureRegistry() {
+    if (state.featureRegistry.length) return state.featureRegistry;
+    try {
+      const data = await apiRequest('/api/master-admin/features/registry', {}, true);
+      state.featureRegistry = data.features || [];
+    } catch (_) {
+      state.featureRegistry = [];
+    }
+    return state.featureRegistry;
+  }
+
+  async function loadRestaurantHub() {
+    const data = await apiRequest('/api/master-admin/restaurants', {}, true);
+    state.hubRestaurants = data.restaurants || [];
+    renderRestaurantHubTable();
+  }
+
+  function getFilteredHubRestaurants() {
+    const q = state.hubQuery.trim().toLowerCase();
+    if (!q) return state.hubRestaurants;
+    return state.hubRestaurants.filter((r) => [
+      r.name, r.owner_name, r.owner_email, r.gstin, String(r.id),
+    ].join(' ').toLowerCase().includes(q));
+  }
+
+  function renderRestaurantHubTable() {
+    const root = el('restaurantHubTable');
+    if (!root) return;
+    const rows = getFilteredHubRestaurants();
+    root.innerHTML = `
+      <table class="ma-data-table">
+        <thead>
+          <tr>
+            <th>Restaurant</th>
+            <th>Owner</th>
+            <th>Status</th>
+            <th>Plan</th>
+            <th>Features</th>
+            <th>Upgrades</th>
+            <th>GSTIN</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          ${rows.map((r) => `
+            <tr>
+              <td><strong>${escapeHtml(r.name)}</strong><br><small class="muted">#${r.id}</small></td>
+              <td>${escapeHtml(r.owner_name || '—')}<br><small class="muted">${escapeHtml(r.owner_email || '')}</small></td>
+              <td>${statusBadge(r.is_active)}</td>
+              <td>${escapeHtml(r.subscription_plan || '—')}<br><small class="muted">${escapeHtml(r.subscription_status || '')}</small></td>
+              <td>${escapeHtml(r.enabled_features_count || 0)} enabled</td>
+              <td>
+                ${Number(r.pending_upgrade_activations || 0) > 0
+                  ? `<span class="ma-badge ma-badge--warn">${r.pending_upgrade_activations} pending</span>`
+                  : `<span class="muted">${r.upgrade_payment_count || 0} paid</span>`}
+              </td>
+              <td>${escapeHtml(r.gstin || '—')}</td>
+              <td><button class="btn btn-primary btn-sm" type="button" data-open-profile="${r.id}">Manage</button></td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    ` || '<p class="muted">No restaurants found.</p>';
+
+    root.querySelectorAll('[data-open-profile]').forEach((btn) => {
+      btn.addEventListener('click', () => openRestaurantProfile(Number(btn.dataset.openProfile)));
+    });
+  }
+
+  async function openRestaurantProfile(restaurantId) {
+    state.profileRestaurantId = restaurantId;
+    state.profileTab = 'overview';
+    const data = await apiRequest(`/api/master-admin/restaurants/${restaurantId}/profile`, {}, true);
+    state.profileData = data;
+    await loadFeatureRegistry();
+    renderRestaurantProfile();
+    const modal = el('restaurantProfileModal');
+    modal?.classList.remove('hidden');
+    modal?.setAttribute('aria-hidden', 'false');
+  }
+
+  function closeRestaurantProfile() {
+    el('restaurantProfileModal')?.classList.add('hidden');
+    el('restaurantProfileModal')?.setAttribute('aria-hidden', 'true');
+    state.profileRestaurantId = null;
+    state.profileData = null;
+  }
+
+  function setProfileTab(tab) {
+    state.profileTab = tab;
+    document.querySelectorAll('[data-profile-tab]').forEach((btn) => {
+      btn.classList.toggle('active', btn.dataset.profileTab === tab);
+    });
+    document.querySelectorAll('[data-profile-panel]').forEach((panel) => {
+      panel.classList.toggle('hidden', panel.dataset.profilePanel !== tab);
+    });
+    renderRestaurantProfile();
+  }
+
+  function renderRestaurantProfile() {
+    const data = state.profileData;
+    if (!data) return;
+    const r = data.restaurant || {};
+    el('profileRestaurantName').textContent = r.name || 'Restaurant';
+    el('profileRestaurantMeta').textContent = [
+      data.owner?.email,
+      r.phone,
+      r.onboarding_status,
+    ].filter(Boolean).join(' · ');
+
+    if (state.profileTab === 'overview') renderProfileOverview(data);
+    if (state.profileTab === 'features') renderProfileFeatures(data);
+    if (state.profileTab === 'financial') renderProfileFinancial(data);
+    if (state.profileTab === 'upgrades') renderProfileUpgrades(data);
+    if (state.profileTab === 'payouts') renderProfilePayouts(data);
+  }
+
+  function renderProfileOverview(data) {
+    const s = data.stats || {};
+    const r = data.restaurant || {};
+    el('profileTabOverview').innerHTML = `
+      <div class="summary-grid summary-grid--compact">
+        <div class="summary-card"><p>Total revenue</p><strong>${formatMoney(s.totalRevenue)}</strong></div>
+        <div class="summary-card"><p>Paid orders</p><strong>${s.paidOrders || 0}</strong></div>
+        <div class="summary-card"><p>AutoResto commission</p><strong>${formatMoney(s.totalCommission)}</strong></div>
+        <div class="summary-card"><p>Net to restaurant</p><strong>${formatMoney(s.netToRestaurant)}</strong></div>
+      </div>
+      <article class="panel ma-hover-card" style="margin-top:1rem;">
+        <h4>Restaurant details</h4>
+        <div class="ma-kv-grid">
+          <div><span>Legal name</span><strong>${escapeHtml(r.legal_name || '—')}</strong></div>
+          <div><span>GSTIN</span><strong>${escapeHtml(r.gstin || '—')}</strong></div>
+          <div><span>Subscription</span><strong>${escapeHtml(r.subscription_plan || '—')} (${escapeHtml(r.subscription_status || '—')})</strong></div>
+          <div><span>Owner</span><strong>${escapeHtml(data.owner?.name || '—')} · ${escapeHtml(data.owner?.email || '')}</strong></div>
+          <div><span>UPI</span><strong>${escapeHtml(r.upi_vpa || '—')}</strong></div>
+          <div><span>Pending settlements</span><strong>${s.pendingSettlements || 0}</strong></div>
+        </div>
+      </article>
+    `;
+  }
+
+  function renderProfileFeatures(data) {
+    const features = data.features || [];
+    el('profileTabFeatures').innerHTML = `
+      <p class="muted">Toggle features for this restaurant. Changes apply immediately.</p>
+      <div class="ma-feature-grid">
+        ${features.map((f) => `
+          <label class="ma-feature-toggle">
+            <input type="checkbox" data-feature-toggle="${escapeHtml(f.feature_key)}" ${f.enabled ? 'checked' : ''} />
+            <span>
+              <strong>${escapeHtml(f.name || f.feature_key)}</strong>
+              <small>${escapeHtml(f.feature_key)}</small>
+            </span>
+          </label>
+        `).join('')}
+      </div>
+    `;
+
+    el('profileTabFeatures').querySelectorAll('[data-feature-toggle]').forEach((input) => {
+      input.addEventListener('change', async () => {
+        const featureKey = input.dataset.featureToggle;
+        try {
+          const result = await apiRequest(
+            `/api/master-admin/restaurants/${state.profileRestaurantId}/features/${featureKey}`,
+            { method: 'POST', body: JSON.stringify({ enabled: input.checked }) },
+            true
+          );
+          state.profileData.features = result.features || state.profileData.features;
+          setMessage(`Feature ${featureKey} ${input.checked ? 'enabled' : 'disabled'}.`);
+        } catch (error) {
+          input.checked = !input.checked;
+          setMessage(error.message, true);
+        }
+      });
+    });
+  }
+
+  function renderProfileFinancial(data) {
+    const r = data.restaurant || {};
+    const bank = (data.bankAccounts || [])[0] || {};
+    el('profileTabFinancial').innerHTML = `
+      <p class="muted">Bank, GST, and payout details used for Cashfree settlements and tax invoices.</p>
+      <form id="profileFinancialForm" class="admin-form ma-financial-form">
+        <fieldset><legend>GST &amp; legal</legend>
+          <input name="legalName" placeholder="Legal business name" value="${escapeHtml(r.legal_name || '')}" />
+          <input name="gstin" placeholder="GSTIN" maxlength="15" value="${escapeHtml(r.gstin || '')}" />
+          <input name="fssaiLicense" placeholder="FSSAI license" value="${escapeHtml(r.fssai_license || '')}" />
+          <input name="stateName" placeholder="State" value="${escapeHtml(r.state_name || '')}" />
+          <input name="stateCode" placeholder="State code" value="${escapeHtml(r.state_code || '')}" />
+          <input name="defaultGstRate" type="number" step="0.01" placeholder="Default GST %" value="${escapeHtml(r.default_gst_rate ?? '')}" />
+          <input name="invoicePrefix" placeholder="Invoice prefix" value="${escapeHtml(r.invoice_prefix || '')}" />
+          <textarea name="businessAddress" placeholder="Business address" rows="2">${escapeHtml(r.business_address || r.address || '')}</textarea>
+        </fieldset>
+        <fieldset><legend>Bank &amp; UPI (for payouts)</legend>
+          <input name="accountHolderName" placeholder="Account holder name" value="${escapeHtml(bank.account_holder_name || r.bank_account_name || '')}" />
+          <input name="bankName" placeholder="Bank name" value="${escapeHtml(bank.bank_name || r.bank_name || '')}" />
+          <input name="accountNumber" placeholder="Account number (enter to update)" autocomplete="off" />
+          <input name="ifscCode" placeholder="IFSC code" value="${escapeHtml(bank.ifsc_code || '')}" />
+          <input name="upiVpa" placeholder="UPI VPA" value="${escapeHtml(r.upi_vpa || bank.upi_id || '')}" />
+          <p class="muted">Current account: ${escapeHtml(bank.account_masked || 'Not on file')}</p>
+        </fieldset>
+        <fieldset><legend>Contact</legend>
+          <input name="phone" placeholder="Phone" value="${escapeHtml(r.phone || '')}" />
+          <input name="address" placeholder="Address" value="${escapeHtml(r.address || '')}" />
+        </fieldset>
+        <button class="btn btn-primary" type="submit">Save financial details</button>
+      </form>
+    `;
+
+    el('profileFinancialForm')?.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const formData = new FormData(event.target);
+      const body = Object.fromEntries(formData.entries());
+      try {
+        const result = await apiRequest(
+          `/api/master-admin/restaurants/${state.profileRestaurantId}/financial`,
+          { method: 'PATCH', body: JSON.stringify(body) },
+          true
+        );
+        state.profileData = result.profile || state.profileData;
+        renderProfileFinancial(state.profileData);
+        setMessage('Financial details saved.');
+      } catch (error) {
+        setMessage(error.message, true);
+      }
+    }, { once: true });
+  }
+
+  function renderProfileUpgrades(data) {
+    const payments = data.upgradePayments || [];
+    el('profileTabUpgrades').innerHTML = `
+      <table class="ma-data-table">
+        <thead><tr><th>Date</th><th>Amount</th><th>Purpose</th><th>Cashfree ID</th><th>Status</th><th>Activation</th></tr></thead>
+        <tbody>
+          ${payments.map((p) => `
+            <tr>
+              <td>${formatDate(p.created_at)}</td>
+              <td>${formatMoney(p.amount)}</td>
+              <td>${escapeHtml(p.payment_purpose || '—')}</td>
+              <td><small>${escapeHtml(p.provider_order_id || p.provider_payment_id || '—')}</small></td>
+              <td>${statusBadge(p.status === 'paid', 'Paid', p.status || '—')}</td>
+              <td>${escapeHtml(p.activation_status || '—')}</td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    ` || '<p class="muted">No upgrade payments yet.</p>';
+  }
+
+  function renderProfilePayouts(data) {
+    const s = data.stats || {};
+    el('profileTabPayouts').innerHTML = `
+      <div class="summary-grid summary-grid--compact">
+        <div class="summary-card"><p>Gross collected</p><strong>${formatMoney(s.totalRevenue)}</strong></div>
+        <div class="summary-card"><p>Platform commission</p><strong>${formatMoney(s.totalCommission)}</strong></div>
+        <div class="summary-card"><p>Restaurant net</p><strong>${formatMoney(s.netToRestaurant)}</strong></div>
+        <div class="summary-card"><p>Pending settlements</p><strong>${s.pendingSettlements || 0}</strong></div>
+      </div>
+      <p class="muted" style="margin-top:1rem;">Use the Settlements section to record Cashfree payout batches to this restaurant.</p>
+      <button class="btn btn-light" type="button" id="profileOpenSettlements">Open settlements</button>
+    `;
+    el('profileOpenSettlements')?.addEventListener('click', () => {
+      closeRestaurantProfile();
+      setSection('settlements');
+    });
+  }
+
+  async function loadUpgradeQueue() {
+    const data = await apiRequest(
+      `/api/master-admin/upgrade-queue?status=${encodeURIComponent(state.upgradeStatus)}`,
+      {},
+      true
+    );
+    await loadFeatureRegistry();
+    renderUpgradeQueue(data.queue || []);
+  }
+
+  function renderUpgradeQueue(queue) {
+    const root = el('upgradeQueueTable');
+    if (!root) return;
+    root.innerHTML = `
+      <table class="ma-data-table">
+        <thead>
+          <tr>
+            <th>Restaurant</th>
+            <th>Owner</th>
+            <th>Amount</th>
+            <th>Cashfree ref</th>
+            <th>Date</th>
+            <th>Status</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${queue.map((item) => `
+            <tr>
+              <td><strong>${escapeHtml(item.restaurant_name)}</strong></td>
+              <td>${escapeHtml(item.owner_email || '—')}</td>
+              <td>${formatMoney(item.amount)}</td>
+              <td><small>${escapeHtml(item.provider_order_id || '—')}</small></td>
+              <td>${formatDate(item.created_at)}</td>
+              <td><span class="ma-badge ma-badge--${item.status === 'pending' ? 'warn' : item.status === 'activated' ? 'success' : 'muted'}">${escapeHtml(item.status)}</span></td>
+              <td class="ma-actions-cell">
+                ${item.status === 'pending' ? `
+                  <button class="btn btn-primary btn-sm" type="button" data-activate-upgrade="${item.id}">Activate</button>
+                  <button class="btn btn-light btn-sm" type="button" data-reject-upgrade="${item.id}">Reject</button>
+                  <button class="btn btn-light btn-sm" type="button" data-manage-restaurant="${item.restaurant_id}">Manage</button>
+                ` : `<button class="btn btn-light btn-sm" type="button" data-manage-restaurant="${item.restaurant_id}">Manage</button>`}
+              </td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    ` || '<p class="muted">No items in this queue.</p>';
+
+    root.querySelectorAll('[data-activate-upgrade]').forEach((btn) => {
+      btn.addEventListener('click', () => activateUpgrade(Number(btn.dataset.activateUpgrade)));
+    });
+    root.querySelectorAll('[data-reject-upgrade]').forEach((btn) => {
+      btn.addEventListener('click', () => rejectUpgrade(Number(btn.dataset.rejectUpgrade)));
+    });
+    root.querySelectorAll('[data-manage-restaurant]').forEach((btn) => {
+      btn.addEventListener('click', () => openRestaurantProfile(Number(btn.dataset.manageRestaurant)));
+    });
+  }
+
+  async function activateUpgrade(id) {
+    const featureKeys = state.featureRegistry.map((f) => f.feature_key);
+    const selected = prompt(
+      'Enter feature keys to enable (comma-separated), or leave blank to mark paid only:',
+      featureKeys.slice(0, 5).join(', ')
+    );
+    const keys = selected ? selected.split(',').map((k) => k.trim()).filter(Boolean) : [];
+    try {
+      await apiRequest(`/api/master-admin/upgrade-activations/${id}/activate`, {
+        method: 'POST',
+        body: JSON.stringify({ featureKeys: keys }),
+      }, true);
+      setMessage('Upgrade activated and features enabled.');
+      await loadUpgradeQueue();
+      await loadRestaurantHub();
+    } catch (error) {
+      setMessage(error.message, true);
+    }
+  }
+
+  async function rejectUpgrade(id) {
+    const notes = prompt('Reason for rejection (optional):') || '';
+    try {
+      await apiRequest(`/api/master-admin/upgrade-activations/${id}/reject`, {
+        method: 'POST',
+        body: JSON.stringify({ notes }),
+      }, true);
+      setMessage('Upgrade marked as rejected.');
+      await loadUpgradeQueue();
+    } catch (error) {
+      setMessage(error.message, true);
+    }
+  }
+
+  async function loadSupportTickets() {
+    if (!state.hubRestaurants.length) {
+      try {
+        const hub = await apiRequest('/api/master-admin/restaurants', {}, true);
+        state.hubRestaurants = hub.restaurants || [];
+      } catch (_) { /* dashboard list fallback in populate */ }
+    }
+    const status = state.supportStatus;
+    const query = status ? `?status=${encodeURIComponent(status)}` : '';
+    const data = await apiRequest(`/api/master-admin/support-tickets${query}`, {}, true);
+    renderSupportTicketsTable(data.tickets || []);
+    populateSupportRestaurantSelect();
+  }
+
+  function populateSupportRestaurantSelect() {
+    const select = el('supportRestaurantSelect');
+    if (!select || select.options.length > 1) return;
+    const restaurants = state.hubRestaurants.length
+      ? state.hubRestaurants
+      : (getDashboard().restaurants || []);
+    select.innerHTML = '<option value="">No restaurant (platform)</option>' + restaurants.map((r) => (
+      `<option value="${r.id}">${escapeHtml(r.name)}</option>`
+    )).join('');
+  }
+
+  function renderSupportTicketsTable(tickets) {
+    const root = el('supportTicketsTable');
+    if (!root) return;
+    root.innerHTML = `
+      <table class="ma-data-table">
+        <thead><tr>
+          <th>ID</th><th>Subject</th><th>Restaurant</th><th>Priority</th><th>Status</th><th>Created</th><th></th>
+        </tr></thead>
+        <tbody>
+          ${tickets.map((t) => `
+            <tr>
+              <td>#${t.id}</td>
+              <td>${escapeHtml(t.subject)}</td>
+              <td>${escapeHtml(t.restaurant_name || 'Platform')}</td>
+              <td><span class="ma-badge ma-badge--${t.priority === 'urgent' ? 'warn' : 'muted'}">${escapeHtml(t.priority)}</span></td>
+              <td>${escapeHtml(t.status)}</td>
+              <td>${formatDateShort(t.created_at)}</td>
+              <td><button class="btn btn-light btn-sm" type="button" data-view-ticket="${t.id}">View</button></td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    ` || '<p class="muted">No tickets yet.</p>';
+
+    root.querySelectorAll('[data-view-ticket]').forEach((btn) => {
+      btn.addEventListener('click', () => openSupportTicket(Number(btn.dataset.viewTicket)));
+    });
+  }
+
+  async function openSupportTicket(id) {
+    state.selectedTicketId = id;
+    const data = await apiRequest(`/api/master-admin/support-tickets/${id}`, {}, true);
+    const t = data.ticket;
+    const detail = el('supportTicketDetail');
+    const replyForm = el('supportReplyForm');
+    const hint = el('supportDetailHint');
+    if (hint) hint.textContent = `Ticket #${t.id}`;
+    if (!detail) return;
+
+    const allMessages = [
+      ...(data.messages || []).map((m) => ({ ...m, internal: false })),
+      ...(data.internalNotes || []).map((m) => ({ ...m, internal: true })),
+    ].sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+
+    detail.innerHTML = `
+      <div class="ma-kv-grid" style="margin-bottom:0.75rem;">
+        <div><span>Status</span><strong>${escapeHtml(t.status)}</strong></div>
+        <div><span>Priority</span><strong>${escapeHtml(t.priority)}</strong></div>
+        <div><span>Category</span><strong>${escapeHtml(t.category)}</strong></div>
+        <div><span>From</span><strong>${escapeHtml(t.created_by_name || t.created_by_email || '—')}</strong></div>
+      </div>
+      <div class="admin-toolbar" style="margin-bottom:0.75rem;">
+        <select id="supportStatusSelect">
+          <option value="open" ${t.status === 'open' ? 'selected' : ''}>Open</option>
+          <option value="in_progress" ${t.status === 'in_progress' ? 'selected' : ''}>In progress</option>
+          <option value="waiting_customer" ${t.status === 'waiting_customer' ? 'selected' : ''}>Waiting customer</option>
+          <option value="resolved" ${t.status === 'resolved' ? 'selected' : ''}>Resolved</option>
+          <option value="closed" ${t.status === 'closed' ? 'selected' : ''}>Closed</option>
+        </select>
+        <button class="btn btn-light" type="button" id="supportUpdateStatusBtn">Update status</button>
+      </div>
+      <div class="ma-thread">
+        ${allMessages.map((m) => `
+          <div class="ma-thread-item${m.internal ? ' ma-thread-item--internal' : ''}">
+            <strong>${escapeHtml(m.author_name || m.author_role || 'User')}${m.internal ? ' (internal)' : ''}</strong>
+            <p>${escapeHtml(m.message)}</p>
+            <small>${formatDate(m.created_at)}</small>
+          </div>
+        `).join('') || '<p class="muted">No messages yet.</p>'}
+      </div>
+    `;
+
+    replyForm?.classList.remove('hidden');
+    el('supportUpdateStatusBtn')?.addEventListener('click', async () => {
+      const status = el('supportStatusSelect')?.value;
+      try {
+        await apiRequest(`/api/master-admin/support-tickets/${id}`, {
+          method: 'PATCH',
+          body: JSON.stringify({ status }),
+        }, true);
+        setMessage('Ticket status updated.');
+        await openSupportTicket(id);
+        await loadSupportTickets();
+      } catch (error) {
+        setMessage(error.message, true);
+      }
+    });
+  }
+
+  async function handleSupportCreate(event) {
+    event.preventDefault();
+    const formData = new FormData(event.target);
+    try {
+      await apiRequest('/api/master-admin/support-tickets', {
+        method: 'POST',
+        body: JSON.stringify({
+          restaurantId: formData.get('restaurantId') || null,
+          subject: formData.get('subject'),
+          category: formData.get('category'),
+          priority: formData.get('priority'),
+          description: formData.get('description'),
+        }),
+      }, true);
+      event.target.reset();
+      setMessage('Support ticket created.');
+      await loadSupportTickets();
+    } catch (error) {
+      setMessage(error.message, true);
+    }
+  }
+
+  async function handleSupportReply(event) {
+    event.preventDefault();
+    if (!state.selectedTicketId) return;
+    const formData = new FormData(event.target);
+    try {
+      await apiRequest(`/api/master-admin/support-tickets/${state.selectedTicketId}/messages`, {
+        method: 'POST',
+        body: JSON.stringify({
+          message: formData.get('message'),
+          isInternal: formData.get('isInternal') === 'on',
+        }),
+      }, true);
+      event.target.reset();
+      await openSupportTicket(state.selectedTicketId);
+      setMessage('Reply sent.');
+    } catch (error) {
+      setMessage(error.message, true);
+    }
+  }
+
+  async function handleExportClick(exportType) {
+    const map = {
+      orders: ['orders', 'orders_export.csv'],
+      reconciliation: ['reconciliation', 'reconciliation_export.csv'],
+      settlements: ['settlements', 'settlements_export.csv'],
+      restaurants: ['restaurants', 'restaurants_export.csv'],
+      'upgrade-queue': ['upgrade-queue', 'upgrade_queue_export.csv'],
+      'support-tickets': ['support-tickets', 'support_tickets_export.csv'],
+    };
+    const [path, filename] = map[exportType] || [];
+    if (!path) return;
+    try {
+      await downloadExport(`/api/master-admin/exports/${path}`, filename);
+      setMessage('Export downloaded.');
+    } catch (error) {
+      setMessage(error.message, true);
+    }
   }
 
   function ensureAdminAuth() {
@@ -1433,6 +2325,7 @@
 
     try {
       await loadDashboard();
+      await loadMasterMetrics('30d');
       await loadSaasProfits();
       toggleAdMediaFields();
     } catch (error) {

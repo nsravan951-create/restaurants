@@ -7,6 +7,68 @@ const { getRestaurantIdForUser, listRestaurantFeatures } = require('../utils/fea
 
 const router = express.Router();
 
+const OWNER_DASHBOARD_SECTIONS = [
+  'dashboard', 'kitchen', 'ready', 'tables', 'menu', 'invoices',
+  'analytics', 'reviews', 'inventory', 'offers', 'coupons', 'customers', 'loyalty',
+  'advanced-analytics', 'gst', 'password', 'features',
+];
+
+function normalizeDashboardLayout(sections) {
+  const valid = new Set(OWNER_DASHBOARD_SECTIONS);
+  const seen = new Set();
+  const ordered = [];
+  for (const section of sections || []) {
+    const key = String(section || '').trim();
+    if (valid.has(key) && !seen.has(key)) {
+      ordered.push(key);
+      seen.add(key);
+    }
+  }
+  for (const section of OWNER_DASHBOARD_SECTIONS) {
+    if (!seen.has(section)) ordered.push(section);
+  }
+  return ordered;
+}
+
+router.get('/dashboard-layout', requireAuth(['owner']), asyncHandler(async (req, res) => {
+  const restaurantId = await getRestaurantIdForUser(req.user);
+  if (!restaurantId) return res.status(404).json({ message: 'Restaurant not found' });
+
+  let rows = [{ dashboard_layout: null }];
+  try {
+    const result = await pool.query(
+      'SELECT dashboard_layout FROM restaurants WHERE id = $1 LIMIT 1',
+      [restaurantId]
+    );
+    rows = result.rows;
+  } catch (error) {
+    if (error.code !== '42703') throw error;
+  }
+
+  const layout = normalizeDashboardLayout(rows[0]?.dashboard_layout);
+  return res.json({ restaurantId, sections: layout, availableSections: OWNER_DASHBOARD_SECTIONS });
+}));
+
+router.patch('/dashboard-layout', requireAuth(['owner']), asyncHandler(async (req, res) => {
+  const restaurantId = await getRestaurantIdForUser(req.user);
+  if (!restaurantId) return res.status(404).json({ message: 'Restaurant not found' });
+
+  const layout = normalizeDashboardLayout(req.body?.sections);
+  try {
+    await pool.query(
+      'UPDATE restaurants SET dashboard_layout = $1::jsonb WHERE id = $2',
+      [JSON.stringify(layout), restaurantId]
+    );
+  } catch (error) {
+    if (error.code === '42703') {
+      return res.status(503).json({ message: 'Dashboard layout requires migration 013_restaurant_hub_features.sql' });
+    }
+    throw error;
+  }
+
+  return res.json({ message: 'Dashboard layout saved', sections: layout });
+}));
+
 router.get('/entitlements', requireAuth(['owner']), asyncHandler(async (req, res) => {
   const restaurantId = await getRestaurantIdForUser(req.user);
   if (!restaurantId) return res.status(404).json({ message: 'Restaurant not found' });

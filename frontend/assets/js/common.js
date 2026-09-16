@@ -42,6 +42,13 @@ async function apiRequest(path, options = {}, requiresAuth = false) {
 
   const data = await response.json().catch(() => ({}));
   if (!response.ok) {
+    if (requiresAuth && (response.status === 401 || response.status === 403)) {
+      const authFailure = new Error(data.error || data.message || 'Session expired or access denied');
+      authFailure.data = data;
+      authFailure.status = response.status;
+      authFailure.authFailure = true;
+      throw authFailure;
+    }
     const error = new Error(data.error || data.message || 'Request failed');
     error.data = data;
     error.status = response.status;
@@ -60,4 +67,26 @@ function setMessage(elementId, message, isError = false) {
 
 function formatCurrency(value) {
   return Number(value || 0).toFixed(2);
+}
+
+async function downloadExport(path, filename) {
+  const auth = getAuth();
+  const headers = {};
+  if (auth?.token) headers.Authorization = `Bearer ${auth.token}`;
+
+  const response = await fetch(`${API_URL}${path}`, { headers });
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}));
+    throw new Error(data.message || 'Export failed');
+  }
+
+  const blob = await response.blob();
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
 }

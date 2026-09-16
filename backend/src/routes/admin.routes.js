@@ -3,11 +3,12 @@ const pool = require('../config/db');
 const { requireAuth } = require('../middleware/auth');
 const asyncHandler = require('../utils/asyncHandler');
 const { writeAuditLog } = require('../utils/auditLog');
+const { requirePlatformPermission, requirePlatformAccess } = require('../middleware/platformPermissions');
 
 const router = express.Router();
 
-// Require super_admin for all admin routes
-router.use(requireAuth(['super_admin']));
+router.use(requireAuth());
+router.use(requirePlatformAccess());
 
 async function fetchDashboardSummary() {
   const { rows } = await pool.query(`
@@ -147,7 +148,7 @@ async function fetchRevenueSeries() {
 }
 
 // GET /api/admin/stats
-router.get('/stats', asyncHandler(async (req, res) => {
+router.get('/stats', requirePlatformPermission('analytics.read'), asyncHandler(async (req, res) => {
   const stats = {};
   const { rows: restaurantsRows } = await pool.query('SELECT COUNT(*)::int AS total FROM restaurants');
   stats.totalRestaurants = restaurantsRows[0] ? restaurantsRows[0].total : 0;
@@ -189,7 +190,7 @@ router.get('/stats', asyncHandler(async (req, res) => {
 }));
 
 // GET /api/admin/dashboard
-router.get('/dashboard', asyncHandler(async (req, res) => {
+router.get('/dashboard', requirePlatformPermission('analytics.read'), asyncHandler(async (req, res) => {
   const [summary, restaurants, ads, revenueSeries, orders] = await Promise.all([
     fetchDashboardSummary(),
     fetchRestaurantAnalytics(),
@@ -217,7 +218,7 @@ router.get('/dashboard', asyncHandler(async (req, res) => {
 }));
 
 // GET /api/admin/restaurants
-router.get('/restaurants', asyncHandler(async (req, res) => {
+router.get('/restaurants', requirePlatformPermission('restaurants.read'), asyncHandler(async (req, res) => {
   const { rows } = await pool.query(
     `SELECT r.id, r.name, r.slug, r.phone, r.address, r.is_active, r.subscription_plan, r.subscription_status, r.subscription_expires_at, u.name AS owner_name, u.email AS owner_email
      FROM restaurants r
@@ -227,7 +228,7 @@ router.get('/restaurants', asyncHandler(async (req, res) => {
   return res.json({ restaurants: rows });
 }));
 
-router.get('/plans', asyncHandler(async (req, res) => {
+router.get('/plans', requirePlatformPermission('subscriptions.view'), asyncHandler(async (req, res) => {
   const { rows } = await pool.query(
     `SELECT p.id, p.code, p.name, p.description, p.billing_interval, p.price, p.currency, p.is_active,
             COALESCE(json_agg(json_build_object('featureKey', f.feature_key, 'name', f.name))
@@ -241,7 +242,7 @@ router.get('/plans', asyncHandler(async (req, res) => {
   return res.json({ plans: rows });
 }));
 
-router.get('/commission-rules', asyncHandler(async (req, res) => {
+router.get('/commission-rules', requirePlatformPermission('finance.read'), asyncHandler(async (req, res) => {
   const { rows } = await pool.query(
     `SELECT cr.*, r.name AS restaurant_name
      FROM commission_rules cr
@@ -251,7 +252,7 @@ router.get('/commission-rules', asyncHandler(async (req, res) => {
   return res.json({ rules: rows });
 }));
 
-router.post('/commission-rules', asyncHandler(async (req, res) => {
+router.post('/commission-rules', requirePlatformPermission('finance.write'), asyncHandler(async (req, res) => {
   const restaurantId = req.body?.restaurantId ? Number(req.body.restaurantId) : null;
   const commissionType = String(req.body?.commissionType || '').trim();
   const commissionValue = Number(req.body?.commissionValue);
@@ -270,7 +271,7 @@ router.post('/commission-rules', asyncHandler(async (req, res) => {
   return res.status(201).json({ rule: rows[0] });
 }));
 
-router.post('/plans', asyncHandler(async (req, res) => {
+router.post('/plans', requirePlatformPermission('subscriptions.manage'), asyncHandler(async (req, res) => {
   const code = String(req.body?.code || '').trim().toLowerCase();
   const name = String(req.body?.name || '').trim();
   const interval = String(req.body?.billingInterval || 'monthly').trim();
@@ -307,7 +308,7 @@ router.post('/plans', asyncHandler(async (req, res) => {
   }
 }));
 
-router.post('/restaurants/:restaurantId/features/:featureKey', asyncHandler(async (req, res) => {
+router.post('/restaurants/:restaurantId/features/:featureKey', requirePlatformPermission('features.manage'), asyncHandler(async (req, res) => {
   const restaurantId = Number(req.params.restaurantId);
   const featureKey = String(req.params.featureKey || '').trim();
   const enabled = req.body?.enabled !== false;
@@ -328,7 +329,7 @@ router.post('/restaurants/:restaurantId/features/:featureKey', asyncHandler(asyn
 }));
 
 // POST /api/admin/restaurants/:id/subscribe
-router.post('/restaurants/:restaurantId/subscribe', asyncHandler(async (req, res) => {
+router.post('/restaurants/:restaurantId/subscribe', requirePlatformPermission('subscriptions.manage'), asyncHandler(async (req, res) => {
   const { restaurantId } = req.params;
   const { plan = 'Basic', months = 1 } = req.body || {};
 
@@ -354,7 +355,7 @@ router.post('/restaurants/:restaurantId/subscribe', asyncHandler(async (req, res
 }));
 
 // POST /api/admin/restaurants/:id/unsubscribe
-router.post('/restaurants/:restaurantId/unsubscribe', asyncHandler(async (req, res) => {
+router.post('/restaurants/:restaurantId/unsubscribe', requirePlatformPermission('subscriptions.manage'), asyncHandler(async (req, res) => {
   const { restaurantId } = req.params;
 
   await pool.query(
@@ -378,14 +379,14 @@ router.post('/restaurants/:restaurantId/unsubscribe', asyncHandler(async (req, r
 }));
 
 // toggle active
-router.patch('/restaurants/:restaurantId/toggle', asyncHandler(async (req, res) => {
+router.patch('/restaurants/:restaurantId/toggle', requirePlatformPermission('restaurants.suspend'), asyncHandler(async (req, res) => {
   const { restaurantId } = req.params;
   await pool.query('UPDATE restaurants SET is_active = NOT is_active WHERE id = $1', [restaurantId]);
   return res.json({ message: 'Restaurant status toggled' });
 }));
 
 // Summaries
-router.get('/summary', asyncHandler(async (req, res) => {
+router.get('/summary', requirePlatformPermission('analytics.read'), asyncHandler(async (req, res) => {
   const { rows: orderRows } = await pool.query('SELECT COUNT(*)::int AS "totalOrders" FROM orders');
   const { rows: restaurantRows } = await pool.query('SELECT COUNT(*)::int AS "totalRestaurants" FROM restaurants');
   const { rows: activeAdsRows } = await pool.query('SELECT COUNT(*)::int AS "totalActiveAds" FROM ads WHERE is_active = TRUE');
@@ -400,7 +401,7 @@ router.get('/summary', asyncHandler(async (req, res) => {
   });
 }));
 
-router.get('/saas-profits', asyncHandler(async (req, res) => {
+router.get('/saas-profits', requirePlatformPermission('finance.read'), asyncHandler(async (req, res) => {
   const { rows: onlineRows } = await pool.query(`
     SELECT
       COALESCE(SUM(total_amount), 0)::numeric AS revenue,
@@ -469,7 +470,7 @@ router.get('/saas-profits', asyncHandler(async (req, res) => {
   });
 }));
 
-router.get('/restaurants/:restaurantId/payment-details', asyncHandler(async (req, res) => {
+router.get('/restaurants/:restaurantId/payment-details', requirePlatformPermission('bank_details.view'), asyncHandler(async (req, res) => {
   const { restaurantId } = req.params;
   const { rows } = await pool.query(
     `SELECT id, name, upi_vpa, bank_account_name, bank_name, phone, address
@@ -480,7 +481,7 @@ router.get('/restaurants/:restaurantId/payment-details', asyncHandler(async (req
   return res.json({ restaurant: rows[0] });
 }));
 
-router.patch('/restaurants/:restaurantId/payment-details', asyncHandler(async (req, res) => {
+router.patch('/restaurants/:restaurantId/payment-details', requirePlatformPermission('bank_details.manage'), asyncHandler(async (req, res) => {
   const { restaurantId } = req.params;
   const { upiVpa, bankAccountName, bankName, phone, address } = req.body || {};
 
@@ -510,7 +511,7 @@ router.patch('/restaurants/:restaurantId/payment-details', asyncHandler(async (r
   return res.json({ restaurant: rows[0] || null });
 }));
 
-router.get('/audit-logs', asyncHandler(async (req, res) => {
+router.get('/audit-logs', requirePlatformPermission('audit.read'), asyncHandler(async (req, res) => {
   const limit = Math.min(Number(req.query.limit || 100), 500);
   const action = String(req.query.action || '').trim();
   const params = [limit];
