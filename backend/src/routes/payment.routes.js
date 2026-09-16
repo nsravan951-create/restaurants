@@ -16,6 +16,7 @@ const {
   completeOnlinePayment,
   markOnlinePaymentFailed,
 } = require('../utils/paymentCompletion');
+const { upsertCashfreeTransaction } = require('../utils/paymentTransaction');
 
 const router = express.Router();
 
@@ -93,21 +94,13 @@ router.post('/cashfree/create-order', paymentLimiter, asyncHandler(async (req, r
     reference,
   });
 
-  await pool.query(
-    `INSERT INTO payment_transactions
-       (order_id, restaurant_id, payment_provider, payment_purpose, provider_order_id, amount, currency, status, provider_payload)
-     VALUES ($1, $2, 'cashfree', 'CUSTOMER_ORDER', $3, $4, 'INR', 'pending', $5::jsonb)
-     ON CONFLICT (order_id) DO UPDATE SET
-       restaurant_id = EXCLUDED.restaurant_id,
-       provider_order_id = EXCLUDED.provider_order_id,
-       payment_purpose = EXCLUDED.payment_purpose,
-       amount = EXCLUDED.amount,
-       currency = EXCLUDED.currency,
-       status = 'pending',
-       provider_payload = EXCLUDED.provider_payload,
-       updated_at = CURRENT_TIMESTAMP`,
-    [orderId, order.restaurant_id, providerOrder.id, amount, JSON.stringify(providerOrder.raw)]
-  );
+  await upsertCashfreeTransaction(pool, {
+    orderId,
+    restaurantId: order.restaurant_id,
+    providerOrderId: providerOrder.id,
+    amount,
+    providerPayload: providerOrder.raw,
+  });
 
   return res.status(201).json({
     message: 'Cashfree payment order created',

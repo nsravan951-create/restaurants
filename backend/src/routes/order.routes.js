@@ -12,7 +12,12 @@ const { buildInvoiceModel, renderInvoiceHtml, buildInvoicePdf } = require('../ut
 const { syncInvoiceForOrder } = require('../utils/invoiceSync');
 const { completeCashPayment } = require('../utils/paymentCompletion');
 const { validateCoupon, recordCouponRedemption } = require('../utils/coupons');
-const { calculateGstBreakdown, getRestaurantGstProfile } = require('../utils/gst');
+const {
+  calculateGstBreakdown,
+  getRestaurantGstProfile,
+  resolveRestaurantGstRate,
+  insertOrderRecord,
+} = require('../utils/gst');
 const { renderKotHtml, renderThermalBillHtml } = require('../utils/kot');
 
 const router = express.Router();
@@ -223,44 +228,18 @@ router.post('/', publicOrderLimiter, asyncHandler(async (req, res) => {
       couponMeta = couponResult;
     }
 
-    const { rows: gstRows } = await conn.query(
-      'SELECT default_gst_rate FROM restaurants WHERE id = $1 LIMIT 1',
-      [data.restaurantId]
-    );
-    const gstRate = Number(gstRows[0]?.default_gst_rate || process.env.GST_PERCENT || 0);
+    const gstRate = await resolveRestaurantGstRate(conn, data.restaurantId);
     const tax = calculateGstBreakdown({ subtotal, discountAmount, gstRate, isInterState: false });
 
-    const orderResult = await conn.query(
-      `INSERT INTO orders (
-         restaurant_id, table_id, table_session_id, table_number, customer_name,
-         total_amount, subtotal_amount, discount_amount, taxable_amount,
-         cgst_amount, sgst_amount, igst_amount, gst_rate,
-         coupon_code, status, payment_method, payment_provider,
-         payment_status, notes, idempotency_key
-       )
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, 'pending', $15, $15, 'pending', $16, $17)
-       RETURNING id`,
-      [
-        data.restaurantId,
-        data.tableId,
-        data.tableSessionId,
-        tableRows[0].table_number,
-        data.customerName,
-        tax.grandTotal,
-        tax.subtotal,
-        tax.discountAmount,
-        tax.taxableAmount,
-        tax.cgstAmount,
-        tax.sgstAmount,
-        tax.igstAmount,
-        tax.gstRate,
-        couponMeta?.code || null,
-        data.paymentMethod,
-        data.notes,
-        idempotencyKey,
-      ]
-    );
-    const orderId = orderResult.rows[0].id;
+    const orderId = await insertOrderRecord(conn, {
+      data,
+      tableNumber: tableRows[0].table_number,
+      tax,
+      couponCode: couponMeta?.code || null,
+      paymentMethod: data.paymentMethod,
+      notes: data.notes,
+      idempotencyKey,
+    });
 
     if (couponMeta) {
       await recordCouponRedemption(conn, {
@@ -297,7 +276,7 @@ router.post('/', publicOrderLimiter, asyncHandler(async (req, res) => {
     return res.status(201).json({
       message: 'Order placed successfully',
       orderId,
-      totalAmount: total,
+      totalAmount: tax.grandTotal,
     });
   } catch (error) {
     await conn.query('ROLLBACK');
@@ -549,15 +528,19 @@ router.get('/:orderId/kot', requireAuth(['owner', 'super_admin', 'kitchen', 'sta
     [orderId]
   );
 
-  await pool.query(
-    `INSERT INTO kot_prints (order_id, restaurant_id, printed_by_user_id, print_type)
-     VALUES ($1, $2, $3, $4)`,
-    [orderId, orderRows[0].restaurant_id, req.user.userId, printType]
-  );
-  await pool.query(
-    'UPDATE orders SET kot_print_count = kot_print_count + 1 WHERE id = $1',
-    [orderId]
-  );
+  try {
+    await pool.query(
+      `INSERT INTO kot_prints (order_id, restaurant_id, printed_by_user_id, print_type)
+       VALUES ($1, $2, $3, $4)`,
+      [orderId, orderRows[0].restaurant_id, req.user.userId, printType]
+    );
+    await pool.query(
+      'UPDATE orders SET kot_print_count = kot_print_count + 1 WHERE id = $1',
+      [orderId]
+    );
+  } catch (error) {
+    if (error.code !== '42P01' && error.code !== '42703') throw error;
+  }
 
   const html = renderKotHtml({
     restaurant: restaurantRows[0],

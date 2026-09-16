@@ -75,6 +75,9 @@ async function cashfreeRequest(path, options = {}) {
     }
     const error = new Error(message);
     error.status = response.status >= 500 ? 502 : 400;
+    if (response.status === 401 || /auth/i.test(String(providerMessage))) {
+      error.status = 400;
+    }
     error.code = 'CASHFREE_PROVIDER_ERROR';
     error.providerResponse = data;
     throw error;

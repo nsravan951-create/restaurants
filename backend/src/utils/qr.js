@@ -23,12 +23,16 @@ function buildTableQrUrl(qrToken) {
 
 function isCanonicalTableQrUrl(url) {
   if (!url) return false;
+  const expectedOrigin = getFrontendOrigin();
   try {
     const parsed = new URL(url.startsWith('http') ? url : `https://${url}`);
     const token = parsed.searchParams.get('t') || parsed.searchParams.get('token');
-    return /\/table\.html$/i.test(parsed.pathname) && Boolean(token && token.length >= 8);
+    const originMatches = parsed.origin === expectedOrigin;
+    return originMatches
+      && /\/table\.html$/i.test(parsed.pathname)
+      && Boolean(token && token.length >= 8);
   } catch (error) {
-    return /table\.html\?t=[^&]+/i.test(String(url));
+    return false;
   }
 }
 
