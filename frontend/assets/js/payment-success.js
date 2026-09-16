@@ -1,5 +1,5 @@
 (function initPaymentSuccessPage() {
-  const API_URL = window.API_URL || window.APP_CONFIG?.API_BASE_URL || 'http://localhost:5000';
+  const API_URL = window.API_URL || window.APP_CONFIG?.API_BASE_URL || 'https://restaurant-backend-rxqz.onrender.com';
   const STORAGE_KEY = 'autoresto_payment_success_context';
   const POLL_MS = 5000;
 

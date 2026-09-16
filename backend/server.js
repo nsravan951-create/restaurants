@@ -25,27 +25,12 @@ const PORT = Number(process.env.PORT || 5000);
 const isProduction = process.env.NODE_ENV === 'production';
 const server = http.createServer(app);
 
-const allowedOrigins = new Set(
-  String(process.env.CORS_ORIGIN || 'http://localhost:3000,http://localhost:5173')
-    .split(',')
-    .map((origin) => origin.trim())
-    .filter(Boolean)
-);
-
-allowedOrigins.add('https://autoresto.in');
-allowedOrigins.add('https://restaurants.netlify.app');
-allowedOrigins.add('https://restaurantts.netlify.app');
-allowedOrigins.add('https://restauranttts.netlify.app');
+const { buildAllowedOrigins, createOriginValidator } = require('./src/config/cors');
+const allowedOrigins = buildAllowedOrigins();
 
 const io = new Server(server, {
   cors: {
-    origin(origin, callback) {
-      if (!origin || allowedOrigins.has(origin)) {
-        callback(null, true);
-        return;
-      }
-      callback(new Error(`Socket CORS not allowed: ${origin}`));
-    },
+    origin: createOriginValidator(allowedOrigins, 'Socket CORS'),
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
     credentials: true,

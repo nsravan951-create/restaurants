@@ -961,12 +961,13 @@
     </div>
 
     <script src="assets/js/config.js"></script>
-    <script src="https://cdn.socket.io/4.7.5/socket.io.min.js" crossorigin="anonymous"></script>
+    <script src="assets/js/vendor/socket.io.min.js"></script>
     <script src="assets/js/socketClient.js"></script>
     <script src="assets/js/billHistoryGuard.js"></script>
     <script src="assets/js/billPrinter.js"></script>
     <script>
-      const BACKEND_BASE_URL = window.API_URL || window.APP_CONFIG?.API_BASE_URL || 'http://localhost:5000';
+      const PRODUCTION_API = 'https://restaurant-backend-rxqz.onrender.com';
+      const BACKEND_BASE_URL = window.API_URL || window.APP_CONFIG?.API_BASE_URL || PRODUCTION_API;
       const SOCKET_URL = window.APP_CONFIG?.SOCKET_URL || BACKEND_BASE_URL;
 
       const els = {

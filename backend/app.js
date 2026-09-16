@@ -25,31 +25,18 @@ const masterAdminRoutes = require('./src/routes/masterAdmin.routes');
 const exportsRoutes = require('./src/routes/exports.routes');
 const { teamRouter: supportTeamRouter, ownerRouter: supportOwnerRouter } = require('./src/routes/supportTickets.routes');
 const errorHandler = require('./src/middleware/errorHandler');
+const { buildAllowedOrigins, createOriginValidator } = require('./src/config/cors');
 
 const app = express();
 
-const allowedOrigins = new Set(
-  String(process.env.CORS_ORIGIN || 'http://localhost:3000,http://localhost:5173')
-    .split(',')
-    .map((origin) => origin.trim())
-    .filter(Boolean)
-);
-
-allowedOrigins.add('https://autoresto.in');
-allowedOrigins.add('https://restaurants.netlify.app');
-allowedOrigins.add('https://restaurantts.netlify.app');
-allowedOrigins.add('https://restauranttts.netlify.app');
+const allowedOrigins = buildAllowedOrigins();
 
 const corsOptions = {
   origin(origin, callback) {
     if (process.env.NODE_ENV !== 'production') {
       console.log('Request from:', origin);
     }
-    if (!origin || allowedOrigins.has(origin)) {
-      callback(null, true);
-      return;
-    }
-    callback(new Error(`CORS not allowed: ${origin}`));
+    createOriginValidator(allowedOrigins, 'CORS')(origin, callback);
   },
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
   allowedHeaders: ['Content-Type', 'Authorization'],
@@ -72,6 +59,16 @@ app.use((req, res, next) => {
   next();
 });
 
+
+app.get('/', (req, res) => {
+  res.json({
+    status: 'ok',
+    service: 'qr-restaurant-backend',
+    message: 'AutoResto API is running',
+    health: '/api/health',
+    timestamp: new Date().toISOString(),
+  });
+});
 
 app.get('/api/health', async (req, res) => {
   const payload = {
