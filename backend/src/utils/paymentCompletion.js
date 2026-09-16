@@ -130,28 +130,38 @@ async function completeOnlinePayment(orderId, {
   try {
     await conn.query('BEGIN');
 
-    const { rows } = await conn.query(
-      `SELECT o.id, o.restaurant_id, o.table_id, o.payment_status, o.total_amount, pt.amount AS txn_amount, pt.status AS txn_status
-       FROM orders o
-       LEFT JOIN payment_transactions pt ON pt.order_id = o.id AND pt.payment_provider = $2
-       WHERE o.id = $1
+    const { rows: orderRows } = await conn.query(
+      `SELECT id, restaurant_id, table_id, payment_status, total_amount
+       FROM orders
+       WHERE id = $1
        LIMIT 1
        FOR UPDATE`,
-      [orderId, provider]
+      [orderId]
     );
 
-    if (!rows.length) {
+    if (!orderRows.length) {
       await conn.query('ROLLBACK');
       return { ok: false, status: 404, message: 'Order not found' };
     }
 
-    const order = rows[0];
+    const order = orderRows[0];
+
+    const { rows: txnRows } = await conn.query(
+      `SELECT amount AS txn_amount, status AS txn_status
+       FROM payment_transactions
+       WHERE order_id = $1 AND payment_provider = $2
+       LIMIT 1
+       FOR UPDATE`,
+      [orderId, provider]
+    );
+    const txn = txnRows[0] || {};
+
     if (order.payment_status === 'paid') {
       await conn.query('ROLLBACK');
       return { ok: true, status: 200, message: 'Order already paid', orderId, alreadyPaid: true };
     }
 
-    if (order.txn_status === 'paid') {
+    if (txn.txn_status === 'paid') {
       await conn.query('ROLLBACK');
       return { ok: true, status: 200, message: 'Payment already recorded', orderId, alreadyPaid: true };
     }

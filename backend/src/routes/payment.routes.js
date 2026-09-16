@@ -188,10 +188,20 @@ router.get('/cashfree/status/:orderId', paymentLimiter, asyncHandler(async (req,
     : null;
 
   if (providerStatus?.order_status === 'PAID' && rows[0].payment_status !== 'paid') {
-    await completeOnlinePayment(orderId, {
-      provider: 'cashfree',
-      providerPayload: providerStatus,
-    });
+    try {
+      await completeOnlinePayment(orderId, {
+        provider: 'cashfree',
+        providerPayload: providerStatus,
+      });
+    } catch (error) {
+      console.error('[cashfree/status] completeOnlinePayment failed:', error.message);
+      return res.status(502).json({
+        message: 'Payment was received but bill finalization failed. Please ask staff to refresh your table.',
+        orderId,
+        paymentStatus: rows[0].payment_status,
+        providerStatus,
+      });
+    }
   }
 
   const { rows: latest } = await pool.query(
@@ -247,10 +257,21 @@ router.post('/cashfree/verify', paymentLimiter, asyncHandler(async (req, res) =>
 
   const providerStatus = await fetchCashfreePaymentOrder(rows[0].provider_order_id);
   if (providerStatus?.order_status === 'PAID' && rows[0].payment_status !== 'paid') {
-    await completeOnlinePayment(orderId, {
-      provider: 'cashfree',
-      providerPayload: providerStatus,
-    });
+    try {
+      await completeOnlinePayment(orderId, {
+        provider: 'cashfree',
+        providerPayload: providerStatus,
+      });
+    } catch (error) {
+      console.error('[cashfree/verify] completeOnlinePayment failed:', error.message);
+      return res.status(502).json({
+        message: 'Payment was received but bill finalization failed. Please ask staff to refresh your table.',
+        orderId,
+        paymentStatus: rows[0].payment_status,
+        providerOrderId: rows[0].provider_order_id,
+        providerStatus,
+      });
+    }
   }
 
   const { rows: latest } = await pool.query(
