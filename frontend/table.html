@@ -961,9 +961,10 @@
     </div>
 
     <script src="assets/js/config.js"></script>
+    <script src="https://cdn.socket.io/4.7.5/socket.io.min.js" crossorigin="anonymous"></script>
+    <script src="assets/js/socketClient.js"></script>
     <script src="assets/js/billHistoryGuard.js"></script>
     <script src="assets/js/billPrinter.js"></script>
-    <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
     <script>
       const BACKEND_BASE_URL = window.API_URL || window.APP_CONFIG?.API_BASE_URL || 'http://localhost:5000';
       const SOCKET_URL = window.APP_CONFIG?.SOCKET_URL || BACKEND_BASE_URL;
@@ -2009,29 +2010,42 @@
         }, 60000);
       }
 
-      function connectSocket() {
+      async function connectSocket() {
         if (!state.context?.restaurant?.id) return;
+
         if (state.socket) {
           state.socket.disconnect();
+          state.socket = null;
         }
-        state.socket = io(SOCKET_URL, { transports: ['websocket', 'polling'], reconnectionAttempts: 5 });
-        state.socket.on('connect', () => {
-          state.socket.emit('restaurant:join', state.context.restaurant.id);
+
+        const socket = await window.AutoRestoSocket.connect(SOCKET_URL, {
+          transports: ['websocket', 'polling'],
+          reconnectionAttempts: 5,
         });
-        state.socket.on('reconnect', (attempt) => {
-          // re-join room on reconnect and refresh state
-          try { state.socket.emit('restaurant:join', state.context.restaurant.id); } catch (e) {}
+
+        if (!socket) {
+          console.warn('[AutoResto] Realtime socket disabled; payment status will use polling.');
+          return;
+        }
+
+        state.socket = socket;
+
+        socket.on('connect', () => {
+          socket.emit('restaurant:join', state.context.restaurant.id);
+        });
+        socket.on('reconnect', () => {
+          try { socket.emit('restaurant:join', state.context.restaurant.id); } catch (e) {}
           if (state.activeOrder) loadTable().catch(() => {});
         });
-        state.socket.on('disconnect', (reason) => {
+        socket.on('disconnect', (reason) => {
           if (reason === 'io server disconnect') {
-            // the server forcefully disconnected us - try to reconnect
-            state.socket.connect();
+            socket.connect();
           }
-          // show brief offline notice
-          if (reason) setError('Connection lost. Reconnecting...');
         });
-        state.socket.on('order:update', (payload) => {
+        socket.on('connect_error', (error) => {
+          console.warn('[AutoResto] Socket connection error:', error?.message || error);
+        });
+        socket.on('order:update', (payload) => {
           const activeId = state.activeOrder?.orderId;
           const waiting = loadWaitingCashOrder();
           const orderId = payload.orderId;
@@ -2160,7 +2174,7 @@
           state.selectedCategory = 'all';
           renderMenu(data.menu || []);
           renderCart();
-          connectSocket();
+          connectSocket().catch((error) => console.warn('[AutoResto] Socket setup failed:', error.message));
 
           const paidOnReturn = await verifyCashfreeReturn();
           const restoredPostPayment = paidOnReturn ? true : await tryRestorePostPaymentState();
