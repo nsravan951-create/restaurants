@@ -16,7 +16,7 @@
         <div class="auth-hero__copy">
           <p class="eyebrow">AutoResto SaaS</p>
           <h1>One platform for restaurants, payments, and growth.</h1>
-          <p class="hero-copy">Owners manage their restaurant. Team staff login with email, password, and assigned role type.</p>
+          <p class="hero-copy">Owners manage their restaurant. Team staff use the email and password created by Super Admin in Admin → Team.</p>
         </div>
 
         <div class="auth-tabs" role="tablist">
@@ -43,7 +43,7 @@
         <div id="authPanelTeam" class="auth-panel-view hidden">
           <form id="teamLoginForm" class="stack auth-card auth-card--glass">
             <h2>Team staff login</h2>
-            <p class="hero-copy" style="margin:0;">Use the email and password allocated by Super Admin. Your role type decides which pages you see.</p>
+            <p class="hero-copy" style="margin:0;">Enter the email and password your admin gave you. You will be taken straight to your role workspace — no role selection needed here.</p>
             <label class="auth-field">
               <span>Email</span>
               <input name="email" type="email" placeholder="staff@autoresto.in" required autocomplete="username" />
@@ -52,23 +52,8 @@
               <span>Password</span>
               <input name="password" type="password" placeholder="Password from admin" required autocomplete="current-password" />
             </label>
-            <label class="auth-field">
-              <span>Role type (optional check)</span>
-              <select name="roleHint">
-                <option value="">Any team role</option>
-                <option value="payment_manager">Payment Manager</option>
-                <option value="ads_manager">Ads Manager</option>
-                <option value="restaurant_manager">Restaurant Manager</option>
-                <option value="registration_manager">Registration Manager</option>
-                <option value="features_manager">Features Manager</option>
-                <option value="finance_manager">Finance Manager</option>
-                <option value="support_manager">Support Manager</option>
-                <option value="analytics_manager">Analytics Manager</option>
-                <option value="super_admin">Super Admin</option>
-              </select>
-            </label>
             <button class="btn btn-primary" type="submit">Login to Team Workspace</button>
-            <small class="muted">Super Admin? Select Super Admin above or use Owner tab — you will be sent to Admin Control Center.</small>
+            <small class="muted">Super Admin? Use the Restaurant Owner tab — you will be sent to the Admin Control Center.</small>
           </form>
         </div>
 

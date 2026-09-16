@@ -328,6 +328,13 @@
     ` || '<p>No tickets.</p>';
   }
 
+  function isPlatformTeamUser(user) {
+    if (!user?.role) return false;
+    if (user.role === 'super_admin' || RESTAURANT_ROLES.has(user.role)) return false;
+    if (user.isPlatformTeam) return true;
+    return String(user.role).endsWith('_manager');
+  }
+
   async function ensureAuth() {
     const auth = getAuth();
     if (!auth?.token) {
@@ -338,7 +345,11 @@
       window.location.href = './admin.html';
       return null;
     }
-    if (RESTAURANT_ROLES.has(auth.user.role)) {
+    if (RESTAURANT_ROLES.has(auth.user.role) || !isPlatformTeamUser(auth.user)) {
+      try {
+        sessionStorage.setItem('owner_auth_message', 'Sign in with Team Staff using your admin-allocated email and password.');
+        sessionStorage.setItem('prefer_team_tab', '1');
+      } catch (_) {}
       window.location.href = './auth.html';
       return null;
     }

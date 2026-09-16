@@ -55,19 +55,48 @@
     return new Date(value).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
   }
 
+  function showModal(modalId) {
+    const modal = el(modalId);
+    if (!modal) return;
+    modal.classList.remove('hidden');
+    modal.classList.add('is-open');
+    modal.setAttribute('aria-hidden', 'false');
+    document.body.classList.add('bill-modal-open');
+  }
+
+  function closeModal(modalId) {
+    const modal = el(modalId);
+    if (!modal) return;
+    modal.classList.add('hidden');
+    modal.classList.remove('is-open');
+    modal.setAttribute('aria-hidden', 'true');
+    if (!document.querySelector('.bill-modal.is-open:not(.hidden)')) {
+      document.body.classList.remove('bill-modal-open');
+    }
+    if (modalId === 'restaurantProfileModal') {
+      state.profileRestaurantId = null;
+      state.profileData = null;
+    }
+    if (modalId === 'upgradeActivateModal') {
+      state.pendingUpgradeId = null;
+    }
+  }
+
   function setSection(section) {
     state.activeSection = section;
     document.querySelectorAll('.admin-section').forEach((node) => node.classList.add('hidden'));
     const target = document.getElementById(`section-${section}`);
     if (target) {
       target.classList.remove('hidden');
-      target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      window.scrollTo({ top: 0, behavior: 'auto' });
     }
+    document.body.classList.remove('bill-modal-open');
 
     document.querySelectorAll('.admin-link[data-section]').forEach((button) => {
       button.classList.toggle('active', button.dataset.section === section);
     });
 
+    if (section === 'platform-bank') loadPlatformBank().catch((e) => setMessage(e.message, true));
     if (section === 'profits') loadSaasProfits();
     if (section === 'platform') loadPlatformOrders();
     if (section === 'reconciliation') loadReconciliation();
@@ -541,18 +570,12 @@
   }
 
   function openPaymentAuthModal() {
-    const modal = el('paymentAuthModal');
-    if (!modal) return;
-    modal.classList.remove('hidden');
-    modal.setAttribute('aria-hidden', 'false');
+    showModal('paymentAuthModal');
     el('paymentAuthPassword')?.focus();
   }
 
   function closePaymentAuthModal() {
-    const modal = el('paymentAuthModal');
-    if (!modal) return;
-    modal.classList.add('hidden');
-    modal.setAttribute('aria-hidden', 'true');
+    closeModal('paymentAuthModal');
   }
 
   async function unlockPaymentVault(password) {
@@ -1346,8 +1369,23 @@
       renderRestaurantHubTable();
     });
     el('closeProfileModal')?.addEventListener('click', closeRestaurantProfile);
+    el('platformBankForm')?.addEventListener('submit', (e) => {
+      savePlatformBank(e).catch((error) => setMessage(error.message, true));
+    });
     document.querySelectorAll('[data-profile-tab]').forEach((btn) => {
       btn.addEventListener('click', () => setProfileTab(btn.dataset.profileTab));
+    });
+    ['restaurantProfileModal', 'upgradeActivateModal', 'paymentAuthModal'].forEach((modalId) => {
+      const modal = el(modalId);
+      modal?.addEventListener('click', (event) => {
+        if (event.target === modal) closeModal(modalId);
+      });
+    });
+    document.addEventListener('keydown', (event) => {
+      if (event.key !== 'Escape') return;
+      if (el('restaurantProfileModal')?.classList.contains('is-open')) closeRestaurantProfile();
+      else if (el('upgradeActivateModal')?.classList.contains('is-open')) closeUpgradeModal();
+      else if (el('paymentAuthModal')?.classList.contains('is-open')) closePaymentAuthModal();
     });
     document.querySelectorAll('#upgradeQueueFilters .ma-filter-btn').forEach((btn) => {
       btn.addEventListener('click', () => {
@@ -1635,6 +1673,24 @@
       </table>`;
   }
 
+  const PLATFORM_ROLE_FALLBACK = [
+    { role_key: 'finance_manager', name: 'Finance Manager', department_name: 'Finance', description: 'Full finance access — commissions, settlements, refunds.' },
+    { role_key: 'payment_manager', name: 'Payment Manager', department_name: 'Finance', description: 'Cashfree reconciliation and restaurant payout details.' },
+    { role_key: 'settlement_manager', name: 'Settlement Manager', department_name: 'Finance', description: 'Restaurant settlement batches and payout status.' },
+    { role_key: 'subscription_manager', name: 'Subscription Manager', department_name: 'Finance', description: 'SaaS plans and billing for restaurants.' },
+    { role_key: 'restaurant_manager', name: 'Restaurant Manager', department_name: 'Operations', description: 'Day-to-day restaurant operations and status.' },
+    { role_key: 'registration_manager', name: 'Registration Manager', department_name: 'Operations', description: 'Onboard new restaurants and owners.' },
+    { role_key: 'operations_manager', name: 'Operations Manager', department_name: 'Operations', description: 'Live platform operations and orders.' },
+    { role_key: 'features_manager', name: 'Features Manager', department_name: 'Operations', description: 'Enable features after upgrade payments.' },
+    { role_key: 'ads_manager', name: 'Ads Manager', department_name: 'Marketing', description: 'Promotions, banners, and ad campaigns.' },
+    { role_key: 'promotions_manager', name: 'Promotions Manager', department_name: 'Marketing', description: 'Marketing campaigns and promotional content.' },
+    { role_key: 'analytics_manager', name: 'Analytics Manager', department_name: 'Analytics', description: 'Platform analytics and CSV exports.' },
+    { role_key: 'user_enquiry_manager', name: 'Support / Enquiry Manager', department_name: 'Support', description: 'Support tickets and restaurant enquiries.' },
+    { role_key: 'support_manager', name: 'Support Manager', department_name: 'Support', description: 'Full support queue management.' },
+    { role_key: 'database_manager', name: 'Database Manager', department_name: 'Technology', description: 'Database health and migrations.' },
+    { role_key: 'backend_manager', name: 'Backend Manager', department_name: 'Technology', description: 'API health and system settings.' },
+  ];
+
   function updateTeamRoleDescription(roleKey, roleMeta) {
     const desc = el('teamRoleDescription');
     if (!desc) return;
@@ -1652,9 +1708,28 @@
   }
 
   async function loadTeamPanel() {
-    const rolesData = await apiRequest('/api/team/roles', {}, true);
-    const membersData = await apiRequest('/api/team/members', {}, true);
-    const roleMeta = rolesData.roleMeta || [];
+    let rolesData = { roleMeta: [], rolesByDepartment: {}, mappings: [] };
+    try {
+      rolesData = await apiRequest('/api/team/roles', {}, true);
+    } catch (error) {
+      const grouped = PLATFORM_ROLE_FALLBACK.reduce((acc, row) => {
+        const dept = row.department_name || 'General';
+        if (!acc[dept]) acc[dept] = [];
+        acc[dept].push(row);
+        return acc;
+      }, {});
+      rolesData = { roleMeta: PLATFORM_ROLE_FALLBACK, rolesByDepartment: grouped, mappings: [] };
+      setMessage('Role catalog loaded from defaults. Run DB migrations for full role permissions.', true);
+    }
+
+    let membersData = { members: [] };
+    try {
+      membersData = await apiRequest('/api/team/members', {}, true);
+    } catch (error) {
+      setMessage(error.message, true);
+    }
+
+    const roleMeta = rolesData.roleMeta?.length ? rolesData.roleMeta : PLATFORM_ROLE_FALLBACK;
 
     const catalogRoot = el('teamRoleCatalog');
     if (catalogRoot) {
@@ -1803,20 +1878,38 @@
     }
   }
 
+  function showTeamCreateSuccess(member, payload) {
+    const box = el('teamCreateSuccess');
+    if (!box) return;
+    const roleLabel = String(payload.role || '').replace(/_/g, ' ');
+    box.classList.remove('hidden');
+    box.innerHTML = `
+      <p><strong>Account created</strong></p>
+      <p>Share these login details with ${escapeHtml(member.name || payload.name)}:</p>
+      <ul class="ma-team-success__list">
+        <li><span>Login page</span><strong>auth.html → Team Staff</strong></li>
+        <li><span>Email</span><strong>${escapeHtml(payload.email)}</strong></li>
+        <li><span>Password</span><strong>(the password you just set)</strong></li>
+        <li><span>Role type</span><strong>${escapeHtml(roleLabel)}</strong></li>
+      </ul>
+      <p class="muted">They will open <strong>team.html</strong> automatically with access limited to this role.</p>
+    `;
+  }
+
   async function handleTeamCreate(event) {
     event.preventDefault();
     const form = event.target;
     const fd = new FormData(form);
     const payload = {
       name: String(fd.get('name') || '').trim(),
-      email: String(fd.get('email') || '').trim(),
+      email: String(fd.get('email') || '').trim().toLowerCase(),
       password: String(fd.get('password') || ''),
       role: String(fd.get('role') || '').trim(),
       phone: String(fd.get('phone') || '').trim(),
       scopeType: String(fd.get('scopeType') || 'global'),
     };
     if (!payload.name || !payload.email || !payload.password || !payload.role) {
-      setMessage('Name, email, password, and role type are required.', true);
+      setMessage('Full name, email, password, and role type are required.', true);
       return;
     }
     if (payload.password.length < 8) {
@@ -1824,15 +1917,27 @@
       return;
     }
     const username = String(fd.get('username') || '').trim();
-    if (username) payload.username = username;
-    if (payload.scopeType === 'restaurant' && fd.get('scopeRestaurantId')) {
-      payload.scopeRestaurantId = Number(fd.get('scopeRestaurantId'));
+    if (username) payload.username = username.toLowerCase();
+    if (payload.scopeType === 'restaurant') {
+      const scopeId = Number(fd.get('scopeRestaurantId'));
+      if (!scopeId) {
+        setMessage('Select a restaurant when using single-restaurant scope.', true);
+        return;
+      }
+      payload.scopeRestaurantId = scopeId;
     }
-    await apiRequest('/api/team/members', { method: 'POST', body: JSON.stringify(payload) }, true);
-    form.reset();
-    el('teamRoleDescription').textContent = '';
-    setMessage(`Team member created. They can login at auth page → Team Staff with email ${payload.email}.`);
-    await loadTeamPanel();
+
+    try {
+      const result = await apiRequest('/api/team/members', { method: 'POST', body: JSON.stringify(payload) }, true);
+      showTeamCreateSuccess(result.member || { name: payload.name }, payload);
+      form.reset();
+      el('teamRoleDescription').textContent = '';
+      document.querySelectorAll('.ma-role-card').forEach((card) => card.classList.remove('is-selected'));
+      setMessage(`Team member created — ${payload.email} can login via Team Staff tab.`);
+      await loadTeamPanel();
+    } catch (error) {
+      setMessage(error.message || 'Could not create team member.', true);
+    }
   }
 
   async function loadAuditLogs() {
@@ -1911,7 +2016,10 @@
                   : `<span class="muted">${r.upgrade_payment_count || 0} paid</span>`}
               </td>
               <td>${escapeHtml(r.gstin || '—')}</td>
-              <td><button class="btn btn-primary btn-sm" type="button" data-open-profile="${r.id}">Manage</button></td>
+              <td class="ma-actions-cell">
+                <button class="btn btn-primary btn-sm" type="button" data-open-profile="${r.id}">Manage</button>
+                <button class="btn btn-light btn-sm" type="button" data-open-profile="${r.id}" data-profile-tab="financial">Bank</button>
+              </td>
             </tr>
           `).join('')}
         </tbody>
@@ -1919,27 +2027,37 @@
     ` || '<p class="muted">No restaurants found.</p>';
 
     root.querySelectorAll('[data-open-profile]').forEach((btn) => {
-      btn.addEventListener('click', () => openRestaurantProfile(Number(btn.dataset.openProfile)));
+      btn.addEventListener('click', () => openRestaurantProfile(
+        Number(btn.dataset.openProfile),
+        btn.dataset.profileTab || 'overview'
+      ));
     });
   }
 
-  async function openRestaurantProfile(restaurantId) {
+  async function openRestaurantProfile(restaurantId, initialTab = 'overview') {
     state.profileRestaurantId = restaurantId;
-    state.profileTab = 'overview';
-    const data = await apiRequest(`/api/master-admin/restaurants/${restaurantId}/profile`, {}, true);
-    state.profileData = data;
-    await loadFeatureRegistry();
-    renderRestaurantProfile();
-    const modal = el('restaurantProfileModal');
-    modal?.classList.remove('hidden');
-    modal?.setAttribute('aria-hidden', 'false');
+    state.profileData = null;
+    state.profileTab = initialTab;
+    showModal('restaurantProfileModal');
+    setProfileTab(initialTab);
+    const activePanel = document.querySelector(`[data-profile-panel="${initialTab}"]`);
+    if (activePanel) {
+      activePanel.innerHTML = '<p class="muted">Loading restaurant profile…</p>';
+    }
+
+    try {
+      const data = await apiRequest(`/api/master-admin/restaurants/${restaurantId}/profile`, {}, true);
+      state.profileData = data;
+      await loadFeatureRegistry();
+      renderRestaurantProfile();
+    } catch (error) {
+      closeModal('restaurantProfileModal');
+      setMessage(error.message || 'Could not load restaurant profile. Run database migrations if this is a new install.', true);
+    }
   }
 
   function closeRestaurantProfile() {
-    el('restaurantProfileModal')?.classList.add('hidden');
-    el('restaurantProfileModal')?.setAttribute('aria-hidden', 'true');
-    state.profileRestaurantId = null;
-    state.profileData = null;
+    closeModal('restaurantProfileModal');
   }
 
   function setProfileTab(tab) {
@@ -1950,7 +2068,7 @@
     document.querySelectorAll('[data-profile-panel]').forEach((panel) => {
       panel.classList.toggle('hidden', panel.dataset.profilePanel !== tab);
     });
-    renderRestaurantProfile();
+    if (state.profileData) renderRestaurantProfile();
   }
 
   function renderRestaurantProfile() {
@@ -2086,7 +2204,7 @@
     const r = data.restaurant || {};
     const bank = (data.bankAccounts || [])[0] || {};
     el('profileTabFinancial').innerHTML = `
-      <p class="muted">Bank, GST, and payout details used for Cashfree settlements and tax invoices.</p>
+      <p class="muted">Restaurant bank account for Cashfree payouts to this business. AutoResto&apos;s own bank is under Finance → AutoResto Bank.</p>
       <form id="profileFinancialForm" class="admin-form ma-financial-form">
         <fieldset><legend>GST &amp; legal</legend>
           <input name="legalName" placeholder="Legal business name" value="${escapeHtml(r.legal_name || '')}" />
@@ -2240,8 +2358,7 @@
   }
 
   function closeUpgradeModal() {
-    el('upgradeActivateModal')?.classList.add('hidden');
-    state.pendingUpgradeId = null;
+    closeModal('upgradeActivateModal');
   }
 
   async function openUpgradeModal(id, meta = {}) {
@@ -2260,7 +2377,44 @@
         <span><strong>${escapeHtml(f.name || f.feature_key)}</strong><small>${escapeHtml(f.feature_key)}</small></span>
       </label>
     `).join('') || '<p class="muted">No features in registry.</p>';
-    el('upgradeActivateModal')?.classList.remove('hidden');
+    showModal('upgradeActivateModal');
+  }
+
+  async function loadPlatformBank() {
+    const data = await apiRequest('/api/master-admin/platform/payout-bank', {}, true);
+    const bank = data.payoutBank || {};
+    const form = el('platformBankForm');
+    if (!form) return;
+    form.legalName.value = bank.legalName || '';
+    form.gstin.value = bank.gstin || '';
+    form.notes.value = bank.notes || '';
+    form.accountHolderName.value = bank.accountHolderName || '';
+    form.bankName.value = bank.bankName || '';
+    form.ifscCode.value = bank.ifscCode || '';
+    form.upiVpa.value = bank.upiVpa || '';
+    form.accountNumber.value = '';
+    const masked = el('platformBankMasked');
+    if (masked) {
+      masked.textContent = bank.accountMasked
+        ? `Current account: ${bank.accountMasked}${bank.updatedAt ? ` · updated ${formatDate(bank.updatedAt)}` : ''}`
+        : 'Current account: Not on file';
+    }
+  }
+
+  async function savePlatformBank(event) {
+    event.preventDefault();
+    const form = event.target;
+    const body = Object.fromEntries(new FormData(form).entries());
+    try {
+      const result = await apiRequest('/api/master-admin/platform/payout-bank', {
+        method: 'PATCH',
+        body: JSON.stringify(body),
+      }, true);
+      await loadPlatformBank();
+      setMessage(result.message || 'AutoResto bank details saved.');
+    } catch (error) {
+      setMessage(error.message, true);
+    }
   }
 
   async function confirmUpgradeActivation() {

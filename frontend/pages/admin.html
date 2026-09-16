@@ -13,7 +13,7 @@
   <script src="../assets/js/config.js"></script>
   <script src="../assets/js/common.js"></script>
 </head>
-<body class="theme-dark">
+<body class="theme-dark admin-page">
   <div class="admin-shell">
     <aside class="admin-sidebar panel">
       <div>
@@ -28,6 +28,7 @@
           <p class="ma-nav-group__label">Finance</p>
           <button data-section="reconciliation" class="admin-link">💳 Payments</button>
           <button data-section="settlements" class="admin-link">🏦 Settlements</button>
+          <button data-section="platform-bank" class="admin-link">🏛️ AutoResto Bank</button>
           <button data-section="profits" class="admin-link">💰 SaaS Profits</button>
         </div>
         <div class="ma-nav-group">
@@ -97,6 +98,39 @@
             <div id="topRestaurants" class="stack"></div>
           </article>
         </div>
+      </section>
+
+      <section id="section-platform-bank" class="admin-section hidden">
+        <div class="section-head">
+          <div>
+            <h3>AutoResto platform bank account</h3>
+            <p>Your company bank details for receiving SaaS commissions, subscriptions, and platform revenue.</p>
+          </div>
+        </div>
+        <article class="panel ma-hover-card">
+          <p class="muted" style="margin-top:0;">
+            This is <strong>your</strong> (AutoResto) payout account — not a restaurant account.
+            To edit a restaurant&apos;s bank details, open <strong>Restaurant Hub → Manage → Bank &amp; GST</strong>.
+          </p>
+          <form id="platformBankForm" class="admin-form ma-financial-form" style="margin-top:1rem;">
+            <fieldset>
+              <legend>Company &amp; tax</legend>
+              <input name="legalName" id="platformBankLegalName" placeholder="Legal company name" />
+              <input name="gstin" id="platformBankGstin" placeholder="GSTIN" maxlength="15" />
+              <textarea name="notes" id="platformBankNotes" placeholder="Internal notes (optional)" rows="2"></textarea>
+            </fieldset>
+            <fieldset>
+              <legend>Bank account (for incoming platform revenue)</legend>
+              <input name="accountHolderName" id="platformBankHolder" placeholder="Account holder name" />
+              <input name="bankName" id="platformBankName" placeholder="Bank name" />
+              <input name="accountNumber" id="platformBankAccount" placeholder="Account number (enter to update)" autocomplete="off" />
+              <input name="ifscCode" id="platformBankIfsc" placeholder="IFSC code" />
+              <input name="upiVpa" id="platformBankUpi" placeholder="UPI VPA (optional)" />
+              <p id="platformBankMasked" class="muted">Current account: Not on file</p>
+            </fieldset>
+            <button class="btn btn-primary admin-form__submit" type="submit">Save AutoResto bank details</button>
+          </form>
+        </article>
       </section>
 
       <section id="section-profits" class="admin-section hidden">
@@ -249,7 +283,7 @@
         <div class="section-head">
           <div>
             <h3>Restaurant Hub</h3>
-            <p>Manage features, financial details, upgrade payments, and payouts per restaurant.</p>
+            <p>Click <strong>Manage</strong> for full profile, or <strong>Bank</strong> to edit restaurant payout details directly.</p>
           </div>
           <div class="admin-toolbar">
             <input id="hubSearch" class="admin-search" placeholder="Search restaurant, owner, GSTIN..." />
@@ -372,29 +406,49 @@
         </article>
         <div class="admin-grid-2" style="margin-top:1rem;">
           <article class="panel ma-hover-card">
-            <div class="section-head"><div><h3>Create team member</h3><p>Allocate username, email, password, and role.</p></div></div>
-            <form id="teamCreateForm" class="admin-form">
-              <label class="auth-field"><span>Full name</span><input name="name" placeholder="Full name" required /></label>
-              <label class="auth-field"><span>Username (optional)</span><input name="username" placeholder="Display username" pattern="[a-zA-Z0-9._-]{3,80}" /></label>
-              <label class="auth-field"><span>Login email *</span><input name="email" type="email" placeholder="staff@autoresto.in" required /></label>
-              <label class="auth-field"><span>Password *</span><input name="password" type="password" placeholder="Min 8 characters" required minlength="8" /></label>
-              <label class="auth-field"><span>Role type *</span>
-              <select name="role" id="teamRoleSelect" required>
-                <option value="">Select role type</option>
-              </select></label>
-              <p id="teamRoleDescription" class="muted" style="margin:0;"></p>
-              <select name="scopeType" id="teamScopeType">
-                <option value="global">Scope: Global (all restaurants)</option>
-                <option value="restaurant">Scope: Single restaurant only</option>
-                <option value="department">Scope: Department</option>
-                <option value="own_records">Scope: Own records only</option>
-              </select>
-              <select name="scopeRestaurantId" id="teamScopeRestaurant" class="hidden">
-                <option value="">Select restaurant for scope</option>
-              </select>
-              <input name="phone" placeholder="Phone (optional)" />
-              <button class="btn btn-primary" type="submit">Create &amp; allocate role</button>
+            <div class="section-head">
+              <div>
+                <h3>Create team member</h3>
+                <p>Set <strong>email</strong>, <strong>password</strong>, and <strong>role type</strong> here. Staff log in at <em>Login → Team Staff</em> — role is assigned only by you, not on the login page.</p>
+              </div>
+            </div>
+            <form id="teamCreateForm" class="admin-form ma-team-form">
+              <fieldset class="ma-form-section">
+                <legend>Account credentials</legend>
+                <label class="auth-field"><span>Full name *</span><input name="name" placeholder="e.g. Priya Sharma" required /></label>
+                <label class="auth-field"><span>Login email *</span><input name="email" type="email" placeholder="staff@autoresto.in" required autocomplete="off" /></label>
+                <label class="auth-field"><span>Login password *</span><input name="password" type="password" placeholder="Min 8 characters" required minlength="8" autocomplete="new-password" /></label>
+              </fieldset>
+              <fieldset class="ma-form-section">
+                <legend>Role type *</legend>
+                <label class="auth-field">
+                  <span>Assigned role (decides which pages they see)</span>
+                  <select name="role" id="teamRoleSelect" required>
+                    <option value="">Select role type</option>
+                  </select>
+                </label>
+                <p id="teamRoleDescription" class="muted ma-role-hint"></p>
+              </fieldset>
+              <fieldset class="ma-form-section">
+                <legend>Access scope &amp; profile</legend>
+                <label class="auth-field">
+                  <span>Scope</span>
+                  <select name="scopeType" id="teamScopeType">
+                    <option value="global">Global — all restaurants</option>
+                    <option value="restaurant">Single restaurant only</option>
+                    <option value="department">Department</option>
+                    <option value="own_records">Own records only</option>
+                  </select>
+                </label>
+                <select name="scopeRestaurantId" id="teamScopeRestaurant" class="hidden">
+                  <option value="">Select restaurant for scope</option>
+                </select>
+                <label class="auth-field"><span>Username (optional)</span><input name="username" placeholder="Display username" pattern="[a-zA-Z0-9._-]{3,80}" /></label>
+                <label class="auth-field"><span>Phone (optional)</span><input name="phone" placeholder="Phone number" /></label>
+              </fieldset>
+              <button class="btn btn-primary admin-form__submit" type="submit">Create account &amp; assign role</button>
             </form>
+            <div id="teamCreateSuccess" class="ma-team-success hidden" aria-live="polite"></div>
           </article>
           <article class="panel ma-hover-card">
             <div class="section-head"><div><h3>Role permissions map</h3><p>What each role can access.</p></div></div>
@@ -561,7 +615,7 @@
       <div class="ma-tabs" id="profileTabs">
         <button type="button" class="ma-tab active" data-profile-tab="overview">Overview</button>
             <button type="button" class="ma-tab" data-profile-tab="features">Features &amp; Upgrades</button>
-        <button type="button" class="ma-tab" data-profile-tab="financial">Financial</button>
+        <button type="button" class="ma-tab" data-profile-tab="financial">Bank &amp; GST</button>
         <button type="button" class="ma-tab" data-profile-tab="upgrades">Upgrades</button>
         <button type="button" class="ma-tab" data-profile-tab="payouts">Payouts</button>
       </div>

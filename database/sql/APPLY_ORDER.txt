@@ -24,6 +24,7 @@ Apply order (psql examples):
   psql "$DATABASE_URL" -f database/sql/013_restaurant_hub_features.sql
   psql "$DATABASE_URL" -f database/sql/014_exports_support_tickets.sql
   psql "$DATABASE_URL" -f database/sql/015_platform_roles_catalog.sql
+  psql "$DATABASE_URL" -f database/sql/016_platform_settings.sql
 
 Or apply all at once (after reviewing each file):
 

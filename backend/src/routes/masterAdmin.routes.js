@@ -863,4 +863,82 @@ router.post('/upgrade-activations/:id/reject', requirePlatformPermission('upgrad
   return res.json({ activation: rows[0] });
 }));
 
+const PAYOUT_BANK_KEY = 'autoresto_payout_bank';
+
+function normalizePayoutBankRow(row) {
+  const value = row?.setting_value || {};
+  const last4 = value.accountNumberLast4 || value.account_number_last4 || '';
+  return {
+    legalName: value.legalName || value.legal_name || '',
+    gstin: value.gstin || '',
+    accountHolderName: value.accountHolderName || value.account_holder_name || '',
+    bankName: value.bankName || value.bank_name || '',
+    ifscCode: value.ifscCode || value.ifsc_code || '',
+    upiVpa: value.upiVpa || value.upi_vpa || '',
+    notes: value.notes || '',
+    accountMasked: last4 ? `XXXX XXXX ${last4}` : '',
+    updatedAt: row?.updated_at || null,
+  };
+}
+
+router.get('/platform/payout-bank', requirePlatformPermission('bank_details.manage'), asyncHandler(async (req, res) => {
+  const { rows } = await pool.query(
+    `SELECT setting_value, updated_at FROM platform_settings WHERE setting_key = $1`,
+    [PAYOUT_BANK_KEY]
+  );
+  return res.json({ payoutBank: normalizePayoutBankRow(rows[0] || { setting_value: {} }) });
+}));
+
+router.patch('/platform/payout-bank', requirePlatformPermission('bank_details.manage'), asyncHandler(async (req, res) => {
+  const body = req.body || {};
+  const { rows: existingRows } = await pool.query(
+    `SELECT setting_value FROM platform_settings WHERE setting_key = $1`,
+    [PAYOUT_BANK_KEY]
+  );
+  const existing = existingRows[0]?.setting_value || {};
+  const rawAccount = String(body.accountNumber || '').replace(/\s/g, '');
+  const last4 = rawAccount.length >= 4 ? rawAccount.slice(-4) : (existing.accountNumberLast4 || existing.account_number_last4 || '');
+  const encrypted = rawAccount.length >= 4 && process.env.BANK_ENCRYPTION_KEY
+    ? crypto.createHmac('sha256', process.env.BANK_ENCRYPTION_KEY).update(rawAccount).digest('hex')
+    : (existing.accountNumberEncrypted || existing.account_number_encrypted || null);
+
+  const nextValue = {
+    legalName: body.legalName ?? existing.legalName ?? existing.legal_name ?? '',
+    gstin: body.gstin ?? existing.gstin ?? '',
+    accountHolderName: body.accountHolderName ?? existing.accountHolderName ?? existing.account_holder_name ?? '',
+    bankName: body.bankName ?? existing.bankName ?? existing.bank_name ?? '',
+    ifscCode: body.ifscCode ?? existing.ifscCode ?? existing.ifsc_code ?? '',
+    upiVpa: body.upiVpa ?? existing.upiVpa ?? existing.upi_vpa ?? '',
+    notes: body.notes ?? existing.notes ?? '',
+    accountNumberLast4: last4 || null,
+    accountNumberEncrypted: encrypted,
+  };
+
+  const { rows } = await pool.query(
+    `INSERT INTO platform_settings (setting_key, setting_value, updated_by_user_id)
+     VALUES ($1, $2::jsonb, $3)
+     ON CONFLICT (setting_key)
+     DO UPDATE SET
+       setting_value = EXCLUDED.setting_value,
+       updated_at = CURRENT_TIMESTAMP,
+       updated_by_user_id = EXCLUDED.updated_by_user_id
+     RETURNING setting_value, updated_at`,
+    [PAYOUT_BANK_KEY, JSON.stringify(nextValue), req.user.userId]
+  );
+
+  await writeAuditLog({
+    actorUserId: req.user.userId,
+    actorRole: req.user.role,
+    action: 'platform_payout_bank_updated',
+    resourceType: 'platform_settings',
+    resourceId: PAYOUT_BANK_KEY,
+    ipAddress: req.ip,
+  });
+
+  return res.json({
+    message: 'AutoResto payout bank details saved',
+    payoutBank: normalizePayoutBankRow(rows[0]),
+  });
+}));
+
 module.exports = router;
