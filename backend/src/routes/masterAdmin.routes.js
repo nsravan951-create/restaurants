@@ -613,6 +613,41 @@ router.get('/features/registry', requirePlatformPermission('features.view'), asy
   return res.json({ features: rows });
 }));
 
+router.patch('/restaurants/:restaurantId/features', requirePlatformPermission('features.manage'), asyncHandler(async (req, res) => {
+  const restaurantId = Number(req.params.restaurantId);
+  const items = Array.isArray(req.body?.features) ? req.body.features : [];
+  if (!items.length) {
+    return res.status(400).json({ message: 'features array is required' });
+  }
+
+  for (const item of items) {
+    const featureKey = String(item.key || item.featureKey || '').trim();
+    const enabled = item.enabled !== false;
+    if (!featureKey) continue;
+    await pool.query(
+      `INSERT INTO restaurant_features (restaurant_id, feature_id, enabled, source)
+       SELECT $1, id, $3, 'admin' FROM features WHERE feature_key = $2
+       ON CONFLICT (restaurant_id, feature_id)
+       DO UPDATE SET enabled = EXCLUDED.enabled, source = 'admin', updated_at = CURRENT_TIMESTAMP`,
+      [restaurantId, featureKey, enabled]
+    );
+  }
+
+  await writeAuditLog({
+    actorUserId: req.user.userId,
+    actorRole: req.user.role,
+    restaurantId,
+    action: 'features_bulk_updated',
+    resourceType: 'restaurant',
+    resourceId: restaurantId,
+    metadata: { count: items.length },
+    ipAddress: req.ip,
+  });
+
+  const features = await listRestaurantFeatures(restaurantId);
+  return res.json({ features });
+}));
+
 router.post('/restaurants/:restaurantId/features/:featureKey', requirePlatformPermission('features.manage'), asyncHandler(async (req, res) => {
   const restaurantId = Number(req.params.restaurantId);
   const featureKey = String(req.params.featureKey || '').trim();

@@ -3,48 +3,86 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Owner Auth</title>
+    <title>AutoResto — Login</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@600;700&family=Sora:wght@400;500;600&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="../assets/css/styles.css" />
+    <link rel="stylesheet" href="../assets/css/master-admin.css" />
   </head>
-  <body>
+  <body class="theme-dark">
     <main class="auth-page">
       <section class="panel auth-panel auth-hero">
         <div class="auth-hero__copy">
-          <p class="eyebrow">Restaurant SaaS</p>
-          <h1>One platform for dine-in, delivery, promos, and invoices.</h1>
-          <p class="hero-copy">Sign in to manage restaurants, track Swiggy/Zomato orders, publish promotions, and make every restaurant owner feel the power of a modern SaaS dashboard.</p>
-          <div class="hero-actions">
-            <span class="badge badge--success">SaaS analytics</span>
-            <span class="badge badge--soft">Platform orders</span>
-            <span class="badge badge--premium">Promotions grid</span>
-          </div>
+          <p class="eyebrow">AutoResto SaaS</p>
+          <h1>One platform for restaurants, payments, and growth.</h1>
+          <p class="hero-copy">Owners manage their restaurant. Team staff login with email, password, and assigned role type.</p>
         </div>
 
-        <div class="auth-card-grid">
+        <div class="auth-tabs" role="tablist">
+          <button type="button" class="auth-tab active" data-auth-tab="owner">Restaurant Owner</button>
+          <button type="button" class="auth-tab" data-auth-tab="team">Team Staff</button>
+          <button type="button" class="auth-tab" data-auth-tab="register">Register</button>
+        </div>
+
+        <div id="authPanelOwner" class="auth-panel-view">
+          <form id="ownerLoginForm" class="stack auth-card auth-card--glass">
+            <h2>Owner login</h2>
+            <label class="auth-field">
+              <span>Email</span>
+              <input name="email" type="email" placeholder="owner@restaurant.com" required autocomplete="username" />
+            </label>
+            <label class="auth-field">
+              <span>Password</span>
+              <input name="password" type="password" placeholder="Your password" required autocomplete="current-password" />
+            </label>
+            <button class="btn btn-primary" type="submit">Login to Owner Dashboard</button>
+          </form>
+        </div>
+
+        <div id="authPanelTeam" class="auth-panel-view hidden">
+          <form id="teamLoginForm" class="stack auth-card auth-card--glass">
+            <h2>Team staff login</h2>
+            <p class="hero-copy" style="margin:0;">Use the email and password allocated by Super Admin. Your role type decides which pages you see.</p>
+            <label class="auth-field">
+              <span>Email</span>
+              <input name="email" type="email" placeholder="staff@autoresto.in" required autocomplete="username" />
+            </label>
+            <label class="auth-field">
+              <span>Password</span>
+              <input name="password" type="password" placeholder="Password from admin" required autocomplete="current-password" />
+            </label>
+            <label class="auth-field">
+              <span>Role type (optional check)</span>
+              <select name="roleHint">
+                <option value="">Any team role</option>
+                <option value="payment_manager">Payment Manager</option>
+                <option value="ads_manager">Ads Manager</option>
+                <option value="restaurant_manager">Restaurant Manager</option>
+                <option value="registration_manager">Registration Manager</option>
+                <option value="features_manager">Features Manager</option>
+                <option value="finance_manager">Finance Manager</option>
+                <option value="support_manager">Support Manager</option>
+                <option value="analytics_manager">Analytics Manager</option>
+                <option value="super_admin">Super Admin</option>
+              </select>
+            </label>
+            <button class="btn btn-primary" type="submit">Login to Team Workspace</button>
+            <small class="muted">Super Admin? Select Super Admin above or use Owner tab — you will be sent to Admin Control Center.</small>
+          </form>
+        </div>
+
+        <div id="authPanelRegister" class="auth-panel-view hidden">
           <form id="registerForm" class="stack auth-card auth-card--glass">
-            <h2>Register</h2>
-            <input name="name" placeholder="Owner Name" required />
+            <h2>Register new restaurant</h2>
+            <input name="name" placeholder="Owner name" required />
             <input name="email" type="email" placeholder="Email" required />
             <input name="password" type="password" placeholder="Password" required />
-            <input name="restaurantName" placeholder="Restaurant Name" required />
-            <input name="totalTables" type="number" min="1" max="500" placeholder="Total Tables" required />
+            <input name="restaurantName" placeholder="Restaurant name" required />
+            <input name="totalTables" type="number" min="1" max="500" placeholder="Total tables" required />
             <input name="phone" placeholder="Phone" />
             <input name="address" placeholder="Address" />
-            <button class="btn btn-primary" type="submit">Create Account</button>
-          </form>
-
-          <form id="loginForm" class="stack auth-card auth-card--glass">
-            <h2>Login</h2>
-            <input name="email" type="email" placeholder="Email" required />
-            <input name="password" type="password" placeholder="Password" required />
-            <button class="btn btn-dark" type="submit">Login</button>
-
-            <small>
-              Super admin should login here too, then open Admin panel.
-            </small>
+            <button class="btn btn-primary" type="submit">Create account</button>
           </form>
         </div>
 

@@ -1,4 +1,5 @@
 const pool = require('../config/db');
+const { resolveFeatureRow } = require('./featureResolution');
 
 async function getRestaurantIdForUser(user) {
   if (!user?.userId) return null;
@@ -25,31 +26,36 @@ async function getRestaurantIdForUser(user) {
   return null;
 }
 
-async function hasFeature(restaurantId, featureKey) {
-  const { rows } = await pool.query(
-    `SELECT EXISTS (
-       SELECT 1
-       FROM features f
-       LEFT JOIN restaurant_features rf
-         ON rf.feature_id = f.id
-        AND rf.restaurant_id = $1
-        AND rf.enabled = TRUE
-        AND (rf.starts_at IS NULL OR rf.starts_at <= CURRENT_TIMESTAMP)
-        AND (rf.ends_at IS NULL OR rf.ends_at >= CURRENT_TIMESTAMP)
-       LEFT JOIN plan_features pf ON pf.feature_id = f.id
-       LEFT JOIN subscriptions s
-         ON s.plan_id = pf.plan_id
+const FEATURE_RESOLUTION_SQL = `
+  SELECT
+    f.feature_key,
+    f.name,
+    rf.enabled AS admin_enabled,
+    rf.source AS admin_source,
+    rf.id AS override_id,
+    EXISTS (
+      SELECT 1
+      FROM plan_features pf
+      INNER JOIN subscriptions s ON s.plan_id = pf.plan_id
+      WHERE pf.feature_id = f.id
         AND s.restaurant_id = $1
         AND s.status = 'active'
         AND (s.starts_at IS NULL OR s.starts_at <= CURRENT_TIMESTAMP)
         AND (s.ends_at IS NULL OR s.ends_at >= CURRENT_TIMESTAMP)
-       WHERE f.feature_key = $2
-         AND f.is_active = TRUE
-         AND (rf.feature_id IS NOT NULL OR s.id IS NOT NULL)
-     ) AS enabled`,
+    ) AS from_plan
+  FROM features f
+  LEFT JOIN restaurant_features rf
+    ON rf.feature_id = f.id AND rf.restaurant_id = $1
+  WHERE f.is_active = TRUE
+`;
+
+async function hasFeature(restaurantId, featureKey) {
+  const { rows } = await pool.query(
+    `${FEATURE_RESOLUTION_SQL} AND f.feature_key = $2 LIMIT 1`,
     [restaurantId, featureKey]
   );
-  return Boolean(rows[0]?.enabled);
+  if (!rows.length) return false;
+  return resolveFeatureRow(rows[0]).enabled;
 }
 
 function requireFeature(featureKey) {
@@ -74,26 +80,10 @@ function requireFeature(featureKey) {
 
 async function listRestaurantFeatures(restaurantId) {
   const { rows } = await pool.query(
-    `SELECT f.feature_key, f.name,
-            EXISTS (
-              SELECT 1 FROM restaurant_features rf
-              WHERE rf.restaurant_id = $1 AND rf.feature_id = f.id AND rf.enabled = TRUE
-                AND (rf.starts_at IS NULL OR rf.starts_at <= CURRENT_TIMESTAMP)
-                AND (rf.ends_at IS NULL OR rf.ends_at >= CURRENT_TIMESTAMP)
-            ) OR EXISTS (
-              SELECT 1
-              FROM plan_features pf
-              INNER JOIN subscriptions s ON s.plan_id = pf.plan_id
-              WHERE pf.feature_id = f.id AND s.restaurant_id = $1 AND s.status = 'active'
-                AND (s.starts_at IS NULL OR s.starts_at <= CURRENT_TIMESTAMP)
-                AND (s.ends_at IS NULL OR s.ends_at >= CURRENT_TIMESTAMP)
-            ) AS enabled
-     FROM features f
-     WHERE f.is_active = TRUE
-     ORDER BY f.name`,
+    `${FEATURE_RESOLUTION_SQL} ORDER BY f.name`,
     [restaurantId]
   );
-  return rows;
+  return rows.map(resolveFeatureRow);
 }
 
 module.exports = {

@@ -85,8 +85,8 @@
           <button type="button" class="ma-filter-btn active" data-range="30d">30 Days</button>
           <button type="button" class="ma-filter-btn" data-range="month">This Month</button>
         </div>
-        <div id="masterMetrics" class="summary-grid"></div>
-        <div id="summaryCards" class="summary-grid"></div>
+        <div id="masterMetrics" class="summary-grid ma-dashboard-metrics"></div>
+        <div id="summaryCards" class="summary-grid ma-dashboard-secondary hidden"></div>
         <div class="admin-grid-2">
           <article class="panel">
             <div class="section-head"><div><h3>Revenue trend</h3><p>Last 14 days across all restaurants.</p></div></div>
@@ -374,13 +374,14 @@
           <article class="panel ma-hover-card">
             <div class="section-head"><div><h3>Create team member</h3><p>Allocate username, email, password, and role.</p></div></div>
             <form id="teamCreateForm" class="admin-form">
-              <input name="name" placeholder="Full name" required />
-              <input name="username" placeholder="Username (optional, for login display)" pattern="[a-zA-Z0-9._-]{3,80}" />
-              <input name="email" type="email" placeholder="Login email" required />
-              <input name="password" type="password" placeholder="Password (min 8 chars)" required minlength="8" />
+              <label class="auth-field"><span>Full name</span><input name="name" placeholder="Full name" required /></label>
+              <label class="auth-field"><span>Username (optional)</span><input name="username" placeholder="Display username" pattern="[a-zA-Z0-9._-]{3,80}" /></label>
+              <label class="auth-field"><span>Login email *</span><input name="email" type="email" placeholder="staff@autoresto.in" required /></label>
+              <label class="auth-field"><span>Password *</span><input name="password" type="password" placeholder="Min 8 characters" required minlength="8" /></label>
+              <label class="auth-field"><span>Role type *</span>
               <select name="role" id="teamRoleSelect" required>
-                <option value="">Select role</option>
-              </select>
+                <option value="">Select role type</option>
+              </select></label>
               <p id="teamRoleDescription" class="muted" style="margin:0;"></p>
               <select name="scopeType" id="teamScopeType">
                 <option value="global">Scope: Global (all restaurants)</option>
@@ -525,6 +526,28 @@
     </main>
   </div>
 
+  <div id="upgradeActivateModal" class="bill-modal hidden" aria-hidden="true">
+    <div class="bill-modal__sheet ma-profile-sheet" role="dialog">
+      <header class="bill-modal__head">
+        <div>
+          <p class="eyebrow">Activate upgrade</p>
+          <h2 id="upgradeModalTitle">Enable features after payment</h2>
+          <p id="upgradeModalMeta" class="admin-intro"></p>
+        </div>
+        <button id="closeUpgradeModal" class="btn btn-light" type="button">✕</button>
+      </header>
+      <div class="bill-modal__body">
+        <p class="muted">Select features to enable for this restaurant:</p>
+        <div id="upgradeFeaturePicker" class="ma-feature-grid"></div>
+        <div class="admin-toolbar" style="margin-top:1rem;">
+          <button type="button" class="btn btn-light" id="upgradeSelectAll">Select all</button>
+          <button type="button" class="btn btn-light" id="upgradeClearAll">Clear all</button>
+          <button type="button" class="btn btn-primary" id="upgradeConfirmBtn">Activate &amp; enable</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <div id="restaurantProfileModal" class="bill-modal hidden" aria-hidden="true">
     <div class="bill-modal__sheet ma-profile-sheet" role="dialog">
       <header class="bill-modal__head">
@@ -537,7 +560,7 @@
       </header>
       <div class="ma-tabs" id="profileTabs">
         <button type="button" class="ma-tab active" data-profile-tab="overview">Overview</button>
-        <button type="button" class="ma-tab" data-profile-tab="features">Features</button>
+            <button type="button" class="ma-tab" data-profile-tab="features">Features &amp; Upgrades</button>
         <button type="button" class="ma-tab" data-profile-tab="financial">Financial</button>
         <button type="button" class="ma-tab" data-profile-tab="upgrades">Upgrades</button>
         <button type="button" class="ma-tab" data-profile-tab="payouts">Payouts</button>

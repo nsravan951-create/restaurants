@@ -19,6 +19,9 @@
     featureRegistry: [],
     supportStatus: '',
     selectedTicketId: null,
+    dashboardRange: '30d',
+    pendingUpgradeId: null,
+    dashboardLoading: false,
   };
 
   const currencyFormatter = new Intl.NumberFormat('en-IN', {
@@ -56,7 +59,10 @@
     state.activeSection = section;
     document.querySelectorAll('.admin-section').forEach((node) => node.classList.add('hidden'));
     const target = document.getElementById(`section-${section}`);
-    if (target) target.classList.remove('hidden');
+    if (target) {
+      target.classList.remove('hidden');
+      target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
 
     document.querySelectorAll('.admin-link[data-section]').forEach((button) => {
       button.classList.toggle('active', button.dataset.section === section);
@@ -804,12 +810,59 @@
     if (state.platformOrders.length) renderPlatformOrders([]);
   }
 
+  function renderDashboardSkeleton() {
+    const root = el('masterMetrics');
+    if (!root) return;
+    root.innerHTML = Array.from({ length: 8 }).map(() => `
+      <article class="summary-card ma-skeleton-card"><p>&nbsp;</p><strong>&nbsp;</strong></article>
+    `).join('');
+  }
+
   async function loadDashboard() {
-    setMessage('Loading dashboard...');
-    const data = await apiRequest('/api/admin/dashboard', {}, true);
-    state.dashboard = data;
-    renderAll();
-    setMessage('Dashboard ready.');
+    if (state.dashboardLoading) return;
+    state.dashboardLoading = true;
+    renderDashboardSkeleton();
+    try {
+      const range = state.dashboardRange || '30d';
+      const [dash, metricsData] = await Promise.all([
+        apiRequest('/api/admin/dashboard', {}, true),
+        apiRequest(`/api/master-admin/dashboard?range=${encodeURIComponent(range)}`, {}, true).catch(() => null),
+      ]);
+      state.dashboard = dash;
+      state.masterMetricsData = metricsData?.metrics || null;
+      renderAll();
+      renderUnifiedMetrics(dash, metricsData);
+      setMessage('');
+    } catch (error) {
+      setMessage(error.message, true);
+    } finally {
+      state.dashboardLoading = false;
+    }
+  }
+
+  function renderUnifiedMetrics(dash, metricsData) {
+    const summary = dash?.summary || {};
+    const m = metricsData?.metrics || {};
+    const root = el('masterMetrics');
+    if (!root) return;
+
+    const cards = [
+      ['Restaurants', m.total_restaurants ?? summary.totalRestaurants ?? 0],
+      ['Active', m.active_restaurants ?? summary.activeRestaurants ?? 0],
+      ['Period orders', m.period_orders ?? summary.totalOrders ?? 0],
+      ['Today orders', m.today_orders ?? summary.activeOrders ?? 0],
+      ['Period GMV', formatMoney(m.period_gmv ?? summary.monthlyRevenue ?? 0)],
+      ['Today GMV', formatMoney(m.today_gmv ?? summary.todayRevenue ?? 0)],
+      ['Commission', formatMoney(m.period_commission ?? 0)],
+      ['Pending settlements', m.pending_settlements ?? 0],
+    ];
+
+    root.innerHTML = cards.map(([label, value]) => `
+      <article class="summary-card ma-hover-card ma-metric-enter">
+        <p>${escapeHtml(label)}</p>
+        <strong>${escapeHtml(String(value))}</strong>
+      </article>
+    `).join('');
   }
 
   // ===== OPERATIONS DASHBOARD =====
@@ -1373,8 +1426,18 @@
       btn.addEventListener('click', () => {
         document.querySelectorAll('#dashboardRangeFilters .ma-filter-btn').forEach((b) => b.classList.remove('active'));
         btn.classList.add('active');
-        loadMasterMetrics(btn.dataset.range).catch(() => {});
+        state.dashboardRange = btn.dataset.range || '30d';
+        loadDashboard().catch((e) => setMessage(e.message, true));
       });
+    });
+
+    el('closeUpgradeModal')?.addEventListener('click', closeUpgradeModal);
+    el('upgradeConfirmBtn')?.addEventListener('click', () => confirmUpgradeActivation().catch((e) => setMessage(e.message, true)));
+    el('upgradeSelectAll')?.addEventListener('click', () => {
+      document.querySelectorAll('.upgrade-feature-cb').forEach((cb) => { cb.checked = true; });
+    });
+    el('upgradeClearAll')?.addEventListener('click', () => {
+      document.querySelectorAll('.upgrade-feature-cb').forEach((cb) => { cb.checked = false; });
     });
 
     // Attach messaging events
@@ -1743,12 +1806,32 @@
   async function handleTeamCreate(event) {
     event.preventDefault();
     const form = event.target;
-    const payload = Object.fromEntries(new FormData(form).entries());
-    if (!payload.scopeRestaurantId) delete payload.scopeRestaurantId;
-    if (!payload.username) delete payload.username;
+    const fd = new FormData(form);
+    const payload = {
+      name: String(fd.get('name') || '').trim(),
+      email: String(fd.get('email') || '').trim(),
+      password: String(fd.get('password') || ''),
+      role: String(fd.get('role') || '').trim(),
+      phone: String(fd.get('phone') || '').trim(),
+      scopeType: String(fd.get('scopeType') || 'global'),
+    };
+    if (!payload.name || !payload.email || !payload.password || !payload.role) {
+      setMessage('Name, email, password, and role type are required.', true);
+      return;
+    }
+    if (payload.password.length < 8) {
+      setMessage('Password must be at least 8 characters.', true);
+      return;
+    }
+    const username = String(fd.get('username') || '').trim();
+    if (username) payload.username = username;
+    if (payload.scopeType === 'restaurant' && fd.get('scopeRestaurantId')) {
+      payload.scopeRestaurantId = Number(fd.get('scopeRestaurantId'));
+    }
     await apiRequest('/api/team/members', { method: 'POST', body: JSON.stringify(payload) }, true);
     form.reset();
-    setMessage('Team member created with allocated role.');
+    el('teamRoleDescription').textContent = '';
+    setMessage(`Team member created. They can login at auth page → Team Staff with email ${payload.email}.`);
     await loadTeamPanel();
   }
 
@@ -1912,39 +1995,90 @@
     `;
   }
 
+  async function toggleRestaurantFeature(featureKey, enabled) {
+    const result = await apiRequest(
+      `/api/master-admin/restaurants/${state.profileRestaurantId}/features/${encodeURIComponent(featureKey)}`,
+      { method: 'POST', body: JSON.stringify({ enabled }) },
+      true
+    );
+    state.profileData.features = result.features || state.profileData.features;
+    return result;
+  }
+
   function renderProfileFeatures(data) {
     const features = data.features || [];
-    el('profileTabFeatures').innerHTML = `
-      <p class="muted">Toggle features for this restaurant. Changes apply immediately.</p>
-      <div class="ma-feature-grid">
+    const panel = el('profileTabFeatures');
+    panel.innerHTML = `
+      <div class="admin-toolbar" style="margin-bottom:0.75rem;">
+        <p class="muted" style="margin:0;">Admin override beats plan. Disabled here blocks the feature even if subscribed.</p>
+        <button type="button" class="btn btn-light btn-sm" id="featuresEnableAll">Enable all</button>
+        <button type="button" class="btn btn-light btn-sm" id="featuresDisableAll">Disable all</button>
+      </div>
+      <div class="ma-feature-grid" id="profileFeatureGrid">
         ${features.map((f) => `
           <label class="ma-feature-toggle">
-            <input type="checkbox" data-feature-toggle="${escapeHtml(f.feature_key)}" ${f.enabled ? 'checked' : ''} />
+            <input type="checkbox" class="ma-toggle-input" data-feature-toggle="${f.feature_key}" ${f.enabled ? 'checked' : ''} />
+            <span class="ma-toggle-switch" aria-hidden="true"></span>
             <span>
               <strong>${escapeHtml(f.name || f.feature_key)}</strong>
               <small>${escapeHtml(f.feature_key)}</small>
+              <span class="ma-badge ma-badge--${f.source === 'plan' ? 'success' : f.source === 'admin' ? 'warn' : 'muted'}">${escapeHtml(f.source || 'none')}</span>
             </span>
           </label>
         `).join('')}
       </div>
     `;
 
-    el('profileTabFeatures').querySelectorAll('[data-feature-toggle]').forEach((input) => {
+    panel.querySelectorAll('[data-feature-toggle]').forEach((input) => {
       input.addEventListener('change', async () => {
         const featureKey = input.dataset.featureToggle;
+        const wantEnabled = input.checked;
+        input.disabled = true;
         try {
-          const result = await apiRequest(
-            `/api/master-admin/restaurants/${state.profileRestaurantId}/features/${featureKey}`,
-            { method: 'POST', body: JSON.stringify({ enabled: input.checked }) },
-            true
-          );
-          state.profileData.features = result.features || state.profileData.features;
-          setMessage(`Feature ${featureKey} ${input.checked ? 'enabled' : 'disabled'}.`);
+          await toggleRestaurantFeature(featureKey, wantEnabled);
+          setMessage(`Feature "${featureKey}" ${wantEnabled ? 'enabled' : 'disabled'}.`);
+          renderProfileFeatures(state.profileData);
         } catch (error) {
-          input.checked = !input.checked;
+          input.checked = !wantEnabled;
           setMessage(error.message, true);
+        } finally {
+          input.disabled = false;
         }
       });
+    });
+
+    el('featuresEnableAll')?.addEventListener('click', async () => {
+      try {
+        await apiRequest(`/api/master-admin/restaurants/${state.profileRestaurantId}/features`, {
+          method: 'PATCH',
+          body: JSON.stringify({
+            features: features.map((f) => ({ key: f.feature_key, enabled: true })),
+          }),
+        }, true);
+        const profile = await apiRequest(`/api/master-admin/restaurants/${state.profileRestaurantId}/profile`, {}, true);
+        state.profileData = profile;
+        renderProfileFeatures(profile);
+        setMessage('All features enabled.');
+      } catch (error) {
+        setMessage(error.message, true);
+      }
+    });
+
+    el('featuresDisableAll')?.addEventListener('click', async () => {
+      try {
+        await apiRequest(`/api/master-admin/restaurants/${state.profileRestaurantId}/features`, {
+          method: 'PATCH',
+          body: JSON.stringify({
+            features: features.map((f) => ({ key: f.feature_key, enabled: false })),
+          }),
+        }, true);
+        const profile = await apiRequest(`/api/master-admin/restaurants/${state.profileRestaurantId}/profile`, {}, true);
+        state.profileData = profile;
+        renderProfileFeatures(profile);
+        setMessage('All features disabled.');
+      } catch (error) {
+        setMessage(error.message, true);
+      }
     });
   }
 
@@ -2075,7 +2209,11 @@
               <td><span class="ma-badge ma-badge--${item.status === 'pending' ? 'warn' : item.status === 'activated' ? 'success' : 'muted'}">${escapeHtml(item.status)}</span></td>
               <td class="ma-actions-cell">
                 ${item.status === 'pending' ? `
-                  <button class="btn btn-primary btn-sm" type="button" data-activate-upgrade="${item.id}">Activate</button>
+                  <button class="btn btn-primary btn-sm" type="button"
+                    data-activate-upgrade="${item.id}"
+                    data-restaurant-name="${escapeHtml(item.restaurant_name)}"
+                    data-amount="${item.amount}"
+                    data-provider="${escapeHtml(item.provider_order_id || '')}">Activate</button>
                   <button class="btn btn-light btn-sm" type="button" data-reject-upgrade="${item.id}">Reject</button>
                   <button class="btn btn-light btn-sm" type="button" data-manage-restaurant="${item.restaurant_id}">Manage</button>
                 ` : `<button class="btn btn-light btn-sm" type="button" data-manage-restaurant="${item.restaurant_id}">Manage</button>`}
@@ -2087,7 +2225,11 @@
     ` || '<p class="muted">No items in this queue.</p>';
 
     root.querySelectorAll('[data-activate-upgrade]').forEach((btn) => {
-      btn.addEventListener('click', () => activateUpgrade(Number(btn.dataset.activateUpgrade)));
+      btn.addEventListener('click', () => activateUpgrade(Number(btn.dataset.activateUpgrade), {
+        restaurantName: btn.dataset.restaurantName,
+        amount: btn.dataset.amount,
+        provider: btn.dataset.provider,
+      }));
     });
     root.querySelectorAll('[data-reject-upgrade]').forEach((btn) => {
       btn.addEventListener('click', () => rejectUpgrade(Number(btn.dataset.rejectUpgrade)));
@@ -2097,24 +2239,49 @@
     });
   }
 
-  async function activateUpgrade(id) {
-    const featureKeys = state.featureRegistry.map((f) => f.feature_key);
-    const selected = prompt(
-      'Enter feature keys to enable (comma-separated), or leave blank to mark paid only:',
-      featureKeys.slice(0, 5).join(', ')
-    );
-    const keys = selected ? selected.split(',').map((k) => k.trim()).filter(Boolean) : [];
+  function closeUpgradeModal() {
+    el('upgradeActivateModal')?.classList.add('hidden');
+    state.pendingUpgradeId = null;
+  }
+
+  async function openUpgradeModal(id, meta = {}) {
+    state.pendingUpgradeId = id;
+    await loadFeatureRegistry();
+    el('upgradeModalTitle').textContent = meta.restaurantName
+      ? `Activate — ${meta.restaurantName}`
+      : 'Activate upgrade payment';
+    el('upgradeModalMeta').textContent = meta.amount
+      ? `Paid ${formatMoney(meta.amount)} · ${meta.provider || 'Cashfree'}`
+      : 'Mark payment verified and enable selected features.';
+    const picker = el('upgradeFeaturePicker');
+    picker.innerHTML = (state.featureRegistry || []).map((f) => `
+      <label class="ma-feature-toggle">
+        <input type="checkbox" class="upgrade-feature-cb" value="${escapeHtml(f.feature_key)}" checked />
+        <span><strong>${escapeHtml(f.name || f.feature_key)}</strong><small>${escapeHtml(f.feature_key)}</small></span>
+      </label>
+    `).join('') || '<p class="muted">No features in registry.</p>';
+    el('upgradeActivateModal')?.classList.remove('hidden');
+  }
+
+  async function confirmUpgradeActivation() {
+    if (!state.pendingUpgradeId) return;
+    const keys = [...document.querySelectorAll('.upgrade-feature-cb:checked')].map((cb) => cb.value);
     try {
-      await apiRequest(`/api/master-admin/upgrade-activations/${id}/activate`, {
+      await apiRequest(`/api/master-admin/upgrade-activations/${state.pendingUpgradeId}/activate`, {
         method: 'POST',
         body: JSON.stringify({ featureKeys: keys }),
       }, true);
+      closeUpgradeModal();
       setMessage('Upgrade activated and features enabled.');
       await loadUpgradeQueue();
       await loadRestaurantHub();
     } catch (error) {
       setMessage(error.message, true);
     }
+  }
+
+  async function activateUpgrade(id, meta = {}) {
+    await openUpgradeModal(id, meta);
   }
 
   async function rejectUpgrade(id) {
@@ -2325,7 +2492,6 @@
 
     try {
       await loadDashboard();
-      await loadMasterMetrics('30d');
       await loadSaasProfits();
       toggleAdMediaFields();
     } catch (error) {
