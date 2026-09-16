@@ -13,6 +13,11 @@ const {
 } = require('../utils/qr');
 const { expireInactiveSessions } = require('../utils/tableSession');
 const { emitTableUpdate, emitOrderUpdate } = require('../services/socket');
+const {
+  getPublicMenuCategories,
+  orderMenuByCategories,
+  filterMenuByActiveCategories,
+} = require('../utils/menuCategories');
 
 const router = express.Router();
 
@@ -53,6 +58,9 @@ async function buildPublicTableContext({ restaurantId, tableId }) {
      ORDER BY category, name`,
     [restaurantId]
   );
+  const foodCategories = await getPublicMenuCategories(pool, restaurantId);
+  const filteredMenu = filterMenuByActiveCategories(menuRows, foodCategories);
+  const orderedMenu = orderMenuByCategories(filteredMenu, foodCategories);
 
   const { rows: activeSessionRows } = await pool.query(
     `SELECT id, expires_at
@@ -92,7 +100,8 @@ async function buildPublicTableContext({ restaurantId, tableId }) {
       expiresAt: session?.expires_at || null,
       reason: orderPlaced ? 'order_placed' : (session ? 'session_active' : null),
     },
-    menu: menuRows,
+    menu: orderedMenu,
+    foodCategories,
   };
 }
 

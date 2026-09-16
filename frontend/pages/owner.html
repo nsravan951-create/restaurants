@@ -8,42 +8,71 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@600;700&family=Sora:wght@400;500;600&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="../assets/css/styles.css" />
+    <link rel="stylesheet" href="../assets/css/owner-dashboard.css" />
     <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
   </head>
   <body>
-    <main class="dashboard-layout owner-shell">
-      <header class="panel owner-topbar">
-        <div>
-          <p class="eyebrow">Owner workspace</p>
-          <h1 id="ownerRestaurantName">Owner Dashboard</h1>
-          <p class="hero-copy">Use the left menu to switch between tables, menu, analytics, invoices, and password settings.</p>
-        </div>
-        <div class="toolbar">
-          <a class="btn btn-light" href="../index.html">Home</a>
-          <button id="themeToggleBtn" class="btn btn-light">Dark</button>
-          <button id="logoutBtn" class="btn btn-dark">Logout</button>
-        </div>
-      </header>
+    <div class="owner-app">
+      <div class="owner-app__overlay" id="sidebarOverlay" aria-hidden="true"></div>
 
-      <div class="owner-grid">
-        <aside class="panel owner-sidebar">
-          <p class="eyebrow">Sections</p>
-          <div class="sidebar-stack">
-            <button class="btn btn-light sidebar-link active" type="button" data-owner-section="tables">1. Tables</button>
-            <button class="btn btn-light sidebar-link" type="button" data-owner-section="menu">2. Food Items</button>
-            <button class="btn btn-light sidebar-link" type="button" data-owner-section="analytics">3. Total Analytics</button>
-            <button class="btn btn-light sidebar-link" type="button" data-owner-section="invoices">4. All Invoices History</button>
-            <button class="btn btn-light sidebar-link" type="button" data-owner-section="password">5. Password Change</button>
-            <button class="btn btn-light sidebar-link" type="button" data-owner-section="features">6. Premium Features</button>
-            <button class="btn btn-light sidebar-link" type="button" data-owner-section="kitchen">7. Kitchen Board</button>
-            <button class="btn btn-light sidebar-link" type="button" data-owner-section="ready">8. Ready Orders</button>
-            <button class="btn btn-light sidebar-link" type="button" data-owner-section="reviews">9. Reviews</button>
-            <button class="btn btn-light sidebar-link" type="button" data-owner-section="gst">10. GST & Invoice</button>
+      <div class="owner-app__layout">
+        <aside class="owner-sidebar" id="ownerSidebar" aria-label="Dashboard navigation">
+          <div class="owner-sidebar__brand">
+            <span class="owner-sidebar__brand-mark">AR</span>
+            <span>AutoResto</span>
           </div>
+          <nav id="ownerNav" class="owner-sidebar__nav" aria-label="Features"></nav>
         </aside>
 
-        <section class="owner-content">
-          <section class="panel dashboard-section" data-owner-section-panel="tables">
+        <div class="owner-main">
+          <header class="owner-header">
+            <button id="sidebarToggleBtn" class="owner-header__menu" type="button" aria-label="Open menu">☰</button>
+            <div class="owner-header__meta">
+              <h1 id="ownerRestaurantName">Owner Dashboard</h1>
+              <p id="ownerRestaurantMeta">Restaurant workspace</p>
+            </div>
+            <div class="owner-header__actions">
+              <span class="owner-status-pill" id="ownerStatusPill">Live</span>
+              <button id="notificationsBtn" class="btn btn-light" type="button" title="Notifications">🔔</button>
+              <button id="themeToggleBtn" class="btn btn-light" type="button">Dark</button>
+              <button id="logoutBtn" class="btn btn-dark" type="button">Logout</button>
+            </div>
+          </header>
+
+          <div class="owner-page-head" id="ownerPageHead">
+            <div class="owner-page-head__row">
+              <div>
+                <h2 id="ownerPageTitle">Dashboard</h2>
+                <p id="ownerPageDescription">Overview of your restaurant operations.</p>
+              </div>
+              <div id="ownerPageActions"></div>
+            </div>
+          </div>
+
+          <main class="owner-content">
+          <section class="panel dashboard-section" data-owner-section-panel="dashboard">
+            <div id="dashboardWidgets" class="od-widget-grid"></div>
+            <div class="analytics-grid">
+              <div class="panel soft-panel">
+                <h3>Recent Orders</h3>
+                <div id="dashboardRecentOrders" class="stack"></div>
+              </div>
+              <div class="panel soft-panel">
+                <h3>Table Status</h3>
+                <div id="dashboardTableSummary" class="stack"></div>
+              </div>
+            </div>
+          </section>
+
+          <section class="panel dashboard-section hidden" data-owner-section-panel="upgrade-gate">
+            <div class="od-upgrade-gate">
+              <div class="od-upgrade-gate__icon" id="upgradeGateIcon">🔒</div>
+              <h3 id="upgradeGateTitle">Premium feature</h3>
+              <p id="upgradeGateText">Upgrade your plan to unlock this feature.</p>
+              <button class="btn btn-primary" id="upgradeGateCta" type="button">View Upgrade Options</button>
+            </div>
+          </section>
+          <section class="panel dashboard-section hidden" data-owner-section-panel="tables">
             <div class="section-head">
               <div>
                 <h2>Tables & QR Codes</h2>
@@ -86,13 +115,30 @@
             <div class="section-head">
               <div>
                 <h2>Food Items</h2>
-                <p class="hero-copy">Add, edit, or delete menu items from here.</p>
+                <p class="hero-copy">Manage categories and menu items shown to QR customers.</p>
               </div>
             </div>
+
+            <div class="panel soft-panel" style="margin-bottom:1rem;padding:1rem;">
+              <div class="section-head" style="margin-bottom:0.75rem;">
+                <div>
+                  <h3>Food Categories</h3>
+                  <p class="hero-copy">Categories appear as horizontal pills on the customer menu.</p>
+                </div>
+              </div>
+              <form id="categoryForm" class="inline-form">
+                <input name="name" placeholder="New category (e.g. Biryani)" required />
+                <button class="btn btn-primary" type="submit">+ Add Category</button>
+              </form>
+              <div id="categoryList" class="stack" style="margin-top:0.85rem;"></div>
+            </div>
+
             <form id="menuForm" class="grid-3">
               <input name="name" placeholder="Item Name" required />
               <input name="price" type="number" step="0.01" placeholder="Price" required />
-              <input name="category" placeholder="Category" required />
+              <select name="category" id="menuCategorySelect" required>
+                <option value="">Select category</option>
+              </select>
               <input name="imageUrl" placeholder="Image URL" />
               <input name="description" placeholder="Description" />
               <button class="btn btn-primary" type="submit">Add Item</button>
@@ -101,7 +147,9 @@
               <input name="itemId" type="hidden" />
               <input name="name" placeholder="Item Name" required />
               <input name="price" type="number" step="0.01" placeholder="Price" required />
-              <input name="category" placeholder="Category" required />
+              <select name="category" id="menuEditCategorySelect" required>
+                <option value="">Select category</option>
+              </select>
               <input name="imageUrl" placeholder="Image URL" />
               <input name="description" placeholder="Description" />
               <button class="btn btn-dark" type="submit">Save Changes</button>
@@ -216,11 +264,40 @@
               <button class="btn btn-primary" type="submit">Save GST Settings</button>
             </form>
           </section>
-        </section>
+          </main>
+
+          <p id="ownerMessage" class="message" style="margin:0 1.25rem 1rem;"></p>
+        </div>
       </div>
 
-      <p id="ownerMessage" class="message"></p>
-    </main>
+      <aside id="floatingPromo" class="od-floating-promo hidden" aria-live="polite">
+        <div class="od-floating-promo__head">
+          <p class="od-floating-promo__title" id="floatingPromoTitle">✨ Upgrade AutoResto</p>
+          <button class="od-floating-promo__close" id="floatingPromoClose" type="button" aria-label="Dismiss">×</button>
+        </div>
+        <p class="od-floating-promo__body" id="floatingPromoBody">Unlock premium features for your restaurant.</p>
+        <p class="od-floating-promo__price" id="floatingPromoPrice"></p>
+        <div class="od-floating-promo__actions">
+          <button class="btn btn-primary" id="floatingPromoCta" type="button">View Upgrade</button>
+        </div>
+      </aside>
+
+      <div id="upgradeModal" class="od-upgrade-modal" aria-hidden="true">
+        <div class="od-upgrade-modal__sheet" role="dialog" aria-labelledby="upgradeModalTitle">
+          <header class="od-upgrade-modal__head">
+            <div>
+              <p class="eyebrow">AutoResto Plans</p>
+              <h2 id="upgradeModalTitle" style="margin:0;font-family:'Fraunces',serif;">Upgrade your restaurant</h2>
+              <p id="upgradeModalSubtitle" class="hero-copy" style="margin:0.35rem 0 0;">Compare plans and unlock premium tools.</p>
+            </div>
+            <button class="btn btn-light" id="upgradeModalClose" type="button" aria-label="Close">✕</button>
+          </header>
+          <div id="upgradeCurrentPlan" style="padding:1rem 1.25rem 0;"></div>
+          <div id="upgradePlanGrid" class="od-plan-grid"></div>
+          <p id="upgradePaymentNote" class="hero-copy" style="padding:0 1.25rem 1.25rem;margin:0;"></p>
+        </div>
+      </div>
+    </div>
 
     <div id="paymentAuthModal" class="bill-modal hidden" aria-hidden="true">
       <div class="bill-modal__sheet" role="dialog" aria-labelledby="paymentAuthTitle">

@@ -18,6 +18,7 @@ Apply order (psql examples):
   psql "$DATABASE_URL" -f database/sql/007_business_features.sql
   psql "$DATABASE_URL" -f database/sql/008_default_commission_rule.sql
   psql "$DATABASE_URL" -f database/sql/009_gst_invoice_team_kot.sql
+  psql "$DATABASE_URL" -f database/sql/010_menu_categories.sql
 
 Or apply all at once (after reviewing each file):
 

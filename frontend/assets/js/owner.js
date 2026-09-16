@@ -2,8 +2,375 @@ let restaurantId = null;
 let latestOrders = [];
 let restaurantProfile = null;
 let menuItemsCache = [];
+let menuCategoriesCache = [];
 let activeBillOrder = null;
 let activeBillTableId = null;
+let ownerEntitlements = new Map();
+let ownerSubscription = null;
+let ownerPlans = [];
+let activeNavSection = 'dashboard';
+let latestTablesCache = [];
+
+const OWNER_NAV = [
+  { group: 'Overview', section: 'dashboard', label: 'Dashboard', icon: 'grid', featureKey: null },
+  { group: 'Operations', section: 'kitchen', label: 'Kitchen', icon: 'flame', featureKey: 'kitchen' },
+  { group: 'Operations', section: 'ready', label: 'Ready Orders', icon: 'check', featureKey: 'orders' },
+  { group: 'Operations', section: 'tables', label: 'Tables & QR', icon: 'qr', featureKey: 'qr_ordering' },
+  { group: 'Operations', section: 'menu', label: 'Menu', icon: 'menu', featureKey: 'basic_menu' },
+  { group: 'Operations', section: 'invoices', label: 'Invoices', icon: 'invoice', featureKey: 'billing' },
+  { group: 'Growth', section: 'analytics', label: 'Analytics', icon: 'chart', featureKey: null },
+  { group: 'Growth', section: 'reviews', label: 'Reviews', icon: 'star', featureKey: null },
+  { group: 'Growth', section: 'inventory', label: 'Inventory', icon: 'box', featureKey: 'inventory', premium: true },
+  { group: 'Growth', section: 'offers', label: 'Offers', icon: 'tag', featureKey: 'offers', premium: true },
+  { group: 'Growth', section: 'coupons', label: 'Coupons', icon: 'ticket', featureKey: 'coupons', premium: true },
+  { group: 'Growth', section: 'customers', label: 'Customers', icon: 'users', featureKey: 'customer_management', premium: true },
+  { group: 'Growth', section: 'loyalty', label: 'Loyalty', icon: 'heart', featureKey: 'loyalty', premium: true },
+  { group: 'Growth', section: 'advanced-analytics', label: 'Advanced Analytics', icon: 'chart', featureKey: 'advanced_analytics', premium: true },
+  { group: 'Settings', section: 'gst', label: 'GST & Invoice', icon: 'settings', featureKey: null },
+  { group: 'Settings', section: 'password', label: 'Password', icon: 'lock', featureKey: null },
+  { group: 'Settings', section: 'features', label: 'Plans & Upgrade', icon: 'sparkles', featureKey: null },
+];
+
+const SECTION_META = {
+  dashboard: { title: 'Dashboard', description: 'Live overview of orders, revenue, and table status.', action: null },
+  kitchen: { title: 'Kitchen Board', description: 'Pending and preparing orders.', action: null },
+  ready: { title: 'Ready Orders', description: 'Orders ready for delivery.', action: null },
+  tables: { title: 'Tables & QR', description: 'Manage table boxes, QR codes, and payment details.', action: { label: 'Generate QR Codes', form: 'autoTableForm' } },
+  menu: { title: 'Menu', description: 'Add, edit, or remove food items.', action: null },
+  invoices: { title: 'Invoices', description: 'Browse synced invoices and receipts.', action: { label: 'Refresh', id: 'refreshInvoicesBtn' } },
+  analytics: { title: 'Analytics', description: 'Revenue, order volume, and popular items.', action: null },
+  reviews: { title: 'Reviews', description: 'Customer ratings after payment.', action: null },
+  gst: { title: 'GST & Invoice Settings', description: 'Legal billing details for tax invoices.', action: null },
+  password: { title: 'Password', description: 'Update your owner dashboard password.', action: null },
+  features: { title: 'Plans & Upgrade', description: 'See enabled features and upgrade options.', action: { label: 'View Upgrade', id: 'openUpgradeFromFeatures' } },
+  inventory: { title: 'Inventory', description: 'Track stock levels and low-stock alerts.', premium: true },
+  offers: { title: 'Offers', description: 'Create promotional offers for guests.', premium: true },
+  coupons: { title: 'Coupons', description: 'Discount codes and campaign management.', premium: true },
+  customers: { title: 'Customers', description: 'Guest profiles and order history.', premium: true },
+  loyalty: { title: 'Loyalty', description: 'Reward repeat customers.', premium: true },
+  'advanced-analytics': { title: 'Advanced Analytics', description: 'Deeper revenue and performance insights.', premium: true },
+};
+
+const NAV_ICONS = {
+  grid: '<svg class="owner-nav-item__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>',
+  flame: '<svg class="owner-nav-item__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3c2 4 5 5 5 9a5 5 0 1 1-10 0c0-4 3-5 5-9z"/></svg>',
+  check: '<svg class="owner-nav-item__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6 9 17l-5-5"/></svg>',
+  qr: '<svg class="owner-nav-item__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><path d="M14 14h3v3h-3zM17 17h3v3h-3z"/></svg>',
+  menu: '<svg class="owner-nav-item__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h10"/></svg>',
+  invoice: '<svg class="owner-nav-item__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16l4-2 4 2 4-2 4 2V8z"/></svg>',
+  chart: '<svg class="owner-nav-item__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19V5M4 19h16M8 17V9M12 17V7M16 17v-4"/></svg>',
+  star: '<svg class="owner-nav-item__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m12 2 3 7 7 1-5 5 1 7-6-3-6 3 1-7-5-5 7-1z"/></svg>',
+  box: '<svg class="owner-nav-item__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22 2 7l10-5 10 5-10 15z"/><path d="M2 7l10 5 10-5M12 12v10"/></svg>',
+  tag: '<svg class="owner-nav-item__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 12 12 20 4 12V4h8z"/><circle cx="9" cy="9" r="1.5"/></svg>',
+  ticket: '<svg class="owner-nav-item__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 9a2 2 0 0 1 0-4h16a2 2 0 0 1 0 4M4 15a2 2 0 0 0 0 4h16a2 2 0 0 0 0-4"/><path d="M9 5v14"/></svg>',
+  users: '<svg class="owner-nav-item__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="8" r="3"/><circle cx="17" cy="9" r="2"/><path d="M3 19c0-3 3-5 6-5s6 2 6 5M14 19c0-2 2-3 4-3"/></svg>',
+  heart: '<svg class="owner-nav-item__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20s-7-4.5-7-10a4 4 0 0 1 7-2 4 4 0 0 1 7 2c0 5.5-7 10-7 10z"/></svg>',
+  settings: '<svg class="owner-nav-item__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>',
+  lock: '<svg class="owner-nav-item__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>',
+  sparkles: '<svg class="owner-nav-item__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m12 3 1.5 4.5L18 9l-4.5 1.5L12 15l-1.5-4.5L6 9l4.5-1.5zM5 19l1 3 1-3 3-1-3-1-1-3-1 3-3 1z"/></svg>',
+};
+
+function promoDismissKey() {
+  return restaurantId ? `owner_promo_dismiss_${restaurantId}` : 'owner_promo_dismiss';
+}
+
+function isFeatureEnabled(featureKey) {
+  if (!featureKey) return true;
+  return ownerEntitlements.get(featureKey) === true;
+}
+
+function getLockedFeatureCount() {
+  return (Array.from(ownerEntitlements.entries()).filter(([, enabled]) => !enabled)).length;
+}
+
+function getUpgradePlan() {
+  const paid = ownerPlans.filter((plan) => Number(plan.price) > 0);
+  if (paid.length) return paid[paid.length - 1];
+  return ownerPlans.find((plan) => plan.code !== 'starter') || null;
+}
+
+function buildOwnerSidebar() {
+  const nav = document.getElementById('ownerNav');
+  if (!nav) return;
+
+  let html = '';
+  let lastGroup = '';
+  OWNER_NAV.forEach((item) => {
+    if (item.group !== lastGroup) {
+      html += `<p class="owner-sidebar__group-label">${escapeHtml(item.group)}</p>`;
+      lastGroup = item.group;
+    }
+    const locked = item.featureKey && !isFeatureEnabled(item.featureKey);
+    html += `
+      <button class="owner-nav-item${activeNavSection === item.section ? ' active' : ''}" type="button"
+        data-owner-section="${item.section}" data-feature-key="${item.featureKey || ''}" data-locked="${locked ? '1' : '0'}">
+        ${NAV_ICONS[item.icon] || ''}
+        <span>${escapeHtml(item.label)}</span>
+        ${locked ? '<span class="owner-nav-item__lock">Premium</span>' : ''}
+      </button>
+    `;
+  });
+  nav.innerHTML = html;
+
+  nav.querySelectorAll('[data-owner-section]').forEach((button) => {
+    button.addEventListener('click', async () => {
+      closeSidebarDrawer();
+      try {
+        await activateSection(button.dataset.ownerSection);
+      } catch (error) {
+        setMessage('ownerMessage', error.message, true);
+      }
+    });
+  });
+}
+
+function updatePageHeader(sectionName) {
+  const meta = SECTION_META[sectionName] || { title: 'Dashboard', description: '' };
+  const titleEl = document.getElementById('ownerPageTitle');
+  const descEl = document.getElementById('ownerPageDescription');
+  const actionsEl = document.getElementById('ownerPageActions');
+  if (titleEl) titleEl.textContent = meta.title;
+  if (descEl) descEl.textContent = meta.description;
+  if (!actionsEl) return;
+
+  actionsEl.innerHTML = '';
+  if (meta.action?.id) {
+    const existing = document.getElementById(meta.action.id);
+    if (existing) {
+      const clone = existing.cloneNode(true);
+      clone.removeAttribute('id');
+      actionsEl.appendChild(clone);
+      clone.addEventListener('click', () => existing.click());
+    }
+  } else if (meta.action?.label === 'View Upgrade') {
+    const btn = document.createElement('button');
+    btn.className = 'btn btn-primary';
+    btn.type = 'button';
+    btn.textContent = meta.action.label;
+    btn.addEventListener('click', openUpgradeModal);
+    actionsEl.appendChild(btn);
+  }
+}
+
+function showUpgradeGate(sectionName) {
+  const meta = SECTION_META[sectionName] || { title: 'Premium feature', description: '' };
+  document.getElementById('upgradeGateTitle').textContent = meta.title;
+  document.getElementById('upgradeGateText').textContent = `${meta.description} Upgrade your AutoResto plan to unlock this feature.`;
+  setActiveSection('upgrade-gate');
+}
+
+function openSidebarDrawer() {
+  document.getElementById('ownerSidebar')?.classList.add('is-open');
+  document.getElementById('sidebarOverlay')?.classList.add('is-visible');
+}
+
+function closeSidebarDrawer() {
+  document.getElementById('ownerSidebar')?.classList.remove('is-open');
+  document.getElementById('sidebarOverlay')?.classList.remove('is-visible');
+}
+
+async function loadEntitlements() {
+  const data = await apiRequest('/owner/entitlements', {}, true);
+  ownerEntitlements = new Map((data.features || []).map((row) => [row.feature_key, Boolean(row.enabled)]));
+}
+
+async function loadSubscriptionData() {
+  try {
+    const [plansData, subData] = await Promise.all([
+      apiRequest('/api/subscriptions/plans', {}, true),
+      apiRequest('/api/subscriptions/me', {}, true),
+    ]);
+    ownerPlans = plansData.plans || [];
+    ownerSubscription = subData.subscription || null;
+  } catch (error) {
+    ownerPlans = [];
+    ownerSubscription = null;
+  }
+}
+
+function renderDashboardOverview() {
+  const orders = latestOrders || [];
+  const pending = orders.filter((o) => ['pending', 'preparing'].includes(o.status)).length;
+  const ready = orders.filter((o) => o.status === 'ready').length;
+  const completed = orders.filter((o) => ['delivered', 'completed'].includes(o.status)).length;
+  const revenue = orders
+    .filter((o) => String(o.payment_status || '').toLowerCase() === 'paid')
+    .reduce((sum, o) => sum + Number(o.total_amount || 0), 0);
+  const avg = orders.length ? revenue / orders.length : 0;
+
+  const widgets = document.getElementById('dashboardWidgets');
+  if (widgets) {
+    widgets.innerHTML = `
+      <div class="od-widget"><strong>${pending}</strong><span>New / Preparing</span></div>
+      <div class="od-widget"><strong>${ready}</strong><span>Ready</span></div>
+      <div class="od-widget"><strong>${completed}</strong><span>Completed</span></div>
+      <div class="od-widget"><strong>INR ${formatCurrency(revenue)}</strong><span>Revenue</span></div>
+      <div class="od-widget"><strong>${orders.length}</strong><span>Total Orders</span></div>
+      <div class="od-widget"><strong>INR ${formatCurrency(avg)}</strong><span>Avg Order Value</span></div>
+      <div class="od-widget"><strong>${latestTablesCache.filter((t) => hasRunningBill(t)).length}</strong><span>Running Bills</span></div>
+      <div class="od-widget"><strong>${latestTablesCache.filter((t) => String(t.availability_status) === 'paid').length}</strong><span>Paid Tables</span></div>
+    `;
+  }
+
+  const recentRoot = document.getElementById('dashboardRecentOrders');
+  if (recentRoot) {
+    recentRoot.innerHTML = orders.slice(0, 5).map((order) => `
+      <div class="analytics-item">
+        <strong>Order #${order.id} · Table ${escapeHtml(order.table_number || '')}</strong>
+        <p>${escapeHtml(order.status || 'unknown')} · INR ${formatCurrency(order.total_amount)}</p>
+      </div>
+    `).join('') || '<p>No orders yet.</p>';
+  }
+
+  const tableRoot = document.getElementById('dashboardTableSummary');
+  if (tableRoot) {
+    const available = latestTablesCache.filter((t) => String(t.availability_status) === 'available' && !hasRunningBill(t)).length;
+    const active = latestTablesCache.filter((t) => hasRunningBill(t) || String(t.availability_status) === 'active').length;
+    const paid = latestTablesCache.filter((t) => String(t.availability_status) === 'paid').length;
+    tableRoot.innerHTML = `
+      <div class="analytics-item"><strong>${available}</strong><p>Available tables</p></div>
+      <div class="analytics-item"><strong>${active}</strong><p>Active / running</p></div>
+      <div class="analytics-item"><strong>${paid}</strong><p>Paid tables</p></div>
+    `;
+  }
+}
+
+async function loadDashboard() {
+  if (!ensureRestaurantId()) return;
+  renderDashboardOverview();
+}
+
+function buildPromotionContent(trigger = 'manual') {
+  const lockedCount = getLockedFeatureCount();
+  const plan = getUpgradePlan();
+  const offerPrice = plan ? Number(plan.price) : 3999;
+  const originalPrice = plan?.code === 'growth' ? offerPrice * 1.2 : offerPrice;
+  return {
+    title: trigger === 'transaction' ? '✨ Unlock more features' : '✨ Upgrade AutoResto',
+    body: lockedCount
+      ? `Unlock ${lockedCount} premium feature${lockedCount === 1 ? '' : 's'} for your restaurant.`
+      : 'Explore premium tools to grow your restaurant.',
+    offerPrice,
+    originalPrice: originalPrice > offerPrice ? originalPrice : null,
+    cta: 'View Upgrade',
+  };
+}
+
+function showFloatingPromo(trigger = 'manual') {
+  if (sessionStorage.getItem(promoDismissKey()) === '1') return;
+  const promo = buildPromotionContent(trigger);
+  const card = document.getElementById('floatingPromo');
+  if (!card) return;
+  document.getElementById('floatingPromoTitle').textContent = promo.title;
+  document.getElementById('floatingPromoBody').textContent = promo.body;
+  const priceEl = document.getElementById('floatingPromoPrice');
+  if (priceEl) {
+    priceEl.innerHTML = promo.originalPrice
+      ? `<del>INR ${formatCurrency(promo.originalPrice)}</del><strong>INR ${formatCurrency(promo.offerPrice)}/month</strong>`
+      : `<strong>INR ${formatCurrency(promo.offerPrice)}/month</strong>`;
+  }
+  card.classList.remove('hidden');
+}
+
+function hideFloatingPromo(dismiss = false) {
+  document.getElementById('floatingPromo')?.classList.add('hidden');
+  if (dismiss) {
+    try { sessionStorage.setItem(promoDismissKey(), '1'); } catch (error) {}
+  }
+}
+
+function openUpgradeModal() {
+  const modal = document.getElementById('upgradeModal');
+  if (!modal) return;
+  renderUpgradeModal();
+  modal.classList.add('is-open');
+  modal.setAttribute('aria-hidden', 'false');
+  document.body.classList.add('bill-modal-open');
+}
+
+function closeUpgradeModal() {
+  const modal = document.getElementById('upgradeModal');
+  if (!modal) return;
+  modal.classList.remove('is-open');
+  modal.setAttribute('aria-hidden', 'true');
+  document.body.classList.remove('bill-modal-open');
+}
+
+function renderUpgradeModal() {
+  const currentRoot = document.getElementById('upgradeCurrentPlan');
+  const grid = document.getElementById('upgradePlanGrid');
+  const note = document.getElementById('upgradePaymentNote');
+  if (!currentRoot || !grid || !note) return;
+
+  const currentName = ownerSubscription?.plan_name
+    || restaurantProfile?.subscription_plan
+    || 'Starter';
+  const enabledFeatures = Array.from(ownerEntitlements.entries())
+    .filter(([, enabled]) => enabled)
+    .map(([key]) => key.replace(/_/g, ' '));
+
+  currentRoot.innerHTML = `
+    <div class="panel soft-panel" style="margin:0 1.25rem;">
+      <strong>Current plan: ${escapeHtml(currentName)}</strong>
+      <p style="margin:0.35rem 0 0;color:var(--muted);font-size:0.9rem;">
+        Enabled: ${enabledFeatures.length ? enabledFeatures.join(', ') : 'Core ordering features'}
+      </p>
+    </div>
+  `;
+
+  const upgradePlan = getUpgradePlan();
+  if (!upgradePlan || Number(upgradePlan.price) <= 0) {
+    grid.innerHTML = `
+      <div class="od-plan-card od-plan-card--highlight">
+        <h3 style="margin:0 0 0.35rem;font-family:'Fraunces',serif;">Growth</h3>
+        <p style="margin:0;color:var(--muted);">₹3999/month</p>
+        <ul>
+          <li>Advanced Analytics</li>
+          <li>Inventory</li>
+          <li>Offers & Coupons</li>
+          <li>Customer Management</li>
+          <li>Loyalty</li>
+        </ul>
+        <button class="btn btn-primary" type="button" disabled style="margin-top:0.85rem;width:100%;">Contact AutoResto to upgrade</button>
+      </div>
+    `;
+    note.textContent = 'Online upgrade payment is not configured yet. Cashfree upgrade flow will activate when your plan is published in AutoResto billing.';
+    return;
+  }
+
+  const lockedFeatures = Array.from(ownerEntitlements.entries()).filter(([, enabled]) => !enabled);
+  grid.innerHTML = ownerPlans.map((plan) => {
+    const isHighlight = plan.id === upgradePlan.id;
+    const features = lockedFeatures.slice(0, 5).map(([key]) => `<li>${escapeHtml(key.replace(/_/g, ' '))}</li>`).join('');
+    return `
+      <div class="od-plan-card${isHighlight ? ' od-plan-card--highlight' : ''}">
+        <h3 style="margin:0 0 0.35rem;font-family:'Fraunces',serif;">${escapeHtml(plan.name)}</h3>
+        <p style="margin:0;color:var(--muted);">INR ${formatCurrency(plan.price)}/${escapeHtml(plan.billing_interval || 'month')}</p>
+        <ul>${features || '<li>All premium features</li>'}</ul>
+        <button class="btn btn-primary od-upgrade-btn" type="button" data-plan-code="${escapeHtml(plan.code)}" disabled style="margin-top:0.85rem;width:100%;">
+          Upgrade (admin activation)
+        </button>
+      </div>
+    `;
+  }).join('');
+
+  note.textContent = 'Cashfree self-serve upgrade is not live yet. Your AutoResto admin can activate the selected plan securely from the control panel.';
+}
+
+function initOwnerDashboardUi() {
+  document.getElementById('sidebarToggleBtn')?.addEventListener('click', openSidebarDrawer);
+  document.getElementById('sidebarOverlay')?.addEventListener('click', closeSidebarDrawer);
+  document.getElementById('floatingPromoClose')?.addEventListener('click', () => hideFloatingPromo(true));
+  document.getElementById('floatingPromoCta')?.addEventListener('click', openUpgradeModal);
+  document.getElementById('upgradeGateCta')?.addEventListener('click', openUpgradeModal);
+  document.getElementById('upgradeModalClose')?.addEventListener('click', closeUpgradeModal);
+  document.getElementById('upgradeModal')?.addEventListener('click', (event) => {
+    if (event.target.id === 'upgradeModal') closeUpgradeModal();
+  });
+  document.getElementById('notificationsBtn')?.addEventListener('click', () => {
+    setMessage('ownerMessage', 'No new notifications.');
+  });
+}
 
 function ensureRestaurantId() {
   if (!restaurantId) {
@@ -332,19 +699,29 @@ async function markBillPaid(method) {
 }
 
 function setActiveSection(sectionName) {
+  activeNavSection = sectionName;
   document.querySelectorAll('[data-owner-section-panel]').forEach((panel) => {
     panel.classList.toggle('hidden', panel.dataset.ownerSectionPanel !== sectionName);
   });
 
-  document.querySelectorAll('[data-owner-section]').forEach((button) => {
+  document.querySelectorAll('.owner-nav-item[data-owner-section]').forEach((button) => {
     button.classList.toggle('active', button.dataset.ownerSection === sectionName);
   });
+
+  updatePageHeader(sectionName);
 }
 
 async function activateSection(sectionName) {
+  const navItem = OWNER_NAV.find((item) => item.section === sectionName);
+  if (navItem?.featureKey && !isFeatureEnabled(navItem.featureKey)) {
+    showUpgradeGate(sectionName);
+    return;
+  }
+
   setActiveSection(sectionName);
 
   const loaders = {
+    dashboard: loadDashboard,
     tables: loadTables,
     menu: loadMenu,
     analytics: loadAnalytics,
@@ -393,22 +770,35 @@ async function loadReviews() {
 }
 
 async function loadFeatures() {
-  const data = await apiRequest('/owner/entitlements', {}, true);
+  await loadEntitlements();
+  buildOwnerSidebar();
   const root = document.getElementById('ownerFeatureList');
   if (!root) return;
-  root.innerHTML = (data.features || []).map((feature) => `
-    <div class="card">
-      <strong>${escapeHtml(feature.enabled ? feature.name : `Locked: ${feature.name}`)}</strong>
-      <p>${feature.enabled ? 'Available on your plan.' : 'Upgrade to unlock this feature.'}</p>
+  root.innerHTML = (Array.from(ownerEntitlements.entries()).map(([key, enabled]) => {
+    const label = key.replace(/_/g, ' ');
+    return `
+    <div class="card od-widget">
+      <strong>${escapeHtml(enabled ? label : `Locked: ${label}`)}</strong>
+      <p>${enabled ? 'Available on your plan.' : 'Upgrade to unlock this feature.'}</p>
+      ${enabled ? '' : '<button class="btn btn-light" type="button" data-open-upgrade>Upgrade</button>'}
     </div>
-  `).join('') || '<p>No feature entitlements configured.</p>';
+  `;
+  })).join('') || '<p>No feature entitlements configured.</p>';
+
+  root.querySelectorAll('[data-open-upgrade]').forEach((btn) => {
+    btn.addEventListener('click', openUpgradeModal);
+  });
 }
 
 async function loadRestaurant() {
   const data = await apiRequest('/restaurants/owner/me', {}, true);
   restaurantProfile = data.restaurant;
   restaurantId = data.restaurant.id;
-  document.getElementById('ownerRestaurantName').textContent = `${data.restaurant.name} Dashboard`;
+  document.getElementById('ownerRestaurantName').textContent = data.restaurant.name;
+  const meta = document.getElementById('ownerRestaurantMeta');
+  if (meta) {
+    meta.textContent = `Table ordering · ${data.restaurant.subscription_plan || 'Starter'} plan`;
+  }
 
   const payForm = document.getElementById('paymentSettingsForm');
   if (payForm) {
@@ -420,8 +810,134 @@ async function loadRestaurant() {
   }
 }
 
+function populateCategorySelects(selectedValue = '') {
+  const options = menuCategoriesCache
+    .filter((row) => row.is_active)
+    .sort((a, b) => Number(a.display_order) - Number(b.display_order) || a.name.localeCompare(b.name))
+    .map((row) => `<option value="${escapeHtml(row.name)}">${escapeHtml(row.name)}</option>`)
+    .join('');
+
+  ['menuCategorySelect', 'menuEditCategorySelect'].forEach((id) => {
+    const select = document.getElementById(id);
+    if (!select) return;
+    const current = selectedValue || select.value;
+    select.innerHTML = `<option value="">Select category</option>${options}`;
+    if (current) select.value = current;
+  });
+}
+
+async function loadMenuCategories() {
+  if (!ensureRestaurantId()) return;
+  const data = await apiRequest(`/menu/${restaurantId}/categories`, {}, true);
+  menuCategoriesCache = data.categories || [];
+  populateCategorySelects();
+  renderCategoryList();
+}
+
+function renderCategoryList() {
+  const root = document.getElementById('categoryList');
+  if (!root) return;
+
+  if (!menuCategoriesCache.length) {
+    root.innerHTML = '<p>No categories yet. Add one above or they will be created from existing menu item categories.</p>';
+    return;
+  }
+
+  const sorted = [...menuCategoriesCache].sort(
+    (a, b) => Number(a.display_order) - Number(b.display_order) || a.name.localeCompare(b.name)
+  );
+
+  root.innerHTML = sorted.map((category) => `
+    <div class="card" data-category-id="${category.id}">
+      <div class="toolbar" style="justify-content:space-between;align-items:center;">
+        <div>
+          <strong>☰ ${escapeHtml(category.name)}</strong>
+          <p style="margin:0.25rem 0 0;color:var(--muted);font-size:0.85rem;">
+            Order ${category.display_order} · ${category.is_active ? 'Active' : 'Disabled'}
+          </p>
+        </div>
+        <div class="toolbar">
+          <button class="btn btn-light" type="button" data-category-up="${category.id}">↑</button>
+          <button class="btn btn-light" type="button" data-category-down="${category.id}">↓</button>
+          <button class="btn btn-light" type="button" data-category-toggle="${category.id}">
+            ${category.is_active ? 'Disable' : 'Enable'}
+          </button>
+          <button class="btn btn-light" type="button" data-category-rename="${category.id}">Rename</button>
+          <button class="btn btn-dark" type="button" data-category-delete="${category.id}">Delete</button>
+        </div>
+      </div>
+    </div>
+  `).join('');
+
+  root.querySelectorAll('[data-category-toggle]').forEach((button) => {
+    button.addEventListener('click', async () => {
+      const category = menuCategoriesCache.find((row) => String(row.id) === button.dataset.categoryToggle);
+      if (!category) return;
+      try {
+        await apiRequest(`/menu/${restaurantId}/categories/${category.id}`, {
+          method: 'PATCH',
+          body: JSON.stringify({ isActive: !category.is_active }),
+        }, true);
+        await loadMenuCategories();
+      } catch (error) {
+        setMessage('ownerMessage', error.message, true);
+      }
+    });
+  });
+
+  root.querySelectorAll('[data-category-rename]').forEach((button) => {
+    button.addEventListener('click', async () => {
+      const category = menuCategoriesCache.find((row) => String(row.id) === button.dataset.categoryRename);
+      if (!category) return;
+      const nextName = window.prompt('Rename category', category.name);
+      if (!nextName || nextName.trim() === category.name) return;
+      try {
+        await apiRequest(`/menu/${restaurantId}/categories/${category.id}`, {
+          method: 'PATCH',
+          body: JSON.stringify({ name: nextName.trim() }),
+        }, true);
+        await Promise.all([loadMenuCategories(), loadMenu()]);
+      } catch (error) {
+        setMessage('ownerMessage', error.message, true);
+      }
+    });
+  });
+
+  root.querySelectorAll('[data-category-delete]').forEach((button) => {
+    button.addEventListener('click', async () => {
+      const categoryId = button.dataset.categoryDelete;
+      if (!window.confirm('Delete this category? This only works when no menu items use it.')) return;
+      try {
+        await apiRequest(`/menu/${restaurantId}/categories/${categoryId}`, { method: 'DELETE' }, true);
+        await loadMenuCategories();
+        setMessage('ownerMessage', 'Category deleted.');
+      } catch (error) {
+        setMessage('ownerMessage', error.message, true);
+      }
+    });
+  });
+
+  root.querySelectorAll('[data-category-up],[data-category-down]').forEach((button) => {
+    button.addEventListener('click', async () => {
+      const category = menuCategoriesCache.find((row) => String(row.id) === (button.dataset.categoryUp || button.dataset.categoryDown));
+      if (!category) return;
+      const delta = button.dataset.categoryUp ? -1 : 1;
+      try {
+        await apiRequest(`/menu/${restaurantId}/categories/${category.id}`, {
+          method: 'PATCH',
+          body: JSON.stringify({ displayOrder: Number(category.display_order || 0) + delta }),
+        }, true);
+        await loadMenuCategories();
+      } catch (error) {
+        setMessage('ownerMessage', error.message, true);
+      }
+    });
+  });
+}
+
 async function loadMenu() {
   if (!ensureRestaurantId()) return;
+  await loadMenuCategories();
   const data = await apiRequest(`/menu/${restaurantId}`, {}, true);
   const menuList = document.getElementById('menuList');
   const items = data.menu || [];
@@ -457,6 +973,7 @@ async function loadMenu() {
       form.itemId.value = item.id;
       form.name.value = item.name;
       form.price.value = item.price;
+      populateCategorySelects(item.category);
       form.category.value = item.category;
       form.imageUrl.value = item.image_url || '';
       form.description.value = item.description || '';
@@ -469,6 +986,7 @@ async function loadTables() {
   const data = await apiRequest(`/restaurants/${restaurantId}/tables`, {}, true);
   const tableList = document.getElementById('tableList');
   const tables = data.tables || [];
+  latestTablesCache = tables;
 
   tableList.innerHTML = tables.length ? tables.map((table) => {
     const qrImage = table.qr_data_url ? `<img src="${table.qr_data_url}" alt="QR for ${escapeHtml(table.table_number)}" class="table-card__qr" />` : '';
@@ -814,26 +1332,32 @@ function initSocket() {
   socket.emit('restaurant:join', restaurantId);
 
   socket.on('order:update', (payload) => {
-    // reload orders and analytics when an order changes
     loadOrders().catch((error) => setMessage('ownerMessage', error.message, true));
     loadAnalytics().catch(() => {});
+    if (activeNavSection === 'dashboard') {
+      loadDashboard().catch(() => {});
+    }
 
-    // play notification sound for new orders
     try {
-      if (payload && payload.type === 'created') {
+      if (payload && (payload.type === 'created' || payload.type === 'paid')) {
         loadTables().catch(() => {});
-        try {
-          const ctx = new (window.AudioContext || window.webkitAudioContext)();
-          const o = ctx.createOscillator();
-          const g = ctx.createGain();
-          o.type = 'sine';
-          o.frequency.value = 880;
-          g.gain.value = 0.05;
-          o.connect(g);
-          g.connect(ctx.destination);
-          o.start();
-          setTimeout(() => { o.stop(); ctx.close().catch(() => {}); }, 120);
-        } catch (e) {}
+        if (payload.type === 'paid') {
+          showFloatingPromo('transaction');
+        }
+        if (payload.type === 'created') {
+          try {
+            const ctx = new (window.AudioContext || window.webkitAudioContext)();
+            const o = ctx.createOscillator();
+            const g = ctx.createGain();
+            o.type = 'sine';
+            o.frequency.value = 880;
+            g.gain.value = 0.05;
+            o.connect(g);
+            g.connect(ctx.destination);
+            o.start();
+            setTimeout(() => { o.stop(); ctx.close().catch(() => {}); }, 120);
+          } catch (e) {}
+        }
       }
     } catch (e) {}
   });
@@ -851,17 +1375,25 @@ async function initOwner() {
   if (!mustOwnerAuth()) return;
 
   hideBillModal();
+  initOwnerDashboardUi();
 
   try {
     await loadRestaurant();
     await Promise.all([
+      loadEntitlements(),
+      loadSubscriptionData(),
       loadMenu(),
       loadTables(),
       loadInvoices(),
     ]);
     await loadOrders();
-    setActiveSection('tables');
+    buildOwnerSidebar();
+    setActiveSection('dashboard');
+    await loadDashboard();
     initSocket();
+    if (getLockedFeatureCount() > 0) {
+      setTimeout(() => showFloatingPromo('manual'), 1200);
+    }
     // apply theme preference
     try {
       const theme = localStorage.getItem('owner_theme') || 'light';
@@ -877,16 +1409,6 @@ async function initOwner() {
     setMessage('ownerMessage', error.message, true);
   }
 }
-
-document.querySelectorAll('[data-owner-section]').forEach((button) => {
-  button.addEventListener('click', async () => {
-    try {
-      await activateSection(button.dataset.ownerSection);
-    } catch (error) {
-      setMessage('ownerMessage', error.message, true);
-    }
-  });
-});
 
 document.getElementById('gstSettingsForm')?.addEventListener('submit', async (event) => {
   event.preventDefault();
@@ -907,6 +1429,25 @@ document.getElementById('gstSettingsForm')?.addEventListener('submit', async (ev
       }),
     }, true);
     setMessage('ownerMessage', 'GST settings saved.');
+  } catch (error) {
+    setMessage('ownerMessage', error.message, true);
+  }
+});
+
+document.getElementById('categoryForm')?.addEventListener('submit', async (event) => {
+  event.preventDefault();
+  if (!ensureRestaurantId()) return;
+  const formData = new FormData(event.target);
+  const name = String(formData.get('name') || '').trim();
+  if (!name) return;
+  try {
+    await apiRequest(`/menu/${restaurantId}/categories`, {
+      method: 'POST',
+      body: JSON.stringify({ name }),
+    }, true);
+    event.target.reset();
+    await loadMenuCategories();
+    setMessage('ownerMessage', `Category "${name}" added.`);
   } catch (error) {
     setMessage('ownerMessage', error.message, true);
   }

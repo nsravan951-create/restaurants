@@ -643,6 +643,393 @@
         .sticky-bar { grid-template-columns: 1fr; }
         .sticky-bar button { width: 100%; min-width: 0; }
       }
+
+      .welcome-card {
+        display: grid;
+        gap: 16px;
+        padding: 28px 22px;
+        margin-top: 4px;
+        text-align: center;
+        border: 1px solid rgba(191, 78, 34, 0.11);
+        border-radius: 22px;
+        background: linear-gradient(180deg, rgba(255,255,255,0.96), rgba(255,248,239,0.94));
+        box-shadow: var(--shadow-soft);
+      }
+
+      .welcome-card p {
+        margin: 0;
+        color: var(--muted);
+        font-size: 0.98rem;
+        line-height: 1.55;
+      }
+
+      .order-food-btn {
+        min-height: 54px;
+        font-size: 1.05rem;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        font-weight: 800;
+      }
+
+      .category-nav-wrap {
+        position: sticky;
+        top: 0;
+        z-index: 5;
+        margin: 0 0 14px;
+        padding: 10px 0 6px;
+        background: linear-gradient(180deg, rgba(251,247,240,0.98) 70%, rgba(251,247,240,0));
+        backdrop-filter: blur(8px);
+      }
+
+      .category-nav {
+        display: flex;
+        gap: 10px;
+        overflow-x: auto;
+        padding: 2px 2px 6px;
+        scroll-snap-type: x proximity;
+        scrollbar-width: none;
+        -ms-overflow-style: none;
+      }
+
+      .category-nav::-webkit-scrollbar { display: none; }
+
+      .category-pill {
+        flex: 0 0 auto;
+        scroll-snap-align: start;
+        border: 1px solid rgba(191, 78, 34, 0.18);
+        background: rgba(255, 255, 255, 0.92);
+        color: var(--ink);
+        border-radius: 999px;
+        padding: 10px 16px;
+        font-weight: 600;
+        font-size: 0.9rem;
+        cursor: pointer;
+        transition: background 220ms ease, border-color 220ms ease, transform 220ms ease, color 220ms ease;
+        white-space: nowrap;
+      }
+
+      .category-pill:hover {
+        border-color: rgba(191, 78, 34, 0.35);
+        transform: translateY(-1px);
+      }
+
+      .category-pill.active {
+        background: linear-gradient(135deg, var(--accent), var(--accent-2));
+        border-color: transparent;
+        color: #fff;
+        box-shadow: 0 10px 22px rgba(191, 78, 34, 0.22);
+      }
+
+      .category-section {
+        scroll-margin-top: 84px;
+      }
+
+      .category-section.is-filtered-out {
+        display: none;
+      }
+
+      .menu-expand-overlay {
+        position: fixed;
+        z-index: 9998;
+        pointer-events: none;
+        background: linear-gradient(135deg, var(--accent), var(--accent-2));
+        box-shadow: 0 20px 60px rgba(72, 44, 19, 0.2);
+        will-change: top, left, width, height, border-radius, opacity;
+        transition:
+          top 680ms cubic-bezier(0.22, 1, 0.36, 1),
+          left 680ms cubic-bezier(0.22, 1, 0.36, 1),
+          width 680ms cubic-bezier(0.22, 1, 0.36, 1),
+          height 680ms cubic-bezier(0.22, 1, 0.36, 1),
+          border-radius 680ms cubic-bezier(0.22, 1, 0.36, 1),
+          opacity 220ms ease;
+      }
+
+      .menu-expand-overlay.is-expanding {
+        top: 0 !important;
+        left: 0 !important;
+        right: 0 !important;
+        bottom: 0 !important;
+        width: auto !important;
+        height: auto !important;
+        border-radius: 0 !important;
+      }
+
+      .menu-expand-overlay.is-fading {
+        opacity: 0;
+      }
+
+      #menuState.menu-reveal {
+        animation: menuContentReveal 520ms cubic-bezier(0.22, 1, 0.36, 1) 180ms both;
+      }
+
+      @keyframes menuContentReveal {
+        from { opacity: 0; transform: translateY(10px); }
+        to { opacity: 1; transform: translateY(0); }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        .menu-expand-overlay { display: none !important; }
+        #menuState.menu-reveal { animation: none; }
+      }
+
+      .bill-experience {
+        display: grid;
+        gap: 18px;
+        max-width: 520px;
+        margin: 0 auto;
+      }
+
+      .bill-payment-status {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        padding: 16px 18px;
+        border-radius: 20px;
+        background: linear-gradient(135deg, rgba(26, 127, 90, 0.12), rgba(255, 255, 255, 0.95));
+        border: 1px solid rgba(26, 127, 90, 0.18);
+        box-shadow: var(--shadow-soft);
+      }
+
+      .bill-payment-icon {
+        width: 48px;
+        height: 48px;
+        border-radius: 14px;
+        display: grid;
+        place-items: center;
+        background: rgba(26, 127, 90, 0.14);
+        color: var(--success);
+        font-size: 1.35rem;
+        flex: 0 0 auto;
+      }
+
+      .bill-payment-copy strong {
+        display: block;
+        font-size: 1.05rem;
+        margin-bottom: 4px;
+      }
+
+      .bill-payment-copy p {
+        margin: 0;
+        color: var(--muted);
+        font-size: 0.92rem;
+        line-height: 1.45;
+      }
+
+      .bill-receipt-stage {
+        position: relative;
+        min-height: 300px;
+        display: flex;
+        align-items: flex-end;
+        justify-content: center;
+        padding: 8px 0 4px;
+      }
+
+      .bill-receipt-icon {
+        position: absolute;
+        bottom: 42px;
+        font-size: 2.5rem;
+        opacity: 1;
+        transform: scale(1);
+        transition: opacity 0.28s ease, transform 0.4s ease;
+        filter: drop-shadow(0 8px 16px rgba(72, 44, 19, 0.12));
+      }
+
+      .bill-receipt-stage.is-animating .bill-receipt-icon,
+      .bill-receipt-stage.is-ready .bill-receipt-icon {
+        opacity: 0;
+        transform: scale(0.55) translateY(-18px);
+        pointer-events: none;
+      }
+
+      .bill-receipt-shell {
+        width: min(100%, 400px);
+        opacity: 0;
+        transform: translateY(52px) scale(0.74);
+        transform-origin: bottom center;
+        transition: transform 0.78s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.52s ease;
+      }
+
+      .bill-receipt-stage.is-animating .bill-receipt-shell,
+      .bill-receipt-stage.is-ready .bill-receipt-shell {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+      }
+
+      .bill-receipt-card {
+        background: #fffdf9;
+        border-radius: 14px 14px 6px 6px;
+        border: 1px solid rgba(191, 78, 34, 0.14);
+        box-shadow: 0 22px 48px rgba(34, 26, 20, 0.16);
+        overflow: hidden;
+      }
+
+      .bill-receipt-head {
+        display: flex;
+        align-items: flex-start;
+        gap: 12px;
+        padding: 18px 18px 12px;
+        border-bottom: 1px dashed rgba(191, 78, 34, 0.18);
+        background: linear-gradient(180deg, rgba(255, 252, 247, 1), rgba(255, 248, 239, 0.92));
+      }
+
+      .bill-receipt-logo {
+        width: 52px;
+        height: 52px;
+        object-fit: contain;
+        border-radius: 12px;
+        background: #fff;
+        border: 1px solid rgba(191, 78, 34, 0.1);
+      }
+
+      .bill-receipt-label {
+        margin: 0 0 4px;
+        font-size: 0.72rem;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        color: var(--muted);
+        font-weight: 700;
+      }
+
+      .bill-receipt-head h2 {
+        margin: 0;
+        font-family: 'Fraunces', serif;
+        font-size: 1.35rem;
+        line-height: 1.15;
+      }
+
+      .bill-meta-line {
+        margin: 6px 0 0;
+        color: var(--muted);
+        font-size: 0.86rem;
+        line-height: 1.45;
+      }
+
+      .bill-receipt-body {
+        padding: 14px 18px 18px;
+        opacity: 0;
+        transform: translateY(10px);
+        transition: opacity 0.42s ease 0.36s, transform 0.42s ease 0.36s;
+      }
+
+      .bill-receipt-card.is-content-visible .bill-receipt-body {
+        opacity: 1;
+        transform: translateY(0);
+      }
+
+      .bill-receipt-items {
+        display: grid;
+        gap: 10px;
+        margin-bottom: 12px;
+      }
+
+      .bill-line-item {
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        font-size: 0.94rem;
+      }
+
+      .bill-line-item small {
+        display: block;
+        color: var(--muted);
+        margin-top: 2px;
+      }
+
+      .bill-receipt-totals {
+        display: grid;
+        gap: 8px;
+        padding-top: 12px;
+        border-top: 1px dashed rgba(191, 78, 34, 0.18);
+      }
+
+      .bill-total-row {
+        display: flex;
+        justify-content: space-between;
+        gap: 10px;
+        font-size: 0.92rem;
+        color: var(--muted);
+      }
+
+      .bill-total-row strong {
+        color: var(--ink);
+      }
+
+      .bill-total-row.grand {
+        margin-top: 4px;
+        padding-top: 10px;
+        border-top: 1px solid rgba(191, 78, 34, 0.14);
+        font-size: 1rem;
+        color: var(--ink);
+      }
+
+      .bill-receipt-payline {
+        margin-top: 12px;
+        padding-top: 10px;
+        border-top: 1px dashed rgba(191, 78, 34, 0.14);
+        font-size: 0.88rem;
+        color: var(--muted);
+      }
+
+      .bill-actions {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 10px;
+      }
+
+      .bill-actions .btn {
+        min-height: 48px;
+      }
+
+      .bill-feedback-panel {
+        margin-top: 4px;
+      }
+
+      .bill-feedback-title {
+        margin: 0 0 4px;
+        font-family: 'Fraunces', serif;
+        font-size: 1.2rem;
+        text-align: center;
+      }
+
+      .cash-waiting-pulse {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .cash-waiting-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 999px;
+        background: var(--accent);
+        animation: cashWaitPulse 1.4s ease-in-out infinite;
+      }
+
+      @keyframes cashWaitPulse {
+        0%, 100% { opacity: 0.35; transform: scale(0.9); }
+        50% { opacity: 1; transform: scale(1.1); }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        .bill-receipt-icon,
+        .bill-receipt-shell,
+        .bill-receipt-body,
+        .cash-waiting-dot {
+          transition: none !important;
+          animation: none !important;
+        }
+
+        .bill-receipt-stage.is-ready .bill-receipt-icon { display: none; }
+        .bill-receipt-shell,
+        .bill-receipt-card.is-content-visible .bill-receipt-body {
+          opacity: 1;
+          transform: none;
+        }
+      }
+
+      @media (max-width: 480px) {
+        .bill-actions { grid-template-columns: 1fr; }
+      }
     </style>
   </head>
   <body>
@@ -679,6 +1066,13 @@
         <button class="btn btn-primary" id="retryBtn" type="button" style="margin-top:12px;">Try Again</button>
       </section>
 
+      <section id="welcomeState" class="screen hidden" aria-label="Start ordering">
+        <div class="welcome-card">
+          <p>Browse the menu, add items to your cart, and checkout when you are ready.</p>
+          <button class="btn btn-primary order-food-btn" id="orderFoodBtn" type="button">Order Food</button>
+        </div>
+      </section>
+
       <section id="menuState" class="screen hidden">
         <div class="layout">
           <section class="panel">
@@ -690,6 +1084,9 @@
               <span class="toast success" id="menuToast">Live</span>
             </div>
             <div class="section-body">
+              <div class="category-nav-wrap">
+                <div id="categoryNav" class="category-nav" role="tablist" aria-label="Food categories"></div>
+              </div>
               <div id="menuContainer" class="menu-grid"></div>
             </div>
           </section>
@@ -716,9 +1113,9 @@
 
       <section id="trackingState" class="screen hidden">
         <section class="tracking-hero">
-          <span class="tracking-status" id="trackingBadge">Order confirmed</span>
-          <h2 id="trackingTitle" style="margin:0;font-family:'Fraunces',serif;font-size:1.6rem;">Order tracking</h2>
-          <p id="trackingText" style="margin:0;color:var(--muted);">Your items are being prepared. Please wait 15-20 minutes.</p>
+          <span class="tracking-status" id="trackingBadge" style="background:rgba(191,78,34,.12);color:var(--accent);">Order placed</span>
+          <h2 id="trackingTitle" style="margin:0;font-family:'Fraunces',serif;font-size:1.6rem;">Waiting for restaurant</h2>
+          <p id="trackingText" style="margin:0;color:var(--muted);">Please pay cash at the counter. Your bill will appear once the restaurant confirms payment.</p>
         </section>
 
         <section class="panel">
@@ -735,53 +1132,58 @@
         </section>
       </section>
 
-      <section id="reviewState" class="screen hidden">
-        <section class="receipt-hero">
-          <span class="tracking-status" style="background:rgba(26,127,90,.12);color:var(--success);">Payment received</span>
-          <h2 style="margin:0;font-family:'Fraunces',serif;font-size:1.7rem;">How was your food?</h2>
-          <p style="margin:0;color:var(--muted);">Optional — helps the restaurant improve. You can skip anytime.</p>
-        </section>
-        <section class="panel">
-          <div class="section-body">
-            <div id="reviewStars" class="review-stars" role="group" aria-label="Overall rating">
-              <button type="button" class="review-star" data-rating="1" aria-label="1 star">★</button>
-              <button type="button" class="review-star" data-rating="2" aria-label="2 stars">★</button>
-              <button type="button" class="review-star" data-rating="3" aria-label="3 stars">★</button>
-              <button type="button" class="review-star" data-rating="4" aria-label="4 stars">★</button>
-              <button type="button" class="review-star" data-rating="5" aria-label="5 stars">★</button>
-            </div>
-            <textarea id="reviewComment" class="review-comment" maxlength="1000" placeholder="Optional comment (e.g. loved the biryani)"></textarea>
-            <p id="reviewMessage" style="margin:12px 0 0;color:var(--muted);font-size:.92rem;"></p>
-            <div class="review-actions">
-              <button class="btn btn-primary" id="reviewSubmitBtn" type="button">Submit review</button>
-              <button class="btn btn-light" id="reviewSkipBtn" type="button">Skip to bill</button>
+      <section id="billExperienceState" class="screen hidden">
+        <div class="bill-experience">
+          <div id="billPaymentStatus" class="bill-payment-status" aria-live="polite">
+            <span id="billPaymentIcon" class="bill-payment-icon" aria-hidden="true">✓</span>
+            <div class="bill-payment-copy">
+              <strong id="billPaymentTitle">Payment received</strong>
+              <p id="billPaymentSubtitle">Your bill is ready.</p>
             </div>
           </div>
-        </section>
-      </section>
 
-      <section id="receiptState" class="screen hidden">
-        <section class="receipt-hero">
-          <span class="tracking-status" style="background:rgba(26,127,90,.12);color:var(--success);">Payment complete</span>
-          <h2 style="margin:0;font-family:'Fraunces',serif;font-size:1.7rem;">Thank you</h2>
-          <p id="receiptMessage" style="margin:0;color:var(--muted);">Your receipt is ready.</p>
-        </section>
+          <div id="billReceiptStage" class="bill-receipt-stage">
+            <div id="billReceiptIcon" class="bill-receipt-icon" aria-hidden="true">🧾</div>
+            <div id="billReceiptShell" class="bill-receipt-shell">
+              <article id="billReceiptCard" class="bill-receipt-card">
+                <header class="bill-receipt-head">
+                  <img id="billRestaurantLogo" class="bill-receipt-logo hidden" alt="" />
+                  <div>
+                    <p class="bill-receipt-label">Bill</p>
+                    <h2 id="billRestaurantName">Restaurant</h2>
+                    <p id="billMetaLine" class="bill-meta-line"></p>
+                  </div>
+                </header>
+                <div class="bill-receipt-body">
+                  <div id="billItems" class="bill-receipt-items"></div>
+                  <div id="billTotals" class="bill-receipt-totals"></div>
+                  <div id="billPaymentMethod" class="bill-receipt-payline"></div>
+                </div>
+              </article>
+            </div>
+          </div>
 
-        <section class="panel">
-          <div class="panel-head">
-            <div>
-              <h2>Paid Receipt</h2>
-              <p>Invoice details synced for owner records.</p>
-            </div>
+          <div class="bill-actions">
+            <button class="btn btn-light" id="billDownloadBtn" type="button">Download Bill</button>
+            <button class="btn btn-primary" id="billViewBtn" type="button">View Bill</button>
           </div>
-          <div class="section-body">
-            <div id="receiptBox" class="invoice-box"></div>
-            <div id="receiptActions" class="receipt-actions hidden">
-              <button class="btn btn-light" id="receiptPrintBtn" type="button">Print Receipt</button>
-              <button class="btn btn-primary" id="receiptPdfBtn" type="button">Save as PDF</button>
+
+          <section class="panel bill-feedback-panel">
+            <div class="section-body">
+              <h3 class="bill-feedback-title">How was your experience?</h3>
+              <div id="reviewStars" class="review-stars" role="group" aria-label="Overall rating">
+                <button type="button" class="review-star" data-rating="1" aria-label="1 star">★</button>
+                <button type="button" class="review-star" data-rating="2" aria-label="2 stars">★</button>
+                <button type="button" class="review-star" data-rating="3" aria-label="3 stars">★</button>
+                <button type="button" class="review-star" data-rating="4" aria-label="4 stars">★</button>
+                <button type="button" class="review-star" data-rating="5" aria-label="5 stars">★</button>
+              </div>
+              <textarea id="reviewComment" class="review-comment" maxlength="1000" placeholder="Optional written feedback"></textarea>
+              <p id="reviewMessage" style="margin:12px 0 0;color:var(--muted);font-size:.92rem;"></p>
+              <button class="btn btn-primary full" id="reviewSubmitBtn" type="button">Give Feedback</button>
             </div>
-          </div>
-        </section>
+          </section>
+        </div>
       </section>
     </main>
 
@@ -851,7 +1253,10 @@
         errorState: document.getElementById('errorState'),
         errorText: document.getElementById('errorText'),
         retryBtn: document.getElementById('retryBtn'),
+        welcomeState: document.getElementById('welcomeState'),
+        orderFoodBtn: document.getElementById('orderFoodBtn'),
         menuState: document.getElementById('menuState'),
+        categoryNav: document.getElementById('categoryNav'),
         menuContainer: document.getElementById('menuContainer'),
         menuToast: document.getElementById('menuToast'),
         cartContainer: document.getElementById('cartContainer'),
@@ -877,18 +1282,25 @@
         trackingText: document.getElementById('trackingText'),
         trackingItems: document.getElementById('trackingItems'),
         trackingStatusPill: document.getElementById('trackingStatusPill'),
-        reviewState: document.getElementById('reviewState'),
+        billExperienceState: document.getElementById('billExperienceState'),
+        billPaymentIcon: document.getElementById('billPaymentIcon'),
+        billPaymentTitle: document.getElementById('billPaymentTitle'),
+        billPaymentSubtitle: document.getElementById('billPaymentSubtitle'),
+        billReceiptStage: document.getElementById('billReceiptStage'),
+        billReceiptIcon: document.getElementById('billReceiptIcon'),
+        billReceiptCard: document.getElementById('billReceiptCard'),
+        billRestaurantLogo: document.getElementById('billRestaurantLogo'),
+        billRestaurantName: document.getElementById('billRestaurantName'),
+        billMetaLine: document.getElementById('billMetaLine'),
+        billItems: document.getElementById('billItems'),
+        billTotals: document.getElementById('billTotals'),
+        billPaymentMethod: document.getElementById('billPaymentMethod'),
+        billDownloadBtn: document.getElementById('billDownloadBtn'),
+        billViewBtn: document.getElementById('billViewBtn'),
         reviewStars: document.getElementById('reviewStars'),
         reviewComment: document.getElementById('reviewComment'),
         reviewMessage: document.getElementById('reviewMessage'),
         reviewSubmitBtn: document.getElementById('reviewSubmitBtn'),
-        reviewSkipBtn: document.getElementById('reviewSkipBtn'),
-        receiptState: document.getElementById('receiptState'),
-        receiptMessage: document.getElementById('receiptMessage'),
-        receiptBox: document.getElementById('receiptBox'),
-        receiptActions: document.getElementById('receiptActions'),
-        receiptPrintBtn: document.getElementById('receiptPrintBtn'),
-        receiptPdfBtn: document.getElementById('receiptPdfBtn'),
       };
 
       const state = {
@@ -901,14 +1313,25 @@
         pingTimer: null,
         timerInterval: null,
         invoicePayload: null,
+        completedOrder: null,
+        paymentPollTimer: null,
+        billAnimating: false,
         estimatedMinutes: '15-20',
         checkoutIdempotencyKey: null,
         tableLocked: false,
         qrToken: null,
         cashfreeMode: 'sandbox',
+        menuEntering: false,
+        foodCategories: [],
+        allMenuItems: [],
+        selectedCategory: 'all',
       };
 
       const PENDING_ORDER_KEY = 'qr_pending_cashfree_order';
+      const WAITING_CASH_ORDER_KEY = 'qr_waiting_cash_order';
+      const COMPLETED_ORDER_KEY = 'qr_completed_order';
+      const MENU_ENTERED_KEY_PREFIX = 'qr_menu_entered_';
+      const MENU_EXPAND_MS = 680;
 
       const CLIENT_ID_KEY = 'qr_customer_client_id';
       const CART_KEY_PREFIX = 'qr_cart_';
@@ -1063,16 +1486,146 @@
         }
       }
 
+      function prefersReducedMotion() {
+        return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      }
+
+      function getMenuEnteredKey() {
+        if (!state.context) return null;
+        return storageKey(MENU_ENTERED_KEY_PREFIX, state.context.restaurant.id, state.context.table.id);
+      }
+
+      function isMenuEntered() {
+        const key = getMenuEnteredKey();
+        if (!key) return false;
+        try { return sessionStorage.getItem(key) === '1'; } catch (error) { return false; }
+      }
+
+      function markMenuEntered() {
+        const key = getMenuEnteredKey();
+        if (!key) return;
+        try { sessionStorage.setItem(key, '1'); } catch (error) {}
+      }
+
+      function clearMenuEntered() {
+        const key = getMenuEnteredKey();
+        if (!key) return;
+        try { sessionStorage.removeItem(key); } catch (error) {}
+      }
+
+      function shouldSkipWelcome() {
+        if (isMenuEntered()) return true;
+        if (state.cart && state.cart.size > 0) return true;
+        if (new URLSearchParams(window.location.search).get('menu') === '1') return true;
+        return false;
+      }
+
+      function waitForTransition(node, timeoutMs = MENU_EXPAND_MS + 120) {
+        return new Promise((resolve) => {
+          let done = false;
+          const finish = () => {
+            if (done) return;
+            done = true;
+            node.removeEventListener('transitionend', onEnd);
+            clearTimeout(timer);
+            resolve();
+          };
+          const onEnd = (event) => {
+            if (event.target === node) finish();
+          };
+          node.addEventListener('transitionend', onEnd);
+          const timer = setTimeout(finish, timeoutMs);
+        });
+      }
+
       function setView(view) {
         state.view = view;
         els.loadingState.classList.toggle('hidden', view !== 'loading');
         els.errorState.classList.toggle('hidden', view !== 'error');
+        els.welcomeState.classList.toggle('hidden', view !== 'welcome');
         els.menuState.classList.toggle('hidden', view !== 'menu');
         els.trackingState.classList.toggle('hidden', view !== 'tracking');
-        els.reviewState.classList.toggle('hidden', view !== 'review');
-        els.receiptState.classList.toggle('hidden', view !== 'receipt');
+        els.billExperienceState.classList.toggle('hidden', view !== 'bill');
         els.stickyBar.classList.toggle('hidden', view !== 'menu');
-        els.receiptActions?.classList.toggle('hidden', view !== 'receipt');
+        if (view !== 'menu') {
+          els.menuState.classList.remove('menu-reveal');
+        }
+      }
+
+      function finalizeMenuEnter({ pushHistory = true } = {}) {
+        markMenuEntered();
+        setView('menu');
+        els.menuState.classList.add('menu-reveal');
+        if (pushHistory) {
+          history.pushState({ autorestoView: 'menu' }, '', window.location.href);
+        }
+        state.menuEntering = false;
+        document.body.style.overflow = '';
+        els.orderFoodBtn?.removeAttribute('disabled');
+      }
+
+      async function enterMenuWithAnimation(button) {
+        if (state.menuEntering || state.view === 'menu') return;
+        state.menuEntering = true;
+        button.setAttribute('disabled', 'true');
+
+        if (prefersReducedMotion()) {
+          finalizeMenuEnter();
+          return;
+        }
+
+        let overlay = null;
+        try {
+          const rect = button.getBoundingClientRect();
+          overlay = document.createElement('div');
+          overlay.className = 'menu-expand-overlay';
+          overlay.setAttribute('aria-hidden', 'true');
+          overlay.style.top = `${rect.top}px`;
+          overlay.style.left = `${rect.left}px`;
+          overlay.style.width = `${rect.width}px`;
+          overlay.style.height = `${rect.height}px`;
+          overlay.style.borderRadius = `${window.getComputedStyle(button).borderRadius || '14px'}`;
+
+          document.body.appendChild(overlay);
+          document.body.style.overflow = 'hidden';
+
+          setView('menu');
+          els.menuState.style.opacity = '0';
+
+          requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+              overlay.classList.add('is-expanding');
+            });
+          });
+
+          await waitForTransition(overlay);
+          overlay.classList.add('is-fading');
+          els.menuState.style.opacity = '';
+          finalizeMenuEnter();
+          await waitForTransition(overlay, 260);
+        } finally {
+          overlay?.remove();
+          if (state.view !== 'menu') {
+            state.menuEntering = false;
+            document.body.style.overflow = '';
+            button.removeAttribute('disabled');
+          }
+        }
+      }
+
+      function setupHistoryNavigation() {
+        window.addEventListener('popstate', (event) => {
+          if (state.menuEntering) return;
+          const nextView = event.state?.autorestoView;
+          if (nextView === 'welcome' && ['menu', 'welcome'].includes(state.view)) {
+            clearMenuEntered();
+            setView('welcome');
+            return;
+          }
+          if (nextView === 'menu' && state.view === 'welcome') {
+            finalizeMenuEnter({ pushHistory: false });
+          }
+        });
       }
 
       function setLoading(message = 'Loading your menu...') {
@@ -1201,25 +1754,98 @@
         }, 1400);
       }
 
+      function deriveCategoriesFromMenu(menuItems) {
+        const names = [...new Set(menuItems.map((item) => String(item.category || 'Other').trim()).filter(Boolean))];
+        return names.map((name, index) => ({ id: name, name, display_order: index, is_active: true }));
+      }
+
+      function getCategoryNames() {
+        if (state.foodCategories.length) {
+          return state.foodCategories.map((row) => row.name);
+        }
+        return deriveCategoriesFromMenu(state.allMenuItems).map((row) => row.name);
+      }
+
+      function renderCategoryBar() {
+        if (!els.categoryNav) return;
+        const names = getCategoryNames();
+        if (!names.length) {
+          els.categoryNav.innerHTML = '';
+          return;
+        }
+
+        const pills = ['all', ...names];
+        els.categoryNav.innerHTML = pills.map((name) => `
+          <button
+            type="button"
+            class="category-pill${state.selectedCategory === name ? ' active' : ''}"
+            data-category="${name === 'all' ? 'all' : name}"
+            role="tab"
+            aria-selected="${state.selectedCategory === name ? 'true' : 'false'}"
+          >${name === 'all' ? 'All' : name}</button>
+        `).join('');
+
+        els.categoryNav.querySelectorAll('[data-category]').forEach((button) => {
+          button.addEventListener('click', () => {
+            state.selectedCategory = button.dataset.category;
+            renderCategoryBar();
+            renderMenu(state.allMenuItems);
+            if (state.selectedCategory !== 'all') {
+              const target = document.getElementById(`category-section-${slugifyCategory(state.selectedCategory)}`);
+              target?.scrollIntoView({ behavior: prefersReducedMotion() ? 'auto' : 'smooth', block: 'start' });
+            }
+          });
+        });
+
+        const active = els.categoryNav.querySelector('.category-pill.active');
+        if (active) {
+          active.scrollIntoView({ behavior: prefersReducedMotion() ? 'auto' : 'smooth', inline: 'center', block: 'nearest' });
+        }
+      }
+
+      function slugifyCategory(name) {
+        return String(name).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'other';
+      }
+
       function groupMenu(menuItems) {
-        return menuItems.reduce((groups, item) => {
+        const order = getCategoryNames();
+        const groups = menuItems.reduce((acc, item) => {
           const key = item.category || 'Other';
-          (groups[key] ||= []).push(item);
-          return groups;
+          (acc[key] ||= []).push(item);
+          return acc;
         }, {});
+
+        const ordered = [];
+        order.forEach((name) => {
+          if (groups[name]?.length) ordered.push([name, groups[name]]);
+        });
+        Object.entries(groups).forEach(([name, items]) => {
+          if (!order.includes(name)) ordered.push([name, items]);
+        });
+        return ordered;
       }
 
       function renderMenu(menuItems) {
-        const groups = groupMenu(menuItems);
-        const categories = Object.entries(groups);
+        state.allMenuItems = menuItems || [];
+        renderCategoryBar();
+
+        let visibleItems = state.allMenuItems;
+        if (state.selectedCategory && state.selectedCategory !== 'all') {
+          visibleItems = state.allMenuItems.filter((item) => (item.category || 'Other') === state.selectedCategory);
+        }
+
+        const groups = groupMenu(visibleItems);
+        const categories = state.selectedCategory === 'all'
+          ? groups
+          : groups.filter(([category]) => category === state.selectedCategory);
 
         if (!categories.length) {
-          els.menuContainer.innerHTML = '<div class="empty">No menu items available for this restaurant.</div>';
+          els.menuContainer.innerHTML = '<div class="empty">No menu items available for this category.</div>';
           return;
         }
 
         els.menuContainer.innerHTML = categories.map(([category, items]) => `
-          <section class="category-card">
+          <section class="category-card category-section" id="category-section-${slugifyCategory(category)}">
             <h3 class="category-title">${category}</h3>
             <div class="items-grid">
               ${items.map((item) => `
@@ -1242,7 +1868,7 @@
 
         els.menuContainer.querySelectorAll('[data-add-item]').forEach((btn) => {
           btn.addEventListener('click', () => {
-            const item = menuItems.find((menuItem) => Number(menuItem.id) === Number(btn.dataset.addItem));
+            const item = state.allMenuItems.find((menuItem) => Number(menuItem.id) === Number(btn.dataset.addItem));
             if (!item) return;
             btn.classList.add('added');
             setTimeout(() => btn.classList.remove('added'), 180);
@@ -1298,23 +1924,6 @@
         };
       }
 
-      function buildInvoicePayload(order, paymentStatus = 'paid') {
-        const items = Array.isArray(order?.items) ? order.items : [];
-        const total = Number(order?.totalAmount || items.reduce((sum, item) => sum + Number(item.lineTotal || 0), 0));
-        return {
-          orderId: order.orderId,
-          sessionToken: state.session?.sessionToken || '',
-          tableId: state.context.table.id,
-          restaurantId: state.context.restaurant.id,
-          tableNumber: state.context.table.table_number,
-          customerName: order.customerName || els.customerName.value.trim() || 'Guest',
-          paymentStatus,
-          timestamp: new Date().toISOString(),
-          items,
-          totalAmount: total,
-        };
-      }
-
       async function syncInvoiceToOwnerDashboard(invoicePayload) {
         try {
           await fetch(`${BACKEND_BASE_URL}/api/invoices/sync`, {
@@ -1340,14 +1949,98 @@
         resetTimers();
       }
 
-      function showTrackingView(order, paymentLabel = 'Confirmed') {
-        state.activeOrder = order;
+      function saveWaitingCashOrder(order, sessionToken) {
+        if (!order?.orderId || !sessionToken) return;
+        sessionStorage.setItem(WAITING_CASH_ORDER_KEY, JSON.stringify({
+          orderId: order.orderId,
+          sessionToken,
+          totalAmount: order.totalAmount,
+          customerName: order.customerName,
+          items: order.items || [],
+        }));
+      }
+
+      function loadWaitingCashOrder() {
+        try {
+          return JSON.parse(sessionStorage.getItem(WAITING_CASH_ORDER_KEY) || 'null');
+        } catch (_) {
+          return null;
+        }
+      }
+
+      function clearWaitingCashOrder() {
+        sessionStorage.removeItem(WAITING_CASH_ORDER_KEY);
+      }
+
+      function saveCompletedOrder(order) {
+        if (!order?.orderId || !order?.sessionToken) return;
+        sessionStorage.setItem(COMPLETED_ORDER_KEY, JSON.stringify(order));
+        state.completedOrder = order;
+      }
+
+      function loadCompletedOrder() {
+        if (state.completedOrder) return state.completedOrder;
+        try {
+          const parsed = JSON.parse(sessionStorage.getItem(COMPLETED_ORDER_KEY) || 'null');
+          state.completedOrder = parsed;
+          return parsed;
+        } catch (_) {
+          return null;
+        }
+      }
+
+      function getBillCredentials() {
+        const source = state.completedOrder || state.activeOrder || loadCompletedOrder() || loadWaitingCashOrder();
+        if (!source?.orderId) return null;
+        const sessionToken = source.sessionToken || state.session?.sessionToken || '';
+        if (!sessionToken) return null;
+        return { orderId: source.orderId, sessionToken };
+      }
+
+      async function fetchCustomerOrderStatus(orderId, sessionToken) {
+        return apiRequest(`/api/invoices/customer/${orderId}/status?sessionToken=${encodeURIComponent(sessionToken)}`);
+      }
+
+      async function fetchCustomerInvoice(orderId, sessionToken) {
+        const data = await apiRequest(`/api/invoices/customer/${orderId}?sessionToken=${encodeURIComponent(sessionToken)}`);
+        return data.invoice;
+      }
+
+      function stopPaymentPolling() {
+        if (state.paymentPollTimer) {
+          clearInterval(state.paymentPollTimer);
+          state.paymentPollTimer = null;
+        }
+      }
+
+      function startPaymentPolling(orderId, sessionToken) {
+        stopPaymentPolling();
+        state.paymentPollTimer = setInterval(async () => {
+          try {
+            const status = await fetchCustomerOrderStatus(orderId, sessionToken);
+            if (status.paymentStatus === 'paid') {
+              stopPaymentPolling();
+              const method = status.paymentMethod === 'cash' ? 'cash' : 'online';
+              await beginBillExperience({
+                orderId,
+                sessionToken,
+                paymentMethod: method,
+              });
+            }
+          } catch (error) {
+            console.warn('Payment status poll failed:', error.message);
+          }
+        }, 5000);
+      }
+
+      function showCashWaitingView(order, sessionToken) {
+        state.activeOrder = { ...order, sessionToken };
         setView('tracking');
-        els.trackingBadge.textContent = paymentLabel;
-        els.trackingTitle.textContent = `Order #${order.orderId} is in progress`;
-        els.trackingText.textContent = `Ready in ${state.estimatedMinutes} minutes. Please wait while the kitchen prepares your food.`;
-        els.trackingStatusPill.textContent = 'Preparing';
-        els.trackingItems.innerHTML = order.items.map((item) => `
+        els.trackingBadge.innerHTML = '<span class="cash-waiting-pulse"><span class="cash-waiting-dot"></span>Order placed</span>';
+        els.trackingTitle.textContent = 'Waiting for restaurant';
+        els.trackingText.textContent = `Please pay INR ${money(order.totalAmount)} at the counter. Your bill will appear once the restaurant confirms cash collection.`;
+        els.trackingStatusPill.textContent = 'Awaiting cash';
+        els.trackingItems.innerHTML = (order.items || []).map((item) => `
           <div class="order-item-row">
             <div>
               <strong>${item.name}</strong>
@@ -1358,66 +2051,109 @@
         `).join('');
       }
 
-      async function printReceipt(orderId) {
-        const targetId = Number(orderId || state.activeOrder?.orderId || state.invoicePayload?.orderId || 0);
-        if (!targetId) return;
-        const win = window.open('', '_blank', 'noopener,noreferrer');
-        if (!win) return;
-        const response = await fetch(`${BACKEND_BASE_URL}/orders/${targetId}/invoice?format=html`);
-        const html = await response.text();
-        win.document.write(html);
-        win.document.close();
-        win.focus();
-        setTimeout(() => {
-          try { win.print(); } catch (_) {}
-        }, 250);
+      function renderBillPaymentStatus(paymentMethod) {
+        const isCash = paymentMethod === 'cash';
+        els.billPaymentIcon.textContent = isCash ? '💵' : '✓';
+        els.billPaymentTitle.textContent = isCash ? 'Cash Collected' : 'Online Payment Successful';
+        els.billPaymentSubtitle.textContent = isCash
+          ? 'Payment received by restaurant'
+          : 'Payment completed successfully';
       }
 
-      async function downloadReceiptPdf(orderId) {
-        const targetId = Number(orderId || state.activeOrder?.orderId || state.invoicePayload?.orderId || 0);
-        if (!targetId) return;
-        const response = await fetch(`${BACKEND_BASE_URL}/orders/${targetId}/invoice?format=pdf`);
-        if (!response.ok) throw new Error('PDF download failed');
-        const blob = await response.blob();
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = `receipt-${targetId}.pdf`;
-        document.body.appendChild(link);
-        link.click();
-        link.remove();
-        URL.revokeObjectURL(url);
+      function renderBillDetails(invoice) {
+        state.invoicePayload = invoice;
+        const restaurantName = invoice.restaurant?.name || state.context?.restaurant?.name || 'Restaurant';
+        const logoUrl = normalizeUrl(invoice.restaurant?.logoUrl || state.context?.restaurant?.logo_url || '');
+        els.billRestaurantName.textContent = restaurantName;
+
+        if (logoUrl) {
+          els.billRestaurantLogo.src = logoUrl;
+          els.billRestaurantLogo.alt = `${restaurantName} logo`;
+          els.billRestaurantLogo.classList.remove('hidden');
+        } else {
+          els.billRestaurantLogo.classList.add('hidden');
+          els.billRestaurantLogo.removeAttribute('src');
+        }
+
+        const orderDate = new Date(invoice.order?.createdAt || Date.now()).toLocaleString();
+        els.billMetaLine.textContent = `Order #${invoice.order?.id} · Table ${invoice.order?.tableNumber} · ${orderDate}`;
+
+        els.billItems.innerHTML = (invoice.items || []).map((item) => `
+          <div class="bill-line-item">
+            <div>
+              <strong>${item.name}</strong>
+              <small>Qty ${item.quantity} · INR ${money(item.price)} each</small>
+            </div>
+            <strong>INR ${money(item.lineTotal)}</strong>
+          </div>
+        `).join('');
+
+        const taxRows = [];
+        taxRows.push(`<div class="bill-total-row"><span>Subtotal</span><strong>INR ${money(invoice.subtotal)}</strong></div>`);
+        if (Number(invoice.discountAmount) > 0) {
+          taxRows.push(`<div class="bill-total-row"><span>Discount</span><strong>-INR ${money(invoice.discountAmount)}</strong></div>`);
+        }
+        if (Number(invoice.gstRate) > 0) {
+          if (Number(invoice.igstAmount) > 0) {
+            taxRows.push(`<div class="bill-total-row"><span>IGST (${invoice.gstRate}%)</span><strong>INR ${money(invoice.igstAmount)}</strong></div>`);
+          } else {
+            taxRows.push(`<div class="bill-total-row"><span>CGST (${money(invoice.gstRate / 2)}%)</span><strong>INR ${money(invoice.cgstAmount)}</strong></div>`);
+            taxRows.push(`<div class="bill-total-row"><span>SGST (${money(invoice.gstRate / 2)}%)</span><strong>INR ${money(invoice.sgstAmount)}</strong></div>`);
+          }
+        }
+        taxRows.push(`<div class="bill-total-row grand"><span>Total</span><strong>INR ${money(invoice.grandTotal)}</strong></div>`);
+        els.billTotals.innerHTML = taxRows.join('');
+
+        const paymentMethod = (invoice.order?.paymentMethod || 'paid').toUpperCase();
+        const paymentStatus = (invoice.order?.paymentStatus || 'paid').toUpperCase();
+        els.billPaymentMethod.innerHTML = `
+          <div><strong>Payment method:</strong> ${paymentMethod}</div>
+          <div><strong>Payment status:</strong> ${paymentStatus}</div>
+          ${invoice.order?.invoiceNumber ? `<div><strong>Invoice:</strong> ${invoice.order.invoiceNumber}</div>` : ''}
+        `;
+      }
+
+      async function playBillAnimation({ skipAnimation = false } = {}) {
+        els.billReceiptStage.classList.remove('is-animating', 'is-ready');
+        els.billReceiptCard.classList.remove('is-content-visible');
+
+        if (skipAnimation || prefersReducedMotion()) {
+          els.billReceiptStage.classList.add('is-ready');
+          els.billReceiptCard.classList.add('is-content-visible');
+          return;
+        }
+
+        await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+        els.billReceiptStage.classList.add('is-animating');
+        await waitForTransition(els.billReceiptShell, 900);
+        els.billReceiptStage.classList.add('is-ready');
+        els.billReceiptCard.classList.add('is-content-visible');
+        await waitForTransition(els.billReceiptCard.querySelector('.bill-receipt-body'), 500);
       }
 
       function resetReviewForm() {
         state.selectedReviewRating = 0;
+        state.reviewSubmitted = false;
         els.reviewStars?.querySelectorAll('.review-star').forEach((btn) => btn.classList.remove('active'));
         if (els.reviewComment) els.reviewComment.value = '';
         if (els.reviewMessage) els.reviewMessage.textContent = '';
-      }
-
-      function showReviewPrompt(invoicePayload) {
-        state.pendingReviewPayload = invoicePayload;
-        resetReviewForm();
-        setView('review');
-      }
-
-      async function completeReviewFlow() {
-        const payload = state.pendingReviewPayload;
-        state.pendingReviewPayload = null;
-        if (payload) showReceiptView(payload);
+        if (els.reviewSubmitBtn) els.reviewSubmitBtn.disabled = false;
       }
 
       async function submitReview() {
-        const payload = state.pendingReviewPayload;
+        const credentials = getBillCredentials();
         const rating = Number(state.selectedReviewRating || 0);
-        if (!payload?.orderId || !payload?.sessionToken) {
-          await completeReviewFlow();
+        if (!credentials?.orderId || !credentials?.sessionToken) {
+          if (els.reviewMessage) els.reviewMessage.textContent = 'Unable to submit feedback for this order.';
+          return;
+        }
+        if (state.reviewSubmitted) {
+          if (els.reviewMessage) els.reviewMessage.textContent = 'Thank you — your feedback was already submitted.';
           return;
         }
         if (rating < 1 || rating > 5) {
           if (els.reviewMessage) {
-            els.reviewMessage.textContent = 'Please tap a star rating (1–5) or skip.';
+            els.reviewMessage.textContent = 'Please choose a star rating between 1 and 5.';
             els.reviewMessage.style.color = 'var(--danger)';
           }
           return;
@@ -1427,56 +2163,186 @@
           await apiRequest('/api/reviews', {
             method: 'POST',
             body: JSON.stringify({
-              orderId: payload.orderId,
-              sessionToken: payload.sessionToken,
+              orderId: credentials.orderId,
+              sessionToken: credentials.sessionToken,
               rating,
               comment: els.reviewComment?.value?.trim() || '',
             }),
           });
+          state.reviewSubmitted = true;
+          if (els.reviewMessage) {
+            els.reviewMessage.textContent = 'Thank you for your feedback!';
+            els.reviewMessage.style.color = 'var(--success)';
+          }
         } catch (error) {
-          console.warn('Review submit failed:', error.message);
-        } finally {
-          els.reviewSubmitBtn.disabled = false;
-          await completeReviewFlow();
+          if (error.status === 409) {
+            state.reviewSubmitted = true;
+            if (els.reviewMessage) {
+              els.reviewMessage.textContent = 'Thank you — your feedback was already submitted.';
+              els.reviewMessage.style.color = 'var(--success)';
+            }
+          } else if (els.reviewMessage) {
+            els.reviewMessage.textContent = error.message || 'Unable to submit feedback right now.';
+            els.reviewMessage.style.color = 'var(--danger)';
+            els.reviewSubmitBtn.disabled = false;
+          }
         }
       }
 
-      function showReceiptView(invoicePayload) {
-        state.invoicePayload = invoicePayload;
-        setView('receipt');
-        els.receiptMessage.textContent = 'Thank you! Payment received. Please visit again.';
-        els.receiptBox.innerHTML = `
-          <div class="invoice-row"><span>Order ID</span><strong>#${invoicePayload.orderId}</strong></div>
-          <div class="invoice-row"><span>Table ID</span><strong>${invoicePayload.tableId}</strong></div>
-          <div class="invoice-row"><span>Table Number</span><strong>${invoicePayload.tableNumber}</strong></div>
-          <div class="invoice-row"><span>Timestamp</span><strong>${new Date(invoicePayload.timestamp).toLocaleString()}</strong></div>
-          <div class="invoice-grid">
-            ${invoicePayload.items.map((item) => `
-              <div class="invoice-row">
-                <span>${item.name} x${item.quantity}</span>
-                <strong>INR ${money(item.lineTotal)}</strong>
-              </div>
-            `).join('')}
-          </div>
-          <div class="invoice-row" style="border-bottom:0;padding-bottom:0;">
-            <span>Final Total</span><strong>INR ${money(invoicePayload.totalAmount)}</strong>
-          </div>
-        `;
+      async function viewBill() {
+        const credentials = getBillCredentials();
+        if (!credentials) throw new Error('Bill is not available for this order.');
+        const url = `${BACKEND_BASE_URL}/api/invoices/customer/${credentials.orderId}/view?sessionToken=${encodeURIComponent(credentials.sessionToken)}&format=html`;
+        const win = window.open(url, '_blank', 'noopener,noreferrer');
+        if (!win) throw new Error('Please allow pop-ups to view your bill.');
       }
 
-      async function finalizePaidReceipt(order, paymentStatus = 'paid') {
-        const invoicePayload = buildInvoicePayload(order, paymentStatus);
-        const sessionToken = invoicePayload.sessionToken;
-        await syncInvoiceToOwnerDashboard(invoicePayload);
-        await endSession('payment_completed');
-        clearCartStorage();
-        clearSessionStorage();
-        state.cart.clear();
-        state.session = null;
-        state.activeOrder = null;
-        renderCart();
-        invoicePayload.sessionToken = sessionToken;
-        showReviewPrompt(invoicePayload);
+      async function downloadBill() {
+        const credentials = getBillCredentials();
+        if (!credentials) throw new Error('Bill is not available for this order.');
+        const response = await fetch(`${BACKEND_BASE_URL}/api/invoices/customer/${credentials.orderId}/view?sessionToken=${encodeURIComponent(credentials.sessionToken)}&format=pdf`);
+        if (!response.ok) {
+          const data = await response.json().catch(() => ({}));
+          throw new Error(data.message || 'PDF download failed');
+        }
+        const blob = await response.blob();
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `bill-${credentials.orderId}.pdf`;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        URL.revokeObjectURL(url);
+      }
+
+      async function beginBillExperience({
+        orderId,
+        sessionToken,
+        paymentMethod = 'online',
+        skipAnimation = false,
+      }) {
+        if (state.billAnimating) return;
+        state.billAnimating = true;
+        stopPaymentPolling();
+        clearWaitingCashOrder();
+        sessionStorage.removeItem(PENDING_ORDER_KEY);
+
+        const completed = { orderId, sessionToken, paymentMethod };
+        saveCompletedOrder(completed);
+        state.activeOrder = completed;
+
+        try {
+          const invoice = await fetchCustomerInvoice(orderId, sessionToken);
+          const legacyPayload = {
+            orderId,
+            sessionToken,
+            tableId: state.context?.table?.id,
+            restaurantId: state.context?.restaurant?.id,
+            tableNumber: invoice.order?.tableNumber,
+            customerName: invoice.order?.customerName,
+            paymentStatus: 'paid',
+            timestamp: invoice.order?.createdAt,
+            totalAmount: invoice.grandTotal,
+            items: invoice.items,
+          };
+          await syncInvoiceToOwnerDashboard(legacyPayload);
+          await endSession('payment_completed');
+          clearCartStorage();
+          clearSessionStorage();
+          state.cart.clear();
+          state.session = null;
+          renderCart();
+          lockTableAfterBooking('Payment received. Your bill is ready.');
+
+          resetReviewForm();
+          renderBillPaymentStatus(paymentMethod);
+          renderBillDetails(invoice);
+          setView('bill');
+          await playBillAnimation({ skipAnimation });
+        } catch (error) {
+          console.warn('Bill experience failed:', error.message);
+          setCheckoutPayMessage(error.message || 'Unable to load your bill. Please refresh shortly.', true);
+        } finally {
+          state.billAnimating = false;
+        }
+      }
+
+      async function tryRestorePostPaymentState() {
+        let pendingOnline = null;
+        try {
+          pendingOnline = JSON.parse(sessionStorage.getItem(PENDING_ORDER_KEY) || 'null');
+        } catch (_) {
+          pendingOnline = null;
+        }
+
+        if (pendingOnline?.orderId && pendingOnline?.sessionToken) {
+          try {
+            const status = await fetchCustomerOrderStatus(pendingOnline.orderId, pendingOnline.sessionToken);
+            if (status.paymentStatus === 'paid') {
+              await beginBillExperience({
+                orderId: pendingOnline.orderId,
+                sessionToken: pendingOnline.sessionToken,
+                paymentMethod: 'online',
+              });
+              return true;
+            }
+            state.activeOrder = pendingOnline;
+            setCheckoutPayMessage('Verifying your online payment...');
+            startPaymentPolling(pendingOnline.orderId, pendingOnline.sessionToken);
+            lockTableAfterBooking('Payment is being verified. Please wait.');
+            return true;
+          } catch (error) {
+            console.warn('Pending online restore failed:', error.message);
+          }
+        }
+
+        const completed = loadCompletedOrder();
+        if (completed?.orderId && completed?.sessionToken) {
+          try {
+            const status = await fetchCustomerOrderStatus(completed.orderId, completed.sessionToken);
+            if (status.paymentStatus === 'paid') {
+              await beginBillExperience({
+                orderId: completed.orderId,
+                sessionToken: completed.sessionToken,
+                paymentMethod: completed.paymentMethod || (status.paymentMethod === 'cash' ? 'cash' : 'online'),
+                skipAnimation: true,
+              });
+              return true;
+            }
+          } catch (error) {
+            console.warn('Completed order restore failed:', error.message);
+          }
+        }
+
+        const waiting = loadWaitingCashOrder();
+        const sessionToken = waiting?.sessionToken || state.session?.sessionToken;
+        if (waiting?.orderId && sessionToken) {
+          try {
+            const status = await fetchCustomerOrderStatus(waiting.orderId, sessionToken);
+            if (status.paymentStatus === 'paid') {
+              await beginBillExperience({
+                orderId: waiting.orderId,
+                sessionToken,
+                paymentMethod: 'cash',
+              });
+              return true;
+            }
+            showCashWaitingView(waiting, sessionToken);
+            startPaymentPolling(waiting.orderId, sessionToken);
+            lockTableAfterBooking('Order placed. Pay cash at the counter.');
+            return true;
+          } catch (error) {
+            console.warn('Waiting cash restore failed:', error.message);
+          }
+        }
+
+        return false;
+      }
+
+      async function handlePaymentConfirmed(orderId, sessionToken, paymentMethod = 'cash') {
+        if (!orderId || !sessionToken) return;
+        await beginBillExperience({ orderId, sessionToken, paymentMethod });
       }
 
       async function startOrJoinSession(joinExisting = false) {
@@ -1552,15 +2418,24 @@
           if (reason) setError('Connection lost. Reconnecting...');
         });
         state.socket.on('order:update', (payload) => {
-          if (!state.activeOrder || payload.orderId !== state.activeOrder.orderId) return;
-          if (payload.type === 'status_changed') {
+          const activeId = state.activeOrder?.orderId;
+          const waiting = loadWaitingCashOrder();
+          const orderId = payload.orderId;
+          const matchesActive = activeId && orderId === activeId;
+          const matchesWaiting = waiting?.orderId && orderId === waiting.orderId;
+          if (!matchesActive && !matchesWaiting) return;
+
+          if (payload.type === 'status_changed' && matchesActive) {
             els.trackingStatusPill.textContent = payload.status;
-            if (payload.status === 'delivered') {
-              finalizePaidReceipt(state.activeOrder, 'paid').catch((error) => console.warn(error.message));
-            }
           }
+
           if (payload.type === 'paid') {
-            finalizePaidReceipt(state.activeOrder, 'paid').catch((error) => console.warn(error.message));
+            const sessionToken = state.activeOrder?.sessionToken
+              || waiting?.sessionToken
+              || state.session?.sessionToken
+              || loadCompletedOrder()?.sessionToken;
+            const method = payload.method === 'cash' || payload.provider === 'cash' ? 'cash' : 'online';
+            handlePaymentConfirmed(orderId, sessionToken, method).catch((error) => console.warn(error.message));
           }
         });
       }
@@ -1613,8 +2488,11 @@
         clearCartStorage();
         state.cart.clear();
         renderCart();
-        await finalizePaidReceipt(order, 'paid');
-        lockTableAfterBooking('Payment received. Your order is confirmed.');
+        await beginBillExperience({
+          orderId,
+          sessionToken,
+          paymentMethod: 'online',
+        });
 
         const cleanParams = new URLSearchParams(window.location.search);
         cleanParams.delete('orderId');
@@ -1671,12 +2549,24 @@
             }
           }
 
+          state.foodCategories = Array.isArray(data.foodCategories) ? data.foodCategories : [];
+          state.selectedCategory = 'all';
           renderMenu(data.menu || []);
           renderCart();
           connectSocket();
 
           const paidOnReturn = await verifyCashfreeReturn();
-          if (!paidOnReturn) setView('menu');
+          const restoredPostPayment = paidOnReturn ? true : await tryRestorePostPaymentState();
+          if (!paidOnReturn && !restoredPostPayment) {
+            if (shouldSkipWelcome()) {
+              history.replaceState({ autorestoView: 'menu' }, '', window.location.href);
+              setView('menu');
+              els.menuState.classList.add('menu-reveal');
+            } else {
+              history.replaceState({ autorestoView: 'welcome' }, '', window.location.href);
+              setView('welcome');
+            }
+          }
         } catch (error) {
           setError(error.message || 'Unable to load table menu.');
         }
@@ -1734,15 +2624,15 @@
         try {
           const orderData = await placeOrder('cash');
           const order = buildOrderSnapshot(orderData);
+          const sessionToken = state.session.sessionToken;
           closeCheckoutModal();
+          saveWaitingCashOrder(order, sessionToken);
+          showCashWaitingView(order, sessionToken);
+          startPaymentPolling(order.orderId, sessionToken);
           lockTableAfterBooking('Order placed. Pay cash at the counter.');
-          setView('tracking');
-          showTrackingView(order, 'Pay cash at counter');
-          state.activeOrder = order;
           clearCartStorage();
           state.cart.clear();
           renderCart();
-          setToast('trackingStatusPill', `Pay INR ${money(order.totalAmount)} at counter`, 'success');
         } catch (error) {
           setCheckoutPayMessage(error.message || 'Cash checkout failed', true);
         }
@@ -1790,6 +2680,12 @@
 
       function attachEvents() {
         els.retryBtn.addEventListener('click', loadTable);
+        els.orderFoodBtn?.addEventListener('click', () => {
+          enterMenuWithAnimation(els.orderFoodBtn).catch((error) => {
+            console.warn('Menu expansion failed:', error.message);
+            finalizeMenuEnter();
+          });
+        });
         els.clearCartBtn.addEventListener('click', () => clearCart());
         els.proceedBtn.addEventListener('click', openCheckoutModal);
         els.closeCheckoutBtn.addEventListener('click', closeCheckoutModal);
@@ -1809,25 +2705,25 @@
           });
         });
         els.reviewSubmitBtn?.addEventListener('click', submitReview);
-        els.reviewSkipBtn?.addEventListener('click', completeReviewFlow);
 
-        els.receiptPrintBtn?.addEventListener('click', async () => {
+        els.billViewBtn?.addEventListener('click', async () => {
           try {
-            await printReceipt();
+            await viewBill();
           } catch (error) {
-            setCheckoutPayMessage(error.message || 'Unable to print receipt', true);
+            setCheckoutPayMessage(error.message || 'Unable to open bill', true);
           }
         });
 
-        els.receiptPdfBtn?.addEventListener('click', async () => {
+        els.billDownloadBtn?.addEventListener('click', async () => {
           try {
-            await downloadReceiptPdf();
+            await downloadBill();
           } catch (error) {
-            setCheckoutPayMessage(error.message || 'Unable to download PDF', true);
+            setCheckoutPayMessage(error.message || 'Unable to download bill', true);
           }
         });
       }
 
+      setupHistoryNavigation();
       attachEvents();
       loadTable();
     </script>
