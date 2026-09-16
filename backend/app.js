@@ -29,6 +29,10 @@ const { buildAllowedOrigins, createOriginValidator } = require('./src/config/cor
 
 const app = express();
 
+if (process.env.NODE_ENV === 'production') {
+  app.set('trust proxy', 1);
+}
+
 const allowedOrigins = buildAllowedOrigins();
 
 const corsOptions = {

@@ -960,15 +960,13 @@
       </div>
     </div>
 
-    <script src="assets/js/config.js"></script>
-    <script src="assets/js/vendor/socket.io.min.js"></script>
-    <script src="assets/js/socketClient.js"></script>
+    <script src="assets/js/config.js?v=4.8.3"></script>
+    <script src="assets/js/vendor/socket.io.min.js?v=4.8.3"></script>
+    <script src="assets/js/socketClient.js?v=4.8.3"></script>
     <script src="assets/js/billHistoryGuard.js"></script>
     <script src="assets/js/billPrinter.js"></script>
     <script>
-      const PRODUCTION_API = 'https://restaurant-backend-rxqz.onrender.com';
-      const BACKEND_BASE_URL = window.API_URL || window.APP_CONFIG?.API_BASE_URL || PRODUCTION_API;
-      const SOCKET_URL = window.APP_CONFIG?.SOCKET_URL || BACKEND_BASE_URL;
+      const BACKEND_BASE_URL = window.API_URL || window.APP_CONFIG?.API_BASE_URL || window.APP_CONFIG?.BACKEND_PUBLIC_URL || '';
 
       const els = {
         restaurantTitle: document.getElementById('restaurantTitle'),
@@ -2014,13 +2012,17 @@
       async function connectSocket() {
         if (!state.context?.restaurant?.id) return;
 
+        if (!window.AutoRestoSocket) {
+          console.warn('[AutoResto] Realtime socket disabled; payment status will use polling.');
+          return;
+        }
+
         if (state.socket) {
-          state.socket.disconnect();
+          window.AutoRestoSocket.disconnect();
           state.socket = null;
         }
 
-        const socket = await window.AutoRestoSocket.connect(SOCKET_URL, {
-          transports: ['websocket', 'polling'],
+        const socket = await window.AutoRestoSocket.connect({
           reconnectionAttempts: 5,
         });
 

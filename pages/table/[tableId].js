@@ -1,3 +1,4 @@
+// Legacy Next.js prototype — not used in production (autoresto.in uses frontend/table.html).
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/router";
 

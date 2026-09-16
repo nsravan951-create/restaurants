@@ -60,11 +60,22 @@ async function loadStaffBoard() {
   });
 }
 
-function initStaffSocket() {
+async function initStaffSocket() {
   const auth = getStaffAuth();
   if (!auth) return;
+  if (!window.AutoRestoSocket) {
+    console.warn('[AutoResto] Socket wrapper unavailable; staff board will use REST refresh.');
+    return;
+  }
 
-  const socket = io(window.APP_CONFIG.SOCKET_URL, { auth: { token: auth.token } });
+  const socket = await window.AutoRestoSocket.connect({
+    auth: { token: auth.token },
+  });
+  if (!socket) {
+    console.warn('[AutoResto] Staff realtime disabled; board will use REST refresh.');
+    return;
+  }
+
   socket.emit('restaurant:join', auth.restaurant.id);
   socket.on('order:update', () => {
     loadStaffBoard().catch((error) => setMessage('staffMessage', error.message, true));
@@ -72,4 +83,4 @@ function initStaffSocket() {
 }
 
 loadStaffBoard().catch((error) => setMessage('staffMessage', error.message, true));
-initStaffSocket();
+initStaffSocket().catch((error) => console.warn('[AutoResto] Staff socket setup failed:', error.message));

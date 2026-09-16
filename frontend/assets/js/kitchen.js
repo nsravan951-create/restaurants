@@ -84,11 +84,22 @@ async function loadKitchenBoard() {
   });
 }
 
-function initKitchenSocket() {
+async function initKitchenSocket() {
   const auth = getKitchenAuth();
   if (!auth) return;
+  if (!window.AutoRestoSocket) {
+    console.warn('[AutoResto] Socket wrapper unavailable; kitchen board will use REST refresh.');
+    return;
+  }
 
-  const socket = io(window.APP_CONFIG.SOCKET_URL, { auth: { token: auth.token } });
+  const socket = await window.AutoRestoSocket.connect({
+    auth: { token: auth.token },
+  });
+  if (!socket) {
+    console.warn('[AutoResto] Kitchen realtime disabled; board will use REST refresh.');
+    return;
+  }
+
   socket.emit('restaurant:join', auth.restaurant.id);
   socket.on('order:update', () => {
     loadKitchenBoard().catch((error) => setMessage('kitchenMessage', error.message, true));
@@ -96,4 +107,4 @@ function initKitchenSocket() {
 }
 
 loadKitchenBoard().catch((error) => setMessage('kitchenMessage', error.message, true));
-initKitchenSocket();
+initKitchenSocket().catch((error) => console.warn('[AutoResto] Kitchen socket setup failed:', error.message));

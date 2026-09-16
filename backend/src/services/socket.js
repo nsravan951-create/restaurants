@@ -8,6 +8,13 @@ function getSocket() {
   return ioInstance;
 }
 
+function getIO() {
+  if (!ioInstance) {
+    throw new Error('Socket.IO has not been initialized');
+  }
+  return ioInstance;
+}
+
 function emitOrderUpdate(restaurantId, payload) {
   if (!ioInstance) return;
   ioInstance.to(`restaurant_${restaurantId}`).emit('order:update', payload);
@@ -27,6 +34,7 @@ function emitInvoiceCreated(restaurantId, payload) {
 module.exports = {
   initSocket,
   getSocket,
+  getIO,
   emitOrderUpdate,
   emitTableUpdate,
   emitInvoiceCreated,

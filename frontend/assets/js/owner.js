@@ -1473,12 +1473,21 @@ async function loadInvoices() {
   }
 }
 
-function initSocket() {
+async function initSocket() {
   if (!ensureRestaurantId()) return;
-  const socket = io(window.APP_CONFIG.SOCKET_URL, {
-    transports: ['websocket', 'polling'],
+  if (!window.AutoRestoSocket) {
+    console.warn('[AutoResto] Socket wrapper unavailable; realtime updates disabled.');
+    return;
+  }
+
+  const socket = await window.AutoRestoSocket.connect({
     auth: { token: getAuth()?.token },
   });
+  if (!socket) {
+    console.warn('[AutoResto] Owner realtime disabled; dashboard will use REST refresh.');
+    return;
+  }
+
   socket.emit('restaurant:join', restaurantId);
 
   socket.on('order:update', (payload) => {
@@ -1542,7 +1551,7 @@ async function initOwner() {
     buildOwnerSidebar();
     setActiveSection('dashboard');
     await loadDashboard();
-    initSocket();
+    await initSocket();
     if (getLockedFeatureCount() > 0) {
       setTimeout(() => showFloatingPromo('manual'), 1200);
     }

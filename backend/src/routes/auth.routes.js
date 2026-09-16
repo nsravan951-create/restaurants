@@ -10,7 +10,7 @@ const asyncHandler = require('../utils/asyncHandler');
 const { requireAuth } = require('../middleware/auth');
 const { buildQrPayload } = require('../utils/qr');
 const { getJwtSecret } = require('../config/env');
-const { authLimiter } = require('../middleware/rateLimit');
+const { authLimiter, loginFailureLimiter } = require('../middleware/rateLimit');
 
 const router = express.Router();
 
@@ -139,7 +139,7 @@ router.post('/register-owner', authLimiter, asyncHandler(async (req, res) => {
   }
 }));
 
-router.post('/login', authLimiter, asyncHandler(async (req, res) => {
+router.post('/login', loginFailureLimiter, asyncHandler(async (req, res) => {
   const data = loginSchema.parse(req.body);
 
   const { rows } = await pool.query(

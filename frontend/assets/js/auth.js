@@ -63,9 +63,18 @@ async function performLogin(formData) {
   });
 }
 
+function setFormBusy(form, busy) {
+  if (!form) return;
+  form.querySelectorAll('button, input').forEach((el) => {
+    el.disabled = busy;
+  });
+}
+
 async function handleOwnerLogin(event) {
   event.preventDefault();
-  const formData = new FormData(event.target);
+  const form = event.target;
+  const formData = new FormData(form);
+  setFormBusy(form, true);
 
   try {
     const data = await performLogin(formData);
@@ -86,13 +95,20 @@ async function handleOwnerLogin(event) {
     setAuth(data);
     await goToPage(redirectAfterLogin(data.user), { statusText: 'Loading...' });
   } catch (error) {
-    setMessage('authMessage', error.message, true);
+    const message = error.status === 429
+      ? 'Too many login attempts. Please wait a few minutes and try again.'
+      : error.message;
+    setMessage('authMessage', message, true);
+  } finally {
+    setFormBusy(form, false);
   }
 }
 
 async function handleTeamLogin(event) {
   event.preventDefault();
-  const formData = new FormData(event.target);
+  const form = event.target;
+  const formData = new FormData(form);
+  setFormBusy(form, true);
 
   try {
     const data = await performLogin(formData);
@@ -118,13 +134,20 @@ async function handleTeamLogin(event) {
     setAuth(data);
     await goToPage('./team.html', { statusText: 'Loading...' });
   } catch (error) {
-    setMessage('authMessage', error.message, true);
+    const message = error.status === 429
+      ? 'Too many login attempts. Please wait a few minutes and try again.'
+      : error.message;
+    setMessage('authMessage', message, true);
+  } finally {
+    setFormBusy(form, false);
   }
 }
 
 async function handleLogin(event) {
   event.preventDefault();
-  const formData = new FormData(event.target);
+  const form = event.target;
+  const formData = new FormData(form);
+  setFormBusy(form, true);
 
   try {
     const data = await performLogin(formData);
@@ -132,7 +155,12 @@ async function handleLogin(event) {
     setAuth(data);
     await goToPage(redirectAfterLogin(data.user), { statusText: 'Loading...' });
   } catch (error) {
-    setMessage('authMessage', error.message, true);
+    const message = error.status === 429
+      ? 'Too many login attempts. Please wait a few minutes and try again.'
+      : error.message;
+    setMessage('authMessage', message, true);
+  } finally {
+    setFormBusy(form, false);
   }
 }
 
