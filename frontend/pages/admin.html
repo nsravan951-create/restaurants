@@ -4,6 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>SaaS Admin — Restaurant Control Center</title>
+  <link rel="icon" href="../favicon.svg" type="image/svg+xml" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@600;700&family=Sora:wght@400;500;600&display=swap" rel="stylesheet" />
@@ -14,15 +15,15 @@
   <script src="../assets/js/common.js"></script>
 </head>
 <body class="theme-dark admin-page">
-  <div class="admin-shell">
-    <aside class="admin-sidebar panel">
-      <div>
+  <div class="admin-shell" id="adminShellTop">
+    <aside class="admin-sidebar">
+      <div class="admin-sidebar__scroll">
+      <div class="admin-sidebar__head">
         <p class="eyebrow admin-eyebrow">Master Admin</p>
         <h1>Control Center</h1>
         <p class="admin-intro">Platform command center for restaurants, finance, teams, and operations.</p>
       </div>
-
-      <nav class="admin-nav">
+      <nav class="admin-nav" aria-label="Admin navigation">
         <button data-section="overview" class="admin-link active">📊 Dashboard</button>
         <div class="ma-nav-group">
           <p class="ma-nav-group__label">Finance</p>
@@ -60,6 +61,7 @@
         </div>
         <button id="logoutButton" class="admin-link admin-link--danger">🚪 Logout</button>
       </nav>
+      </div>
 
       <div class="admin-sidebar__footer">
         <div id="sessionSummary" class="admin-sidebar__note">Ready to manage the platform.</div>
@@ -68,7 +70,7 @@
     </aside>
 
     <main class="admin-main">
-      <header class="panel admin-topbar">
+      <header id="adminTopbar" class="panel admin-topbar">
         <div>
           <p class="eyebrow">SaaS Command Center</p>
           <h2>Full restaurant ecosystem — dine-in, delivery aggregators &amp; offline revenue.</h2>

@@ -746,8 +746,7 @@ body.bill-modal-open {
   backdrop-filter: blur(4px);
 }
 
-.bill-modal.is-open,
-.bill-modal:not(.hidden) {
+.bill-modal.is-open {
   display: flex;
 }
 

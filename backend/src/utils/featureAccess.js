@@ -32,7 +32,7 @@ const FEATURE_RESOLUTION_SQL = `
     f.name,
     rf.enabled AS admin_enabled,
     rf.source AS admin_source,
-    rf.id AS override_id,
+    rf.feature_id AS override_id,
     EXISTS (
       SELECT 1
       FROM plan_features pf

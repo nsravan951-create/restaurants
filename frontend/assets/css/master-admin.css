@@ -1,19 +1,63 @@
 /* Master Admin — premium hover cards, motion, polish */
 
-html.admin-page,
+html.admin-page {
+  height: auto;
+  overflow-x: hidden;
+  overflow-y: scroll;
+  scroll-behavior: auto;
+}
+
 body.admin-page {
   overflow-x: hidden;
-  overflow-y: auto;
-  min-height: 100%;
+  overflow-y: visible;
+  min-height: 100vh;
   height: auto;
+  margin: 0;
+}
+
+body.admin-page.bill-modal-open {
+  overflow: hidden !important;
 }
 
 body.admin-page .admin-main {
-  padding-bottom: 3rem;
+  padding-bottom: 4rem;
+  min-height: 0;
 }
 
 body.admin-page .admin-shell {
   align-items: start;
+  min-height: 0;
+}
+
+body.admin-page main.admin-main {
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  overflow: visible;
+}
+
+body.admin-page .admin-table-wrap {
+  max-height: none;
+  overflow: visible;
+}
+
+body.admin-page .admin-table-wrap.panel {
+  margin-bottom: 0;
+}
+
+body.admin-page .bill-modal.hidden {
+  display: none !important;
+  pointer-events: none;
+  visibility: hidden;
+}
+
+body.admin-page #restaurantHubTable {
+  min-height: 0;
+}
+
+body.admin-page .admin-topbar {
+  position: relative;
+  z-index: 1;
 }
 
 .theme-dark .bill-modal__sheet,
@@ -247,6 +291,11 @@ body.admin-page .admin-shell {
   overflow: hidden;
   display: flex;
   flex-direction: column;
+  pointer-events: auto;
+}
+
+.bill-modal__sheet {
+  pointer-events: auto;
 }
 
 .ma-profile-body {
@@ -564,8 +613,11 @@ body.admin-page .admin-shell {
 
 .ma-toggle-input {
   position: absolute;
+  width: 1px;
+  height: 1px;
   opacity: 0;
-  pointer-events: none;
+  margin: 0;
+  flex-shrink: 0;
 }
 
 .ma-feature-toggle {

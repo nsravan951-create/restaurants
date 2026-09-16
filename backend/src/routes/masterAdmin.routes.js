@@ -620,17 +620,23 @@ router.patch('/restaurants/:restaurantId/features', requirePlatformPermission('f
     return res.status(400).json({ message: 'features array is required' });
   }
 
+  let updated = 0;
   for (const item of items) {
     const featureKey = String(item.key || item.featureKey || '').trim();
-    const enabled = item.enabled !== false;
+    const enabled = item.enabled === true;
     if (!featureKey) continue;
-    await pool.query(
+    const { rowCount } = await pool.query(
       `INSERT INTO restaurant_features (restaurant_id, feature_id, enabled, source)
        SELECT $1, id, $3, 'admin' FROM features WHERE feature_key = $2
        ON CONFLICT (restaurant_id, feature_id)
        DO UPDATE SET enabled = EXCLUDED.enabled, source = 'admin', updated_at = CURRENT_TIMESTAMP`,
       [restaurantId, featureKey, enabled]
     );
+    if (rowCount) updated += 1;
+  }
+
+  if (!updated) {
+    return res.status(404).json({ message: 'No matching features found to update. Seed the features catalog first.' });
   }
 
   await writeAuditLog({
@@ -651,17 +657,43 @@ router.patch('/restaurants/:restaurantId/features', requirePlatformPermission('f
 router.post('/restaurants/:restaurantId/features/:featureKey', requirePlatformPermission('features.manage'), asyncHandler(async (req, res) => {
   const restaurantId = Number(req.params.restaurantId);
   const featureKey = String(req.params.featureKey || '').trim();
-  const enabled = req.body?.enabled !== false;
+  const enabled = req.body?.enabled === true;
 
-  const { rows } = await pool.query(
-    `INSERT INTO restaurant_features (restaurant_id, feature_id, enabled, source)
-     SELECT $1, id, $3, 'admin' FROM features WHERE feature_key = $2
-     ON CONFLICT (restaurant_id, feature_id)
-     DO UPDATE SET enabled = EXCLUDED.enabled, source = 'admin', updated_at = CURRENT_TIMESTAMP
-     RETURNING restaurant_id, feature_id, enabled`,
-    [restaurantId, featureKey, enabled]
+  if (!featureKey) {
+    return res.status(400).json({ message: 'Feature key is required' });
+  }
+
+  const { rows: restaurantRows } = await pool.query(
+    'SELECT id FROM restaurants WHERE id = $1 LIMIT 1',
+    [restaurantId]
   );
-  if (!rows.length) return res.status(404).json({ message: 'Feature not found' });
+  if (!restaurantRows.length) {
+    return res.status(404).json({ message: 'Restaurant not found' });
+  }
+
+  let rows;
+  try {
+    const result = await pool.query(
+      `INSERT INTO restaurant_features (restaurant_id, feature_id, enabled, source)
+       SELECT $1, id, $3, 'admin' FROM features WHERE feature_key = $2
+       ON CONFLICT (restaurant_id, feature_id)
+       DO UPDATE SET enabled = EXCLUDED.enabled, source = 'admin', updated_at = CURRENT_TIMESTAMP
+       RETURNING restaurant_id, feature_id, enabled`,
+      [restaurantId, featureKey, enabled]
+    );
+    rows = result.rows;
+  } catch (error) {
+    if (error.code === '42P01') {
+      return res.status(503).json({ message: 'Features tables missing. Run database migrations (001, 013).' });
+    }
+    throw error;
+  }
+
+  if (!rows.length) {
+    return res.status(404).json({
+      message: `Feature "${featureKey}" not found. Run database migrations to seed the features catalog.`,
+    });
+  }
 
   await writeAuditLog({
     actorUserId: req.user.userId,

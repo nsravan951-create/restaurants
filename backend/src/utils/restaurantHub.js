@@ -1,78 +1,171 @@
 const pool = require('../config/db');
 const { listRestaurantFeatures } = require('./featureAccess');
 
+function isMissingSchemaError(error) {
+  return error?.code === '42703' || error?.code === '42P01';
+}
+
+async function safeQuery(label, queryFn, fallback) {
+  try {
+    return await queryFn();
+  } catch (error) {
+    if (isMissingSchemaError(error)) {
+      console.warn(`[restaurantHub] ${label}: ${error.message}`);
+      return fallback;
+    }
+    throw error;
+  }
+}
+
 async function loadRestaurantFinancials(restaurantId) {
   const { rows } = await pool.query(
-    `SELECT id, name, slug, phone, address, is_active, onboarding_status,
-            upi_vpa, bank_account_name, bank_name,
-            legal_name, gstin, business_address, state_name, state_code,
-            default_gst_rate, invoice_prefix, fssai_license,
-            subscription_plan, subscription_status, subscription_expires_at,
-            dashboard_layout, created_at, last_activity_at
-     FROM restaurants WHERE id = $1 LIMIT 1`,
+    'SELECT * FROM restaurants WHERE id = $1 LIMIT 1',
     [restaurantId]
   );
   if (!rows.length) return null;
 
   const restaurant = rows[0];
-  const { rows: ownerRows } = await pool.query(
-    `SELECT id, name, email, phone, last_login_at FROM users WHERE id = (
-       SELECT owner_user_id FROM restaurants WHERE id = $1
-     ) LIMIT 1`,
-    [restaurantId]
+
+  const ownerRows = await safeQuery(
+    'owner',
+    async () => {
+      const result = await pool.query(
+        `SELECT id, name, email, phone, last_login_at FROM users WHERE id = (
+           SELECT owner_user_id FROM restaurants WHERE id = $1
+         ) LIMIT 1`,
+        [restaurantId]
+      );
+      return result.rows;
+    },
+    []
   );
 
-  const { rows: bankRows } = await pool.query(
-    `SELECT id, account_holder_name, bank_name, account_number_last4, ifsc_code,
-            upi_id, verification_status, is_primary, created_at, updated_at
-     FROM restaurant_bank_accounts WHERE restaurant_id = $1
-     ORDER BY is_primary DESC, id DESC`,
-    [restaurantId]
-  ).catch(() => ({ rows: [] }));
+  const bankRows = await safeQuery(
+    'bank accounts',
+    async () => {
+      const result = await pool.query(
+        `SELECT id, account_holder_name, bank_name, account_number_last4, ifsc_code,
+                upi_id, verification_status, is_primary, created_at, updated_at
+         FROM restaurant_bank_accounts WHERE restaurant_id = $1
+         ORDER BY is_primary DESC, id DESC`,
+        [restaurantId]
+      );
+      return result.rows;
+    },
+    []
+  );
 
-  const features = await listRestaurantFeatures(restaurantId);
+  let features = await safeQuery(
+    'features',
+    () => listRestaurantFeatures(restaurantId),
+    []
+  );
 
-  const { rows: subRows } = await pool.query(
-    `SELECT s.id, s.status, s.starts_at, s.ends_at, s.amount, s.currency, s.provider_order_id,
-            p.code AS plan_code, p.name AS plan_name
-     FROM subscriptions s
-     INNER JOIN plans p ON p.id = s.plan_id
-     WHERE s.restaurant_id = $1
-     ORDER BY s.created_at DESC LIMIT 5`,
-    [restaurantId]
-  ).catch(() => ({ rows: [] }));
+  if (!features.length) {
+    const catalogRows = await safeQuery(
+      'feature catalog',
+      async () => {
+        const result = await pool.query(
+          'SELECT feature_key, name FROM features WHERE is_active = TRUE ORDER BY name ASC'
+        );
+        return result.rows;
+      },
+      []
+    );
+    features = catalogRows.map((row) => ({
+      feature_key: row.feature_key,
+      name: row.name,
+      enabled: false,
+      source: 'none',
+      from_plan: false,
+      has_admin_override: false,
+    }));
+  }
 
-  const { rows: upgradePayments } = await pool.query(
-    `SELECT pt.id, pt.order_id, pt.amount, pt.status, pt.payment_provider,
-            pt.provider_order_id, pt.provider_payment_id, pt.payment_purpose, pt.created_at,
-            rua.id AS activation_id, rua.status AS activation_status, rua.activated_at
-     FROM payment_transactions pt
-     LEFT JOIN restaurant_upgrade_activations rua ON rua.payment_transaction_id = pt.id
-     WHERE pt.restaurant_id = $1
-       AND pt.payment_purpose IN ('RESTAURANT_UPGRADE', 'RESTAURANT_SUBSCRIPTION')
-     ORDER BY pt.created_at DESC LIMIT 20`,
-    [restaurantId]
-  ).catch(() => ({ rows: [] }));
+  const subRows = await safeQuery(
+    'subscriptions',
+    async () => {
+      const result = await pool.query(
+        `SELECT s.id, s.status, s.starts_at, s.ends_at, s.amount, s.currency, s.provider_order_id,
+                p.code AS plan_code, p.name AS plan_name
+         FROM subscriptions s
+         INNER JOIN plans p ON p.id = s.plan_id
+         WHERE s.restaurant_id = $1
+         ORDER BY s.created_at DESC LIMIT 5`,
+        [restaurantId]
+      );
+      return result.rows;
+    },
+    []
+  );
 
-  const { rows: commissionRows } = await pool.query(
-    `SELECT COALESCE(SUM(charge_amount), 0)::numeric AS total_commission,
-            COUNT(*)::int AS chargeable_orders
-     FROM chargeable_order_ledger WHERE restaurant_id = $1 AND status = 'chargeable'`,
-    [restaurantId]
-  ).catch(() => ({ rows: [{ total_commission: 0, chargeable_orders: 0 }] }));
+  const upgradePayments = await safeQuery(
+    'upgrade payments',
+    async () => {
+      try {
+        const result = await pool.query(
+          `SELECT pt.id, pt.order_id, pt.amount, pt.status, pt.payment_provider,
+                  pt.provider_order_id, pt.provider_payment_id, pt.payment_purpose, pt.created_at,
+                  rua.id AS activation_id, rua.status AS activation_status, rua.activated_at
+           FROM payment_transactions pt
+           LEFT JOIN restaurant_upgrade_activations rua ON rua.payment_transaction_id = pt.id
+           WHERE pt.restaurant_id = $1
+             AND pt.payment_purpose IN ('RESTAURANT_UPGRADE', 'RESTAURANT_SUBSCRIPTION')
+           ORDER BY pt.created_at DESC LIMIT 20`,
+          [restaurantId]
+        );
+        return result.rows;
+      } catch (error) {
+        if (!isMissingSchemaError(error)) throw error;
+        const result = await pool.query(
+          `SELECT pt.id, pt.order_id, pt.amount, pt.status, pt.payment_provider,
+                  pt.provider_order_id, pt.provider_payment_id, pt.payment_purpose, pt.created_at,
+                  NULL::integer AS activation_id, NULL::varchar AS activation_status, NULL::timestamp AS activated_at
+           FROM payment_transactions pt
+           WHERE pt.restaurant_id = $1
+             AND pt.payment_purpose IN ('RESTAURANT_UPGRADE', 'RESTAURANT_SUBSCRIPTION')
+           ORDER BY pt.created_at DESC LIMIT 20`,
+          [restaurantId]
+        );
+        return result.rows;
+      }
+    },
+    []
+  );
 
-  const { rows: revenueRows } = await pool.query(
+  const commissionRows = await safeQuery(
+    'commission',
+    async () => {
+      const result = await pool.query(
+        `SELECT COALESCE(SUM(charge_amount), 0)::numeric AS total_commission,
+                COUNT(*)::int AS chargeable_orders
+         FROM chargeable_order_ledger WHERE restaurant_id = $1 AND status = 'chargeable'`,
+        [restaurantId]
+      );
+      return result.rows;
+    },
+    [{ total_commission: 0, chargeable_orders: 0 }]
+  );
+
+  const revenueRows = await pool.query(
     `SELECT COALESCE(SUM(total_amount), 0)::numeric AS total_revenue,
             COUNT(*)::int AS paid_orders
      FROM orders WHERE restaurant_id = $1 AND payment_status = 'paid'`,
     [restaurantId]
   );
 
-  const { rows: pendingSettlements } = await pool.query(
-    `SELECT COUNT(*)::int AS count FROM settlements
-     WHERE restaurant_id = $1 AND status IN ('pending', 'processing', 'on_hold')`,
-    [restaurantId]
-  ).catch(() => ({ rows: [{ count: 0 }] }));
+  const pendingSettlements = await safeQuery(
+    'settlements',
+    async () => {
+      const result = await pool.query(
+        `SELECT COUNT(*)::int AS count FROM settlements
+         WHERE restaurant_id = $1 AND status IN ('pending', 'processing', 'on_hold')`,
+        [restaurantId]
+      );
+      return result.rows;
+    },
+    [{ count: 0 }]
+  );
 
   return {
     restaurant,

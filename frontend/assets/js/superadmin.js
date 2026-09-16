@@ -22,6 +22,7 @@
     dashboardRange: '30d',
     pendingUpgradeId: null,
     dashboardLoading: false,
+    modalOpenedAt: 0,
   };
 
   const currencyFormatter = new Intl.NumberFormat('en-IN', {
@@ -58,6 +59,7 @@
   function showModal(modalId) {
     const modal = el(modalId);
     if (!modal) return;
+    state.modalOpenedAt = Date.now();
     modal.classList.remove('hidden');
     modal.classList.add('is-open');
     modal.setAttribute('aria-hidden', 'false');
@@ -70,7 +72,7 @@
     modal.classList.add('hidden');
     modal.classList.remove('is-open');
     modal.setAttribute('aria-hidden', 'true');
-    if (!document.querySelector('.bill-modal.is-open:not(.hidden)')) {
+    if (!document.querySelector('.bill-modal.is-open')) {
       document.body.classList.remove('bill-modal-open');
     }
     if (modalId === 'restaurantProfileModal') {
@@ -84,17 +86,28 @@
 
   function setSection(section) {
     state.activeSection = section;
-    document.querySelectorAll('.admin-section').forEach((node) => node.classList.add('hidden'));
+    document.querySelectorAll('.admin-section').forEach((node) => {
+      const isActive = node.id === `section-${section}`;
+      node.classList.toggle('hidden', !isActive);
+      node.setAttribute('aria-hidden', isActive ? 'false' : 'true');
+    });
     const target = document.getElementById(`section-${section}`);
     if (target) {
-      target.classList.remove('hidden');
-      window.scrollTo({ top: 0, behavior: 'auto' });
+      requestAnimationFrame(() => {
+        window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+        document.documentElement.scrollTop = 0;
+        document.body.scrollTop = 0;
+      });
     }
-    document.body.classList.remove('bill-modal-open');
+    resetAdminModals();
 
     document.querySelectorAll('.admin-link[data-section]').forEach((button) => {
       button.classList.toggle('active', button.dataset.section === section);
     });
+
+    const activeNav = document.querySelector(`.admin-link[data-section="${section}"]`);
+    activeNav?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    el('adminTopbar')?.classList.toggle('hidden', section !== 'overview');
 
     if (section === 'platform-bank') loadPlatformBank().catch((e) => setMessage(e.message, true));
     if (section === 'profits') loadSaasProfits();
@@ -1368,7 +1381,21 @@
       state.hubQuery = e.target.value;
       renderRestaurantHubTable();
     });
-    el('closeProfileModal')?.addEventListener('click', closeRestaurantProfile);
+    el('restaurantHubTable')?.addEventListener('click', (event) => {
+      const btn = event.target.closest('[data-open-profile]');
+      if (!btn) return;
+      event.preventDefault();
+      event.stopPropagation();
+      openRestaurantProfile(
+        Number(btn.dataset.openProfile),
+        btn.dataset.profileTab || 'overview'
+      );
+    });
+    el('closeProfileModal')?.addEventListener('click', (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      closeRestaurantProfile();
+    });
     el('platformBankForm')?.addEventListener('submit', (e) => {
       savePlatformBank(e).catch((error) => setMessage(error.message, true));
     });
@@ -1377,8 +1404,13 @@
     });
     ['restaurantProfileModal', 'upgradeActivateModal', 'paymentAuthModal'].forEach((modalId) => {
       const modal = el(modalId);
+      modal?.querySelector('.bill-modal__sheet')?.addEventListener('click', (event) => {
+        event.stopPropagation();
+      });
       modal?.addEventListener('click', (event) => {
-        if (event.target === modal) closeModal(modalId);
+        if (event.target !== modal) return;
+        if (Date.now() - state.modalOpenedAt < 350) return;
+        closeModal(modalId);
       });
     });
     document.addEventListener('keydown', (event) => {
@@ -2026,20 +2058,67 @@
       </table>
     ` || '<p class="muted">No restaurants found.</p>';
 
-    root.querySelectorAll('[data-open-profile]').forEach((btn) => {
-      btn.addEventListener('click', () => openRestaurantProfile(
-        Number(btn.dataset.openProfile),
-        btn.dataset.profileTab || 'overview'
-      ));
+  }
+
+  function showProfileLoadError(message) {
+    const panel = document.querySelector(`[data-profile-panel="${state.profileTab || 'overview'}"]`);
+    if (panel) {
+      panel.innerHTML = `
+        <article class="panel ma-hover-card">
+          <h4>Could not load profile</h4>
+          <p class="muted">${escapeHtml(message || 'Unknown error')}</p>
+          <p class="muted">Run <code>cd backend && npm run db:migrate</code> on production if this is a new install.</p>
+          <button type="button" class="btn btn-light" id="profileRetryBtn">Retry</button>
+        </article>
+      `;
+      el('profileRetryBtn')?.addEventListener('click', () => {
+        if (state.profileRestaurantId) {
+          openRestaurantProfile(state.profileRestaurantId, state.profileTab);
+        }
+      });
+    }
+    setMessage(message || 'Could not load restaurant profile.', true);
+  }
+
+  function mergeProfileFeatures(profileFeatures, registry) {
+    const resolved = profileFeatures || [];
+    const byKey = new Map(resolved.map((row) => [row.feature_key, row]));
+    const catalog = (registry && registry.length) ? registry : resolved;
+    const keys = new Set();
+    const merged = [];
+
+    catalog.forEach((row) => {
+      const key = row.feature_key || row.key;
+      if (!key || keys.has(key)) return;
+      keys.add(key);
+      const existing = byKey.get(key);
+      merged.push({
+        feature_key: key,
+        name: row.name || existing?.name || key,
+        enabled: existing?.enabled ?? false,
+        source: existing?.source || 'none',
+        from_plan: existing?.from_plan ?? false,
+        has_admin_override: existing?.has_admin_override ?? false,
+      });
     });
+
+    resolved.forEach((row) => {
+      if (!keys.has(row.feature_key)) merged.push(row);
+    });
+
+    return merged;
   }
 
   async function openRestaurantProfile(restaurantId, initialTab = 'overview') {
+    if (state.profileLoading) return;
+    state.profileLoading = true;
     state.profileRestaurantId = restaurantId;
     state.profileData = null;
     state.profileTab = initialTab;
     showModal('restaurantProfileModal');
     setProfileTab(initialTab);
+    el('profileRestaurantName').textContent = 'Loading…';
+    el('profileRestaurantMeta').textContent = '';
     const activePanel = document.querySelector(`[data-profile-panel="${initialTab}"]`);
     if (activePanel) {
       activePanel.innerHTML = '<p class="muted">Loading restaurant profile…</p>';
@@ -2047,12 +2126,14 @@
 
     try {
       const data = await apiRequest(`/api/master-admin/restaurants/${restaurantId}/profile`, {}, true);
-      state.profileData = data;
       await loadFeatureRegistry();
+      data.features = mergeProfileFeatures(data.features, state.featureRegistry);
+      state.profileData = data;
       renderRestaurantProfile();
     } catch (error) {
-      closeModal('restaurantProfileModal');
-      setMessage(error.message || 'Could not load restaurant profile. Run database migrations if this is a new install.', true);
+      showProfileLoadError(error.message || 'Could not load restaurant profile.');
+    } finally {
+      state.profileLoading = false;
     }
   }
 
@@ -2116,26 +2197,49 @@
   async function toggleRestaurantFeature(featureKey, enabled) {
     const result = await apiRequest(
       `/api/master-admin/restaurants/${state.profileRestaurantId}/features/${encodeURIComponent(featureKey)}`,
-      { method: 'POST', body: JSON.stringify({ enabled }) },
+      { method: 'POST', body: JSON.stringify({ enabled: Boolean(enabled) }) },
       true
     );
-    state.profileData.features = result.features || state.profileData.features;
+    state.profileData.features = mergeProfileFeatures(
+      result.features || state.profileData.features,
+      state.featureRegistry
+    );
     return result;
   }
 
   function renderProfileFeatures(data) {
-    const features = data.features || [];
+    const features = mergeProfileFeatures(data.features, state.featureRegistry);
+    data.features = features;
     const panel = el('profileTabFeatures');
+    if (!features.length) {
+      panel.innerHTML = `
+        <p class="muted">No features found in the database. Run migrations (001 and 013) to seed the features catalog.</p>
+        <button type="button" class="btn btn-light btn-sm" id="featuresReloadBtn">Reload features</button>
+      `;
+      el('featuresReloadBtn')?.addEventListener('click', async () => {
+        try {
+          await loadFeatureRegistry();
+          const profile = await apiRequest(`/api/master-admin/restaurants/${state.profileRestaurantId}/profile`, {}, true);
+          profile.features = mergeProfileFeatures(profile.features, state.featureRegistry);
+          state.profileData = profile;
+          renderProfileFeatures(profile);
+        } catch (error) {
+          setMessage(error.message, true);
+        }
+      });
+      return;
+    }
+
     panel.innerHTML = `
       <div class="admin-toolbar" style="margin-bottom:0.75rem;">
-        <p class="muted" style="margin:0;">Admin override beats plan. Disabled here blocks the feature even if subscribed.</p>
+        <p class="muted" style="margin:0;">Admin override beats plan. Toggle to enable or disable each feature for this restaurant.</p>
         <button type="button" class="btn btn-light btn-sm" id="featuresEnableAll">Enable all</button>
         <button type="button" class="btn btn-light btn-sm" id="featuresDisableAll">Disable all</button>
       </div>
       <div class="ma-feature-grid" id="profileFeatureGrid">
         ${features.map((f) => `
-          <label class="ma-feature-toggle">
-            <input type="checkbox" class="ma-toggle-input" data-feature-toggle="${f.feature_key}" ${f.enabled ? 'checked' : ''} />
+          <label class="ma-feature-toggle" data-feature-row="${escapeHtml(f.feature_key)}">
+            <input type="checkbox" class="ma-toggle-input" data-feature-toggle="${escapeHtml(f.feature_key)}" ${f.enabled ? 'checked' : ''} />
             <span class="ma-toggle-switch" aria-hidden="true"></span>
             <span>
               <strong>${escapeHtml(f.name || f.feature_key)}</strong>
@@ -2145,19 +2249,24 @@
           </label>
         `).join('')}
       </div>
+      <p id="profileFeaturesStatus" class="muted" style="margin-top:0.75rem;min-height:1.25rem;"></p>
     `;
 
     panel.querySelectorAll('[data-feature-toggle]').forEach((input) => {
       input.addEventListener('change', async () => {
         const featureKey = input.dataset.featureToggle;
         const wantEnabled = input.checked;
+        const status = el('profileFeaturesStatus');
         input.disabled = true;
+        if (status) status.textContent = `Saving ${featureKey}…`;
         try {
           await toggleRestaurantFeature(featureKey, wantEnabled);
+          if (status) status.textContent = `Feature "${featureKey}" ${wantEnabled ? 'enabled' : 'disabled'}.`;
           setMessage(`Feature "${featureKey}" ${wantEnabled ? 'enabled' : 'disabled'}.`);
           renderProfileFeatures(state.profileData);
         } catch (error) {
           input.checked = !wantEnabled;
+          if (status) status.textContent = error.message || 'Could not update feature.';
           setMessage(error.message, true);
         } finally {
           input.disabled = false;
@@ -2174,6 +2283,7 @@
           }),
         }, true);
         const profile = await apiRequest(`/api/master-admin/restaurants/${state.profileRestaurantId}/profile`, {}, true);
+        profile.features = mergeProfileFeatures(profile.features, state.featureRegistry);
         state.profileData = profile;
         renderProfileFeatures(profile);
         setMessage('All features enabled.');
@@ -2191,6 +2301,7 @@
           }),
         }, true);
         const profile = await apiRequest(`/api/master-admin/restaurants/${state.profileRestaurantId}/profile`, {}, true);
+        profile.features = mergeProfileFeatures(profile.features, state.featureRegistry);
         state.profileData = profile;
         renderProfileFeatures(profile);
         setMessage('All features disabled.');
@@ -2638,8 +2749,18 @@
     return auth;
   }
 
+  function resetAdminModals() {
+    document.body.classList.remove('bill-modal-open');
+    document.querySelectorAll('.bill-modal').forEach((modal) => {
+      modal.classList.add('hidden');
+      modal.classList.remove('is-open');
+      modal.setAttribute('aria-hidden', 'true');
+    });
+  }
+
   async function init() {
     if (!ensureAdminAuth()) return;
+    resetAdminModals();
     attachEvents();
     setSection('overview');
     resetAdForm();
