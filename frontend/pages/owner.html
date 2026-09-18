@@ -8,6 +8,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@600;700&family=Sora:wght@400;500;600&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="../assets/css/styles.css" />
+    <link rel="stylesheet" href="../assets/css/design-system.css" />
     <link rel="stylesheet" href="../assets/css/owner-dashboard.css" />
     <link rel="stylesheet" href="../assets/css/page-transition.css" />
   </head>
@@ -33,7 +34,10 @@
             </div>
             <div class="owner-header__actions">
               <span class="owner-status-pill" id="ownerStatusPill">Live</span>
-              <button id="notificationsBtn" class="btn btn-light" type="button" title="Notifications">🔔</button>
+              <button id="notificationsBtn" class="btn btn-light owner-notif-btn" type="button" title="Notifications" aria-label="Open notifications">
+                <span aria-hidden="true">🔔</span>
+                <span id="notificationsBadge" class="owner-notif-badge hidden">0</span>
+              </button>
               <button id="themeToggleBtn" class="btn btn-light" type="button">Dark</button>
               <button id="logoutBtn" class="btn btn-dark" type="button">Logout</button>
             </div>
@@ -155,6 +159,39 @@
               <button class="btn btn-dark" type="submit">Save Changes</button>
             </form>
             <div id="menuList" class="stack"></div>
+          </section>
+
+          <section class="panel dashboard-section hidden" data-owner-section-panel="finance">
+            <div class="section-head">
+              <div>
+                <h2>Finance &amp; Ledger</h2>
+                <p class="hero-copy">Track sales, commission, settlements, and daily ledger statements. Payment status and settlement status are separate.</p>
+              </div>
+            </div>
+            <div id="financeSummary"></div>
+            <div class="analytics-grid" style="margin-top:1rem;">
+              <div class="panel soft-panel">
+                <div class="section-head" style="padding:0 0 0.75rem;">
+                  <h3>Settlements</h3>
+                </div>
+                <div id="financeSettlements"></div>
+              </div>
+              <div class="panel soft-panel">
+                <div class="section-head" style="padding:0 0 0.75rem;">
+                  <h3>Ledger entries</h3>
+                </div>
+                <div id="financeLedger"></div>
+              </div>
+            </div>
+            <div class="panel soft-panel" style="margin-top:1rem;">
+              <h3>Daily ledger email</h3>
+              <p class="hero-copy">Preview or email a reconciliation statement. This is not proof of a bank transfer unless settlement status is verified.</p>
+              <div class="toolbar" style="margin-top:0.75rem;">
+                <button id="previewLedgerEmailBtn" class="btn btn-light" type="button">Preview email</button>
+                <button id="sendLedgerEmailBtn" class="btn btn-primary" type="button">Send to owner email</button>
+              </div>
+              <p id="financeLedgerStatus" class="hero-copy" style="margin-top:0.75rem;"></p>
+            </div>
           </section>
 
           <section class="panel dashboard-section hidden" data-owner-section-panel="analytics">
@@ -393,7 +430,26 @@
       </div>
     </div>
 
+    <aside id="ownerNotificationsDrawer" class="owner-notif-drawer hidden" aria-hidden="true" aria-label="Notifications">
+      <div class="owner-notif-drawer__head">
+        <div>
+          <h2>Notifications</h2>
+          <p class="hero-copy">Announcements and updates from AutoResto</p>
+        </div>
+        <button id="notificationsCloseBtn" class="btn btn-light" type="button" aria-label="Close notifications">✕</button>
+      </div>
+      <div class="owner-notif-drawer__actions">
+        <button id="notificationsMarkAllBtn" class="btn btn-light" type="button">Mark all read</button>
+      </div>
+      <div id="ownerNotificationsList" class="owner-notif-list">
+        <p class="hero-copy">Loading notifications...</p>
+      </div>
+    </aside>
+    <div id="ownerNotificationsOverlay" class="owner-notif-overlay hidden" aria-hidden="true"></div>
+
     <footer class="brand-footer">Powered by Online Solutionzzz</footer>
+    <script src="../assets/js/icons.js?v=4.8.3"></script>
+    <script src="../assets/js/ui-components.js?v=4.8.3"></script>
     <script src="../assets/js/config.js?v=4.8.3"></script>
     <script src="../assets/js/vendor/socket.io.min.js?v=4.8.3"></script>
     <script src="../assets/js/socketClient.js?v=4.8.3"></script>

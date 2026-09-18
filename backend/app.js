@@ -128,6 +128,7 @@ app.use('/table-sessions', tableSessionRoutes);
 app.use('/sessions', tableSessionRoutes);
 app.use('/tables', restaurantRoutes);
 app.use('/owner', ownerRoutes);
+app.use('/api/owner', ownerRoutes);
 app.use('/api/reviews', reviewsRoutes);
 app.use('/api/coupons', couponsRoutes);
 app.use('/api/inventory', inventoryRoutes);

@@ -8,7 +8,7 @@ const { getRestaurantIdForUser, listRestaurantFeatures } = require('../utils/fea
 const router = express.Router();
 
 const OWNER_DASHBOARD_SECTIONS = [
-  'dashboard', 'kitchen', 'ready', 'tables', 'menu', 'invoices',
+  'dashboard', 'kitchen', 'ready', 'tables', 'menu', 'invoices', 'finance',
   'analytics', 'reviews', 'inventory', 'offers', 'coupons', 'customers', 'loyalty',
   'advanced-analytics', 'gst', 'password', 'features',
 ];
@@ -218,6 +218,249 @@ router.patch('/gst-settings', requireAuth(['owner']), asyncHandler(async (req, r
     [restaurantId]
   );
   return res.json({ message: 'GST settings updated', settings: rows[0] });
+}));
+
+// --- OWNER NOTIFICATION CENTER ---
+router.get('/notifications', requireAuth(['owner']), asyncHandler(async (req, res) => {
+  const restaurantId = await getRestaurantIdForUser(req.user);
+  if (!restaurantId) return res.status(404).json({ message: 'Restaurant not found' });
+
+  const { rows: notifications } = await pool.query(
+    `SELECT m.id, m.title, m.content, m.message_type, m.priority, m.created_at,
+            COALESCE(mr.is_read, FALSE) AS is_read, mr.read_at
+     FROM admin_messages m
+     INNER JOIN message_recipients mr ON mr.message_id = m.id
+     WHERE mr.restaurant_id = $1
+       AND (m.expires_at IS NULL OR m.expires_at >= NOW())
+     ORDER BY m.created_at DESC
+     LIMIT 50`,
+    [restaurantId]
+  ).catch(() => ({ rows: [] }));
+
+  const { rows: unreadCountRows } = await pool.query(
+    `SELECT COUNT(*)::int AS count
+     FROM message_recipients mr
+     INNER JOIN admin_messages m ON m.id = mr.message_id
+     WHERE mr.restaurant_id = $1
+       AND mr.is_read = FALSE
+       AND (m.expires_at IS NULL OR m.expires_at >= NOW())`,
+    [restaurantId]
+  ).catch(() => ({ rows: [{ count: 0 }] }));
+
+  return res.json({
+    notifications,
+    unreadCount: unreadCountRows[0]?.count || 0,
+  });
+}));
+
+router.patch('/notifications/:id/read', requireAuth(['owner']), asyncHandler(async (req, res) => {
+  const restaurantId = await getRestaurantIdForUser(req.user);
+  if (!restaurantId) return res.status(404).json({ message: 'Restaurant not found' });
+
+  const messageId = Number(req.params.id);
+  await pool.query(
+    `UPDATE message_recipients
+     SET is_read = TRUE, read_at = CURRENT_TIMESTAMP
+     WHERE message_id = $1 AND restaurant_id = $2`,
+    [messageId, restaurantId]
+  ).catch(() => null);
+
+  return res.json({ success: true, message: 'Notification marked as read' });
+}));
+
+router.patch('/notifications/read-all', requireAuth(['owner']), asyncHandler(async (req, res) => {
+  const restaurantId = await getRestaurantIdForUser(req.user);
+  if (!restaurantId) return res.status(404).json({ message: 'Restaurant not found' });
+
+  await pool.query(
+    `UPDATE message_recipients
+     SET is_read = TRUE, read_at = CURRENT_TIMESTAMP
+     WHERE restaurant_id = $1 AND is_read = FALSE`,
+    [restaurantId]
+  ).catch(() => null);
+
+  return res.json({ success: true, message: 'All notifications marked as read' });
+}));
+
+// --- OWNER FINANCIAL LEDGER & SETTLEMENTS ---
+router.get('/financial-overview', requireAuth(['owner']), asyncHandler(async (req, res) => {
+  const restaurantId = await getRestaurantIdForUser(req.user);
+  if (!restaurantId) return res.status(404).json({ message: 'Restaurant not found' });
+
+  // 1. Get gross sales, order count, and today's sales
+  const { rows: salesRows } = await pool.query(
+    `SELECT
+       COUNT(*)::int AS total_orders,
+       COALESCE(SUM(total_amount), 0)::numeric AS gross_sales,
+       COALESCE(SUM(total_amount) FILTER (WHERE created_at >= date_trunc('day', now())), 0)::numeric AS today_sales
+     FROM orders
+     WHERE restaurant_id = $1 AND payment_status = 'paid'`,
+    [restaurantId]
+  );
+
+  // 2. Get commission charged
+  const { rows: commRows } = await pool.query(
+    `SELECT COALESCE(SUM(charge_amount), 0)::numeric AS total_commission
+     FROM chargeable_order_ledger
+     WHERE restaurant_id = $1`,
+    [restaurantId]
+  ).catch(() => ({ rows: [{ total_commission: 0 }] }));
+
+  // 3. Get latest settlement
+  const { rows: settlementRows } = await pool.query(
+    `SELECT status, settlement_reference, settled_at, net_payable, created_at
+     FROM settlements
+     WHERE restaurant_id = $1
+     ORDER BY created_at DESC
+     LIMIT 1`,
+    [restaurantId]
+  ).catch(() => ({ rows: [] }));
+
+  const grossSales = Number(salesRows[0]?.gross_sales || 0);
+  const commission = Number(commRows[0]?.total_commission || 0);
+  const restaurantPayable = Math.max(0, grossSales - commission);
+  const latestSettlement = settlementRows[0] || null;
+
+  return res.json({
+    grossSales,
+    totalCommission: commission,
+    restaurantPayable,
+    totalOrders: salesRows[0]?.total_orders || 0,
+    todaySales: Number(salesRows[0]?.today_sales || 0),
+    latestSettlement,
+  });
+}));
+
+router.get('/settlements', requireAuth(['owner']), asyncHandler(async (req, res) => {
+  const restaurantId = await getRestaurantIdForUser(req.user);
+  if (!restaurantId) return res.status(404).json({ message: 'Restaurant not found' });
+
+  const { rows: settlements } = await pool.query(
+    `SELECT id, period_start, period_end, gross_amount, commission_amount,
+            refund_amount, adjustment_amount, net_payable, status,
+            settlement_reference, settled_at, notes, created_at
+     FROM settlements
+     WHERE restaurant_id = $1
+     ORDER BY created_at DESC
+     LIMIT 100`,
+    [restaurantId]
+  ).catch(() => ({ rows: [] }));
+
+  return res.json({ settlements });
+}));
+
+router.get('/ledger', requireAuth(['owner']), asyncHandler(async (req, res) => {
+  const restaurantId = await getRestaurantIdForUser(req.user);
+  if (!restaurantId) return res.status(404).json({ message: 'Restaurant not found' });
+
+  const { rows: entries } = await pool.query(
+    `SELECT id, order_id, entry_type, amount, currency, description, created_at
+     FROM financial_ledger_entries
+     WHERE restaurant_id = $1
+     ORDER BY created_at DESC
+     LIMIT 100`,
+    [restaurantId]
+  ).catch(() => ({ rows: [] }));
+
+  return res.json({ entries });
+}));
+
+// --- RESEND DAILY SETTLEMENT LEDGER PREVIEW & DISPATCH ---
+const { generateLedgerEmailHtml, sendLedgerEmail } = require('../services/emailLedger');
+
+router.get('/daily-ledger-preview', requireAuth(['owner']), asyncHandler(async (req, res) => {
+  const restaurantId = await getRestaurantIdForUser(req.user);
+  if (!restaurantId) return res.status(404).json({ message: 'Restaurant not found' });
+
+  const { rows: restRows } = await pool.query(
+    `SELECT r.name, u.name AS owner_name, u.email
+     FROM restaurants r
+     LEFT JOIN users u ON u.id = r.owner_user_id
+     WHERE r.id = $1 LIMIT 1`,
+    [restaurantId]
+  );
+
+  const { rows: salesRows } = await pool.query(
+    `SELECT COUNT(*)::int AS orders, COALESCE(SUM(total_amount), 0)::numeric AS gross
+     FROM orders
+     WHERE restaurant_id = $1 AND payment_status = 'paid'`,
+    [restaurantId]
+  );
+
+  const { rows: commRows } = await pool.query(
+    `SELECT COALESCE(SUM(charge_amount), 0)::numeric AS comm
+     FROM chargeable_order_ledger
+     WHERE restaurant_id = $1`,
+    [restaurantId]
+  ).catch(() => ({ rows: [{ comm: 0 }] }));
+
+  const gross = Number(salesRows[0]?.gross || 0);
+  const commission = Number(commRows[0]?.comm || 0);
+  const payable = Math.max(0, gross - commission);
+
+  const html = generateLedgerEmailHtml({
+    restaurantName: restRows[0]?.name || 'Restaurant',
+    ownerName: restRows[0]?.owner_name || 'Owner',
+    dateFormatted: new Date().toLocaleDateString('en-IN', { dateStyle: 'long' }),
+    totalOrders: salesRows[0]?.orders || 0,
+    grossSales: gross,
+    refunds: 0,
+    commission,
+    restaurantPayable: payable,
+    settlementStatus: 'pending',
+  });
+
+  res.setHeader('Content-Type', 'text/html');
+  return res.send(html);
+}));
+
+router.post('/send-daily-ledger', requireAuth(['owner']), asyncHandler(async (req, res) => {
+  const restaurantId = await getRestaurantIdForUser(req.user);
+  if (!restaurantId) return res.status(404).json({ message: 'Restaurant not found' });
+
+  const { rows: restRows } = await pool.query(
+    `SELECT r.name, u.name AS owner_name, u.email
+     FROM restaurants r
+     LEFT JOIN users u ON u.id = r.owner_user_id
+     WHERE r.id = $1 LIMIT 1`,
+    [restaurantId]
+  );
+
+  const targetEmail = req.body?.email || restRows[0]?.email;
+  if (!targetEmail) return res.status(400).json({ message: 'Recipient email required' });
+
+  const { rows: salesRows } = await pool.query(
+    `SELECT COUNT(*)::int AS orders, COALESCE(SUM(total_amount), 0)::numeric AS gross
+     FROM orders
+     WHERE restaurant_id = $1 AND payment_status = 'paid'`,
+    [restaurantId]
+  );
+
+  const { rows: commRows } = await pool.query(
+    `SELECT COALESCE(SUM(charge_amount), 0)::numeric AS comm
+     FROM chargeable_order_ledger
+     WHERE restaurant_id = $1`,
+    [restaurantId]
+  ).catch(() => ({ rows: [{ comm: 0 }] }));
+
+  const gross = Number(salesRows[0]?.gross || 0);
+  const commission = Number(commRows[0]?.comm || 0);
+  const payable = Math.max(0, gross - commission);
+
+  const result = await sendLedgerEmail({
+    to: targetEmail,
+    restaurantName: restRows[0]?.name || 'Restaurant',
+    ownerName: restRows[0]?.owner_name || 'Owner',
+    dateFormatted: new Date().toLocaleDateString('en-IN', { dateStyle: 'long' }),
+    totalOrders: salesRows[0]?.orders || 0,
+    grossSales: gross,
+    refunds: 0,
+    commission,
+    restaurantPayable: payable,
+    settlementStatus: 'pending',
+  });
+
+  return res.json(result);
 }));
 
 module.exports = router;

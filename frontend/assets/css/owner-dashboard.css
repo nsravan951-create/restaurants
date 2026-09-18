@@ -1,29 +1,29 @@
-/* AutoResto Owner Dashboard — premium SaaS shell */
+/* AutoResto Owner Dashboard — premium SaaS shell (bridged to design-system.css tokens) */
 .owner-app {
   --od-sidebar-w: 260px;
   --od-header-h: 64px;
-  --od-surface: #ffffff;
-  --od-surface-2: #f8f9fc;
-  --od-border: rgba(15, 23, 42, 0.08);
-  --od-shadow: 0 10px 40px rgba(15, 23, 42, 0.06);
-  --od-accent: #bf4e22;
-  --od-accent-2: #e36e33;
-  --od-ink: #1a1520;
-  --od-muted: #6b6570;
-  --od-radius: 16px;
-  --od-transition: 280ms cubic-bezier(0.22, 1, 0.36, 1);
+  --od-surface: var(--ar-surface-card, #ffffff);
+  --od-surface-2: var(--ar-surface-sunken, #f8f9fc);
+  --od-border: color-mix(in srgb, var(--ar-slate-900, #0f172a) 8%, transparent);
+  --od-shadow: var(--ar-shadow-md, 0 10px 40px rgba(15, 23, 42, 0.06));
+  --od-accent: var(--ar-brand-500, #d94f2b);
+  --od-accent-2: var(--ar-brand-400, #f47d5e);
+  --od-ink: var(--ar-text-primary, #1a1520);
+  --od-muted: var(--ar-text-muted, #6b6570);
+  --od-radius: var(--ar-radius-lg, 16px);
+  --od-transition: var(--ar-transition-base, 280ms cubic-bezier(0.22, 1, 0.36, 1));
   min-height: 100vh;
   background: linear-gradient(180deg, #fbf7f2 0%, #f3f0f8 100%);
   color: var(--od-ink);
 }
 
 .theme-dark .owner-app {
-  --od-surface: #1c1824;
-  --od-surface-2: #14111a;
+  --od-surface: var(--ar-slate-900, #1c1824);
+  --od-surface-2: var(--ar-slate-950, #14111a);
   --od-border: rgba(255, 255, 255, 0.08);
   --od-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
-  --od-ink: #f5f0ea;
-  --od-muted: #a8a0b0;
+  --od-ink: var(--ar-text-inverse, #f5f0ea);
+  --od-muted: var(--ar-slate-400, #a8a0b0);
   background: linear-gradient(180deg, #121018 0%, #0d0b12 100%);
 }
 
@@ -497,5 +497,183 @@
   .owner-page-head,
   .owner-content { padding-left: 0.85rem; padding-right: 0.85rem; }
   .od-widget-grid { grid-template-columns: 1fr; }
-  .owner-header__actions .btn:not(#logoutBtn) { display: none; }
+  .owner-header__actions .btn:not(#logoutBtn):not(.owner-notif-btn) { display: none; }
+}
+
+.owner-notif-btn {
+  position: relative;
+}
+
+.owner-notif-badge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--ar-danger, #dc2626);
+  color: var(--ar-text-inverse, #fff);
+  font-size: 0.68rem;
+  font-weight: 700;
+  display: inline-grid;
+  place-items: center;
+}
+
+.owner-notif-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.42);
+  z-index: 80;
+}
+
+.owner-notif-drawer {
+  position: fixed;
+  top: 0;
+  right: 0;
+  width: min(420px, 100vw);
+  height: 100vh;
+  background: var(--od-surface, #fff);
+  border-left: 1px solid var(--od-border, #e2e8f0);
+  box-shadow: -12px 0 40px rgba(15, 23, 42, 0.12);
+  z-index: 81;
+  display: grid;
+  grid-template-rows: auto auto 1fr;
+  transform: translateX(0);
+}
+
+.owner-notif-drawer__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 1rem 1rem 0.5rem;
+  border-bottom: 1px solid var(--od-border, #e2e8f0);
+}
+
+.owner-notif-drawer__head h2 {
+  margin: 0;
+  font-family: 'Fraunces', serif;
+  font-size: 1.2rem;
+}
+
+.owner-notif-drawer__actions {
+  padding: 0.65rem 1rem;
+  border-bottom: 1px solid var(--od-border, #e2e8f0);
+}
+
+.owner-notif-list {
+  overflow: auto;
+  padding: 0.75rem 1rem 1.25rem;
+  display: grid;
+  gap: 0.65rem;
+}
+
+.owner-notif-item {
+  border: 1px solid var(--od-border, #e2e8f0);
+  border-radius: var(--ar-radius-lg, 14px);
+  padding: 0.85rem;
+  background: var(--od-surface, #fff);
+  cursor: pointer;
+  transition: border-color var(--od-transition), background var(--od-transition);
+}
+
+.owner-notif-item:hover {
+  border-color: color-mix(in srgb, var(--od-accent) 24%, var(--od-border));
+}
+
+.owner-notif-item.is-unread {
+  border-color: color-mix(in srgb, var(--od-accent) 28%, transparent);
+  background: var(--ar-brand-subtle, #fff8f4);
+}
+
+.theme-dark .owner-notif-item.is-unread {
+  background: color-mix(in srgb, var(--od-accent) 12%, var(--od-surface));
+}
+
+.owner-notif-item__meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 0.35rem;
+  color: var(--muted, #64748b);
+  font-size: 0.78rem;
+}
+
+.owner-notif-item h3 {
+  margin: 0 0 0.35rem;
+  font-size: 0.95rem;
+}
+
+.owner-notif-item p {
+  margin: 0;
+  color: var(--muted, #64748b);
+  font-size: 0.88rem;
+  line-height: 1.45;
+}
+
+.owner-finance-table-wrap {
+  overflow-x: auto;
+}
+
+.owner-finance-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.88rem;
+}
+
+.owner-finance-table th,
+.owner-finance-table td {
+  padding: 0.65rem 0.5rem;
+  border-bottom: 1px solid var(--od-border, #e2e8f0);
+  text-align: left;
+  vertical-align: top;
+}
+
+.owner-finance-table th {
+  color: var(--muted, #64748b);
+  font-weight: 600;
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.owner-status-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+  background: var(--ar-slate-100, #f1f5f9);
+  color: var(--ar-slate-700, #334155);
+  font-size: 0.75rem;
+  font-weight: 600;
+  border: 1px solid var(--ar-border-subtle, #e2e8f0);
+}
+
+.owner-status-chip--verified,
+.owner-status-chip--paid,
+.owner-status-chip--sent {
+  background: var(--ar-success-bg, #ecfdf5);
+  color: var(--ar-success-text, #065f46);
+  border-color: var(--ar-success-border, #a7f3d0);
+}
+
+.owner-status-chip--processing,
+.owner-status-chip--scheduled {
+  background: var(--ar-info-bg, #eff6ff);
+  color: var(--ar-info-text, #1e40af);
+  border-color: var(--ar-info-border, #bfdbfe);
+}
+
+.owner-status-chip--pending,
+.owner-status-chip--on_hold {
+  background: var(--ar-warning-bg, #fffbeb);
+  color: var(--ar-warning-text, #92400e);
+  border-color: var(--ar-warning-border, #fde68a);
+}
+
+.owner-status-chip--failed {
+  background: var(--ar-danger-bg, #fef2f2);
+  color: var(--ar-danger-text, #991b1b);
+  border-color: var(--ar-danger-border, #fecaca);
 }

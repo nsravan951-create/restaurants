@@ -19,6 +19,7 @@ const OWNER_NAV = [
   { group: 'Operations', section: 'tables', label: 'Tables & QR', icon: 'qr', featureKey: 'qr_ordering' },
   { group: 'Operations', section: 'menu', label: 'Menu', icon: 'menu', featureKey: 'basic_menu' },
   { group: 'Operations', section: 'invoices', label: 'Invoices', icon: 'invoice', featureKey: 'billing' },
+  { group: 'Finance', section: 'finance', label: 'Finance & Ledger', icon: 'finance', featureKey: null },
   { group: 'Growth', section: 'analytics', label: 'Analytics', icon: 'chart', featureKey: null },
   { group: 'Growth', section: 'reviews', label: 'Reviews', icon: 'star', featureKey: null },
   { group: 'Growth', section: 'inventory', label: 'Inventory', icon: 'box', featureKey: 'inventory', premium: true },
@@ -39,6 +40,7 @@ const SECTION_META = {
   tables: { title: 'Tables & QR', description: 'Manage table boxes, QR codes, and payment details.', action: { label: 'Generate QR Codes', form: 'autoTableForm' } },
   menu: { title: 'Menu', description: 'Add, edit, or remove food items.', action: null },
   invoices: { title: 'Invoices', description: 'Browse synced invoices and receipts.', action: { label: 'Refresh', id: 'refreshInvoicesBtn' } },
+  finance: { title: 'Finance & Ledger', description: 'Sales, commission, settlements, and daily ledger email.', action: null },
   analytics: { title: 'Analytics', description: 'Revenue, order volume, and popular items.', action: null },
   reviews: { title: 'Reviews', description: 'Customer ratings after payment.', action: null },
   gst: { title: 'GST & Invoice Settings', description: 'Legal billing details for tax invoices.', action: null },
@@ -69,6 +71,7 @@ const NAV_ICONS = {
   settings: '<svg class="owner-nav-item__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>',
   lock: '<svg class="owner-nav-item__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>',
   sparkles: '<svg class="owner-nav-item__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m12 3 1.5 4.5L18 9l-4.5 1.5L12 15l-1.5-4.5L6 9l4.5-1.5zM5 19l1 3 1-3 3-1-3-1-1-3-1 3-3 1z"/></svg>',
+  finance: '<svg class="owner-nav-item__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>',
 };
 
 function promoDismissKey() {
@@ -262,15 +265,18 @@ async function loadSubscriptionData() {
   }
 }
 
-function renderDashboardOverview() {
+function renderDashboardOverview(financial = null) {
   const orders = latestOrders || [];
   const pending = orders.filter((o) => ['pending', 'preparing'].includes(o.status)).length;
   const ready = orders.filter((o) => o.status === 'ready').length;
   const completed = orders.filter((o) => ['delivered', 'completed'].includes(o.status)).length;
-  const revenue = orders
+  const revenue = financial?.grossSales ?? orders
     .filter((o) => String(o.payment_status || '').toLowerCase() === 'paid')
     .reduce((sum, o) => sum + Number(o.total_amount || 0), 0);
-  const avg = orders.length ? revenue / orders.length : 0;
+  const avg = orders.length ? revenue / Math.max(orders.length, 1) : 0;
+  const todaySales = Number(financial?.todaySales || 0);
+  const payable = Number(financial?.restaurantPayable || 0);
+  const settlementStatus = financial?.latestSettlement?.status || 'none';
 
   const widgets = document.getElementById('dashboardWidgets');
   if (widgets) {
@@ -278,11 +284,11 @@ function renderDashboardOverview() {
       <div class="od-widget"><strong>${pending}</strong><span>New / Preparing</span></div>
       <div class="od-widget"><strong>${ready}</strong><span>Ready</span></div>
       <div class="od-widget"><strong>${completed}</strong><span>Completed</span></div>
-      <div class="od-widget"><strong>INR ${formatCurrency(revenue)}</strong><span>Revenue</span></div>
-      <div class="od-widget"><strong>${orders.length}</strong><span>Total Orders</span></div>
-      <div class="od-widget"><strong>INR ${formatCurrency(avg)}</strong><span>Avg Order Value</span></div>
+      <div class="od-widget"><strong>INR ${formatCurrency(revenue)}</strong><span>Gross sales (paid)</span></div>
+      <div class="od-widget"><strong>INR ${formatCurrency(todaySales)}</strong><span>Today's sales</span></div>
+      <div class="od-widget"><strong>INR ${formatCurrency(payable)}</strong><span>Restaurant payable</span></div>
+      <div class="od-widget"><strong>${escapeHtml(formatSettlementStatus(settlementStatus))}</strong><span>Latest settlement</span></div>
       <div class="od-widget"><strong>${latestTablesCache.filter((t) => hasRunningBill(t)).length}</strong><span>Running Bills</span></div>
-      <div class="od-widget"><strong>${latestTablesCache.filter((t) => String(t.availability_status) === 'paid').length}</strong><span>Paid Tables</span></div>
     `;
   }
 
@@ -311,7 +317,13 @@ function renderDashboardOverview() {
 
 async function loadDashboard() {
   if (!ensureRestaurantId()) return;
-  renderDashboardOverview();
+  let financial = null;
+  try {
+    financial = await apiRequest('/api/owner/financial-overview', {}, true);
+  } catch (error) {
+    console.warn('Financial overview unavailable:', error.message);
+  }
+  renderDashboardOverview(financial);
 }
 
 function buildPromotionContent(trigger = 'manual') {
@@ -442,8 +454,101 @@ function initOwnerDashboardUi() {
     if (event.target.id === 'upgradeModal') closeUpgradeModal();
   });
   document.getElementById('notificationsBtn')?.addEventListener('click', () => {
-    setMessage('ownerMessage', 'No new notifications.');
+    openOwnerNotificationsDrawer();
   });
+  document.getElementById('notificationsCloseBtn')?.addEventListener('click', closeOwnerNotificationsDrawer);
+  document.getElementById('ownerNotificationsOverlay')?.addEventListener('click', closeOwnerNotificationsDrawer);
+  document.getElementById('notificationsMarkAllBtn')?.addEventListener('click', () => {
+    markAllOwnerNotificationsRead().catch((error) => setMessage('ownerMessage', error.message, true));
+  });
+  document.getElementById('previewLedgerEmailBtn')?.addEventListener('click', () => {
+    previewLedgerEmail().catch((error) => setMessage('ownerMessage', error.message, true));
+  });
+  document.getElementById('sendLedgerEmailBtn')?.addEventListener('click', () => {
+    sendLedgerEmail().catch((error) => setMessage('ownerMessage', error.message, true));
+  });
+}
+
+function updateNotificationsBadge(count) {
+  const badge = document.getElementById('notificationsBadge');
+  if (!badge) return;
+  const unread = Number(count || 0);
+  badge.textContent = unread > 99 ? '99+' : String(unread);
+  badge.classList.toggle('hidden', unread <= 0);
+}
+
+function renderOwnerNotifications(notifications = []) {
+  const root = document.getElementById('ownerNotificationsList');
+  if (!root) return;
+
+  if (!notifications.length) {
+    root.innerHTML = '<p class="hero-copy">No announcements right now. AutoResto will post updates here.</p>';
+    return;
+  }
+
+  root.innerHTML = notifications.map((item) => {
+    const isUnread = item.is_read === false || item.is_read === 'f';
+    const created = item.created_at ? new Date(item.created_at).toLocaleString() : '';
+    const priority = item.priority ? String(item.priority) : 'normal';
+    return `
+      <article class="owner-notif-item${isUnread ? ' is-unread' : ''}" data-notification-id="${item.id}">
+        <div class="owner-notif-item__meta">
+          <span>${escapeHtml(item.message_type || 'announcement')}</span>
+          <span>${escapeHtml(priority)} · ${escapeHtml(created)}</span>
+        </div>
+        <h3>${escapeHtml(item.title || 'Announcement')}</h3>
+        <p>${escapeHtml(item.content || '')}</p>
+      </article>
+    `;
+  }).join('');
+
+  root.querySelectorAll('[data-notification-id]').forEach((node) => {
+    node.addEventListener('click', () => {
+      const id = Number(node.dataset.notificationId);
+      if (!id) return;
+      markOwnerNotificationRead(id).catch(() => {});
+    });
+  });
+}
+
+async function loadOwnerNotifications() {
+  try {
+    const data = await apiRequest('/api/owner/notifications', {}, true);
+    updateNotificationsBadge(data.unreadCount || 0);
+    renderOwnerNotifications(data.notifications || []);
+    return data;
+  } catch (error) {
+    updateNotificationsBadge(0);
+    const root = document.getElementById('ownerNotificationsList');
+    if (root) root.innerHTML = '<p class="hero-copy">Unable to load notifications right now.</p>';
+    throw error;
+  }
+}
+
+async function markOwnerNotificationRead(messageId) {
+  await apiRequest(`/api/owner/notifications/${messageId}/read`, { method: 'PATCH' }, true);
+  await loadOwnerNotifications();
+}
+
+async function markAllOwnerNotificationsRead() {
+  await apiRequest('/api/owner/notifications/read-all', { method: 'PATCH' }, true);
+  await loadOwnerNotifications();
+  setMessage('ownerMessage', 'All notifications marked as read.');
+}
+
+function openOwnerNotificationsDrawer() {
+  document.getElementById('ownerNotificationsDrawer')?.classList.remove('hidden');
+  document.getElementById('ownerNotificationsOverlay')?.classList.remove('hidden');
+  document.getElementById('ownerNotificationsDrawer')?.setAttribute('aria-hidden', 'false');
+  document.getElementById('ownerNotificationsOverlay')?.setAttribute('aria-hidden', 'false');
+  loadOwnerNotifications().catch((error) => setMessage('ownerMessage', error.message, true));
+}
+
+function closeOwnerNotificationsDrawer() {
+  document.getElementById('ownerNotificationsDrawer')?.classList.add('hidden');
+  document.getElementById('ownerNotificationsOverlay')?.classList.add('hidden');
+  document.getElementById('ownerNotificationsDrawer')?.setAttribute('aria-hidden', 'true');
+  document.getElementById('ownerNotificationsOverlay')?.setAttribute('aria-hidden', 'true');
 }
 
 function ensureRestaurantId() {
@@ -855,10 +960,151 @@ async function activateSection(sectionName) {
     gst: loadGstSettings,
     kitchen: loadOrders,
     ready: loadOrders,
+    finance: loadFinance,
   };
 
   if (loaders[sectionName]) {
     await loaders[sectionName]();
+  }
+}
+
+function formatSettlementStatus(status) {
+  const value = String(status || 'pending').toUpperCase();
+  const labels = {
+    PENDING: 'Pending',
+    SCHEDULED: 'Scheduled',
+    PROCESSING: 'Processing',
+    SENT: 'Sent',
+    VERIFIED: 'Verified',
+    FAILED: 'Failed',
+    ON_HOLD: 'On hold',
+    PAID: 'Paid',
+  };
+  return labels[value] || value;
+}
+
+async function loadFinance() {
+  if (!ensureRestaurantId()) return;
+
+  const summaryRoot = document.getElementById('financeSummary');
+  const settlementsRoot = document.getElementById('financeSettlements');
+  const ledgerRoot = document.getElementById('financeLedger');
+  const statusRoot = document.getElementById('financeLedgerStatus');
+
+  if (summaryRoot) summaryRoot.innerHTML = '<p class="hero-copy">Loading finance overview...</p>';
+  if (settlementsRoot) settlementsRoot.innerHTML = '';
+  if (ledgerRoot) ledgerRoot.innerHTML = '';
+
+  try {
+    const [overview, settlementsData, ledgerData] = await Promise.all([
+      apiRequest('/api/owner/financial-overview', {}, true),
+      apiRequest('/api/owner/settlements', {}, true).catch(() => ({ settlements: [] })),
+      apiRequest('/api/owner/ledger', {}, true).catch(() => ({ entries: [] })),
+    ]);
+
+    const latest = overview.latestSettlement || null;
+    if (summaryRoot) {
+      summaryRoot.innerHTML = `
+        <div class="od-widget-grid">
+          <div class="od-widget"><strong>INR ${formatCurrency(overview.grossSales || 0)}</strong><span>Gross sales (paid)</span></div>
+          <div class="od-widget"><strong>INR ${formatCurrency(overview.todaySales || 0)}</strong><span>Today's sales</span></div>
+          <div class="od-widget"><strong>INR ${formatCurrency(overview.totalCommission || 0)}</strong><span>Platform commission</span></div>
+          <div class="od-widget"><strong>INR ${formatCurrency(overview.restaurantPayable || 0)}</strong><span>Restaurant payable</span></div>
+          <div class="od-widget"><strong>${overview.totalOrders || 0}</strong><span>Paid orders</span></div>
+          <div class="od-widget"><strong>${escapeHtml(formatSettlementStatus(latest?.status || 'pending'))}</strong><span>Latest settlement</span></div>
+        </div>
+        <p class="hero-copy" style="margin-top:0.75rem;">
+          Payment status and settlement status are tracked separately. A paid order does not mean a bank transfer has completed.
+        </p>
+      `;
+    }
+
+    const settlements = settlementsData.settlements || [];
+    if (settlementsRoot) {
+      settlementsRoot.innerHTML = settlements.length ? `
+        <div class="owner-finance-table-wrap">
+          <table class="owner-finance-table">
+            <thead>
+              <tr>
+                <th>Period</th>
+                <th>Gross</th>
+                <th>Commission</th>
+                <th>Net payable</th>
+                <th>Status</th>
+                <th>Reference</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${settlements.map((row) => `
+                <tr>
+                  <td>${escapeHtml(new Date(row.period_start).toLocaleDateString())} – ${escapeHtml(new Date(row.period_end).toLocaleDateString())}</td>
+                  <td>INR ${formatCurrency(row.gross_amount)}</td>
+                  <td>INR ${formatCurrency(row.commission_amount)}</td>
+                  <td>INR ${formatCurrency(row.net_payable)}</td>
+                  <td><span class="owner-status-chip owner-status-chip--${escapeHtml(String(row.status || 'pending').toLowerCase())}">${escapeHtml(formatSettlementStatus(row.status))}</span></td>
+                  <td>${escapeHtml(row.settlement_reference || '—')}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
+      ` : '<p class="hero-copy">No settlement batches yet. AutoResto will list payout records here when they are created.</p>';
+    }
+
+    const entries = ledgerData.entries || [];
+    if (ledgerRoot) {
+      ledgerRoot.innerHTML = entries.length ? `
+        <div class="stack">
+          ${entries.slice(0, 20).map((entry) => `
+            <div class="analytics-item">
+              <strong>${escapeHtml(entry.entry_type || 'entry')} · INR ${formatCurrency(entry.amount)}</strong>
+              <p>${escapeHtml(entry.description || 'Ledger entry')}${entry.order_id ? ` · Order #${entry.order_id}` : ''}</p>
+              <p class="hero-copy">${escapeHtml(new Date(entry.created_at).toLocaleString())}</p>
+            </div>
+          `).join('')}
+        </div>
+      ` : '<p class="hero-copy">No ledger entries yet.</p>';
+    }
+  } catch (error) {
+    if (summaryRoot) summaryRoot.innerHTML = `<p class="hero-copy" style="color:var(--danger,#b42318);">Unable to load finance data: ${escapeHtml(error.message)}</p>`;
+  }
+}
+
+async function previewLedgerEmail() {
+  if (!ensureRestaurantId()) return;
+  const statusRoot = document.getElementById('financeLedgerStatus');
+  if (statusRoot) statusRoot.textContent = 'Opening ledger preview...';
+  try {
+    const auth = getAuth();
+    const response = await fetch(`${window.API_URL}/api/owner/daily-ledger-preview`, {
+      headers: { Authorization: `Bearer ${auth.token}` },
+    });
+    const html = await response.text();
+    const previewWindow = window.open('', '_blank');
+    if (previewWindow) {
+      previewWindow.document.open();
+      previewWindow.document.write(html);
+      previewWindow.document.close();
+    }
+    if (statusRoot) statusRoot.textContent = 'Ledger preview opened in a new tab.';
+  } catch (error) {
+    if (statusRoot) statusRoot.textContent = error.message;
+  }
+}
+
+async function sendLedgerEmail() {
+  if (!ensureRestaurantId()) return;
+  const statusRoot = document.getElementById('financeLedgerStatus');
+  if (statusRoot) statusRoot.textContent = 'Sending ledger email...';
+  try {
+    const result = await apiRequest('/api/owner/send-daily-ledger', { method: 'POST', body: '{}' }, true);
+    if (statusRoot) {
+      statusRoot.textContent = result.message || (result.success ? 'Ledger email sent.' : 'Ledger email could not be sent.');
+    }
+    setMessage('ownerMessage', result.message || 'Ledger email processed.');
+  } catch (error) {
+    if (statusRoot) statusRoot.textContent = error.message;
+    setMessage('ownerMessage', error.message, true);
   }
 }
 
@@ -1552,6 +1798,7 @@ async function initOwner() {
     buildOwnerSidebar();
     setActiveSection('dashboard');
     await loadDashboard();
+    loadOwnerNotifications().catch(() => {});
     await initSocket();
     if (getLockedFeatureCount() > 0) {
       setTimeout(() => showFloatingPromo('manual'), 1200);

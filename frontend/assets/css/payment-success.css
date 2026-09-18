@@ -1,57 +1,57 @@
-/* Payment status pages — grayscale only (printer animation uses bill-printer.css) */
-:root {
-  --bg: #ffffff;
-  --card: #ffffff;
-  --ink: #111111;
-  --muted: #666666;
-  --line: #d4d4d4;
-}
-
-* { box-sizing: border-box; }
+/* ==========================================================================
+   AUTORESTO PAYMENT STATUS & VERIFICATION
+   Clean, reassuring, high-trust payment verification and receipt view.
+   ========================================================================== */
 
 body {
   margin: 0;
-  font-family: 'Sora', system-ui, sans-serif;
-  color: var(--ink);
-  background: var(--bg);
+  font-family: var(--ar-font-sans, 'Outfit', sans-serif);
+  color: var(--ar-text-primary, #0f172a);
+  background-color: var(--ar-bg-base, #f8fafc);
   min-height: 100vh;
 }
 
 .page {
-  max-width: 720px;
+  max-width: 600px;
   margin: 0 auto;
-  padding: 24px 16px 80px;
+  padding: 40px 16px 80px;
 }
 
 .hidden { display: none !important; }
 
 .state-card {
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  background: var(--card);
-  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.06);
-  padding: 32px 24px;
+  border: 1px solid var(--ar-border-subtle, #e2e8f0);
+  border-radius: var(--ar-radius-xl, 20px);
+  background: var(--ar-surface-card, #ffffff);
+  box-shadow: var(--ar-shadow-md, 0 4px 14px rgba(15, 23, 42, 0.07));
+  padding: 40px 24px;
   text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
 }
 
 .state-card h1 {
   margin: 0;
-  font-size: 1.25rem;
+  font-size: 1.35rem;
   font-weight: 700;
+  color: var(--ar-text-primary, #0f172a);
 }
 
 .state-card p {
   margin: 10px 0 0;
-  color: var(--muted);
-  font-size: 0.92rem;
+  color: var(--ar-text-secondary, #475569);
+  font-size: 0.95rem;
+  max-width: 420px;
+  line-height: 1.55;
 }
 
 .spinner {
-  width: 42px;
-  height: 42px;
-  margin: 0 auto 16px;
-  border: 3px solid #e5e5e5;
-  border-top-color: var(--ink);
+  width: 48px;
+  height: 48px;
+  margin: 0 auto 20px;
+  border: 4px solid var(--ar-border-subtle, #e2e8f0);
+  border-top-color: var(--ar-brand-500, #d94f2b);
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
 }
@@ -59,36 +59,66 @@ body {
 @keyframes spin { to { transform: rotate(360deg); } }
 
 .status-icon {
-  width: 56px;
-  height: 56px;
-  margin: 0 auto 16px;
+  width: 64px;
+  height: 64px;
+  margin: 0 auto 20px;
   border-radius: 50%;
   display: grid;
   place-items: center;
-  font-size: 1.6rem;
+  font-size: 1.75rem;
   font-weight: 700;
-  border: 2px solid var(--ink);
-  color: var(--ink);
-  background: #f5f5f5;
+}
+
+.status-icon--error {
+  background-color: var(--ar-danger-bg, #fef2f2);
+  color: var(--ar-danger, #dc2626);
+  border: 2px solid var(--ar-danger-border, #fecaca);
+}
+
+.status-icon--pending {
+  background-color: var(--ar-warning-bg, #fffbeb);
+  color: var(--ar-warning, #d97706);
+  border: 2px solid var(--ar-warning-border, #fde68a);
+}
+
+.status-icon--success {
+  background-color: var(--ar-success-bg, #ecfdf5);
+  color: var(--ar-success, #059669);
+  border: 2px solid var(--ar-success-border, #a7f3d0);
 }
 
 .btn {
-  border: 1px solid var(--ink);
-  border-radius: 10px;
-  padding: 14px 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: var(--ar-radius-md, 10px);
+  padding: 12px 24px;
+  font-family: inherit;
+  font-size: 0.95rem;
   font-weight: 600;
   cursor: pointer;
-  margin-top: 16px;
-  background: var(--ink);
-  color: #fff;
-  min-height: 48px;
+  margin-top: 24px;
+  min-height: 46px;
+  transition: all 150ms ease;
+}
+
+.btn-primary {
+  background-color: var(--ar-brand-500, #d94f2b);
+  color: #ffffff;
+  box-shadow: 0 2px 8px rgba(217, 79, 43, 0.25);
+}
+
+.btn-primary:hover {
+  background-color: var(--ar-brand-600, #c13d1c);
+  box-shadow: 0 4px 14px rgba(217, 79, 43, 0.35);
 }
 
 .brand-footer {
   text-align: center;
-  color: var(--muted);
+  color: var(--ar-text-muted, #64748b);
   font-size: 0.85rem;
-  padding: 0 16px 24px;
+  padding: 0 16px 32px;
 }
 
 @media (prefers-reduced-motion: reduce) {
