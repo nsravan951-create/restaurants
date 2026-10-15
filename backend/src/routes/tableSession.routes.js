@@ -5,7 +5,7 @@ const pool = require('../config/db');
 const asyncHandler = require('../utils/asyncHandler');
 const { createRateLimiter } = require('../middleware/rateLimit');
 
-const sessionLimiter = createRateLimiter({ windowMs: 10 * 60 * 1000, max: 40 });
+const sessionLimiter = createRateLimiter({ windowMs: 10 * 60 * 1000, max: 250 });
 const {
   SESSION_TIMEOUT_MINUTES,
   generateSessionToken,

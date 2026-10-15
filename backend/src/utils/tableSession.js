@@ -8,7 +8,21 @@ function generateSessionToken() {
   return crypto.randomBytes(24).toString('hex');
 }
 
+let expiryInFlight = null;
+let expiryLastRun = 0;
+
 async function expireInactiveSessions() {
+  const now = Date.now();
+  if (expiryInFlight) return expiryInFlight;
+  if (now - expiryLastRun < 15000) return 0;
+  expiryLastRun = now;
+  expiryInFlight = expireInactiveSessionsNow().finally(() => {
+    expiryInFlight = null;
+  });
+  return expiryInFlight;
+}
+
+async function expireInactiveSessionsNow() {
   const conn = await pool.connect();
   try {
     await conn.query('BEGIN');
@@ -17,7 +31,9 @@ async function expireInactiveSessions() {
       `SELECT id, table_id
        FROM table_sessions
        WHERE status = 'active' AND expires_at <= NOW()
-       FOR UPDATE`
+       ORDER BY expires_at ASC
+       LIMIT 100
+       FOR UPDATE SKIP LOCKED`
     );
 
     if (expiredRows.length) {

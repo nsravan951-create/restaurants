@@ -59,17 +59,21 @@ io.on('connection', (socket) => {
   }
 
   socket.on('restaurant:join', async (restaurantId) => {
-    const requestedRestaurantId = Number(restaurantId);
-    if (!user || !Number.isInteger(requestedRestaurantId) || requestedRestaurantId <= 0) return;
+    try {
+      const requestedRestaurantId = Number(restaurantId);
+      if (!user || !Number.isInteger(requestedRestaurantId) || requestedRestaurantId <= 0) return;
 
-    if (user.role === 'super_admin') {
-      socket.join(`restaurant_${requestedRestaurantId}`);
-      return;
-    }
+      if (user.role === 'super_admin') {
+        socket.join(`restaurant_${requestedRestaurantId}`);
+        return;
+      }
 
-    const { rows } = await db.query('SELECT restaurant_id FROM users WHERE id = $1 LIMIT 1', [user.userId]);
-    if (rows[0] && Number(rows[0].restaurant_id) === requestedRestaurantId) {
-      socket.join(`restaurant_${requestedRestaurantId}`);
+      const { rows } = await db.query('SELECT restaurant_id FROM users WHERE id = $1 LIMIT 1', [user.userId]);
+      if (rows[0] && Number(rows[0].restaurant_id) === requestedRestaurantId) {
+        socket.join(`restaurant_${requestedRestaurantId}`);
+      }
+    } catch (error) {
+      console.error('[socket] restaurant join failed', error.message);
     }
   });
 });

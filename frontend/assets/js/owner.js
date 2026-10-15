@@ -453,11 +453,27 @@ function initOwnerDashboardUi() {
   document.getElementById('upgradeModal')?.addEventListener('click', (event) => {
     if (event.target.id === 'upgradeModal') closeUpgradeModal();
   });
-  document.getElementById('notificationsBtn')?.addEventListener('click', () => {
-    openOwnerNotificationsDrawer();
+  document.getElementById('notificationsBtn')?.addEventListener('click', (event) => {
+    event.stopPropagation();
+    const drawer = document.getElementById('ownerNotificationsDrawer');
+    if (drawer?.classList.contains('is-open')) closeOwnerNotificationsDrawer();
+    else openOwnerNotificationsDrawer();
   });
-  document.getElementById('notificationsCloseBtn')?.addEventListener('click', closeOwnerNotificationsDrawer);
+  document.getElementById('notificationsCloseBtn')?.addEventListener('click', (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    closeOwnerNotificationsDrawer();
+  });
   document.getElementById('ownerNotificationsOverlay')?.addEventListener('click', closeOwnerNotificationsDrawer);
+  document.addEventListener('keydown', (event) => {
+    if (event.key !== 'Escape') return;
+    const drawer = document.getElementById('ownerNotificationsDrawer');
+    if (drawer?.classList.contains('is-open')) {
+      closeOwnerNotificationsDrawer();
+      return;
+    }
+    closeSidebarDrawer();
+  });
   document.getElementById('notificationsMarkAllBtn')?.addEventListener('click', () => {
     markAllOwnerNotificationsRead().catch((error) => setMessage('ownerMessage', error.message, true));
   });
@@ -537,18 +553,28 @@ async function markAllOwnerNotificationsRead() {
 }
 
 function openOwnerNotificationsDrawer() {
-  document.getElementById('ownerNotificationsDrawer')?.classList.remove('hidden');
-  document.getElementById('ownerNotificationsOverlay')?.classList.remove('hidden');
-  document.getElementById('ownerNotificationsDrawer')?.setAttribute('aria-hidden', 'false');
-  document.getElementById('ownerNotificationsOverlay')?.setAttribute('aria-hidden', 'false');
+  const drawer = document.getElementById('ownerNotificationsDrawer');
+  const overlay = document.getElementById('ownerNotificationsOverlay');
+  drawer?.classList.remove('hidden');
+  overlay?.classList.remove('hidden');
+  drawer?.classList.add('is-open');
+  overlay?.classList.add('is-open');
+  drawer?.setAttribute('aria-hidden', 'false');
+  overlay?.setAttribute('aria-hidden', 'false');
+  document.body.style.overflow = 'hidden';
   loadOwnerNotifications().catch((error) => setMessage('ownerMessage', error.message, true));
 }
 
 function closeOwnerNotificationsDrawer() {
-  document.getElementById('ownerNotificationsDrawer')?.classList.add('hidden');
-  document.getElementById('ownerNotificationsOverlay')?.classList.add('hidden');
-  document.getElementById('ownerNotificationsDrawer')?.setAttribute('aria-hidden', 'true');
-  document.getElementById('ownerNotificationsOverlay')?.setAttribute('aria-hidden', 'true');
+  const drawer = document.getElementById('ownerNotificationsDrawer');
+  const overlay = document.getElementById('ownerNotificationsOverlay');
+  drawer?.classList.remove('is-open');
+  overlay?.classList.remove('is-open');
+  drawer?.classList.add('hidden');
+  overlay?.classList.add('hidden');
+  drawer?.setAttribute('aria-hidden', 'true');
+  overlay?.setAttribute('aria-hidden', 'true');
+  document.body.style.overflow = '';
 }
 
 function ensureRestaurantId() {
@@ -634,7 +660,7 @@ function buildItemsList(items) {
     return 'Unable to parse order items';
   }
 
-  return parsed.map((item) => `${item.item_name} x${item.quantity}`).join(', ');
+  return parsed.map((item) => `${escapeHtml(item.item_name)} x${escapeHtml(item.quantity)}`).join(', ');
 }
 
 function escapeHtml(str) {
@@ -1380,7 +1406,8 @@ async function loadTables() {
   latestTablesCache = tables;
 
   tableList.innerHTML = tables.length ? tables.map((table) => {
-    const qrImage = table.qr_data_url ? `<img src="${table.qr_data_url}" alt="QR for ${escapeHtml(table.table_number)}" class="table-card__qr" />` : '';
+    const qrSrc = safeResourceUrl(table.qr_data_url);
+    const qrImage = qrSrc ? `<img src="${escapeHtml(qrSrc)}" alt="QR for ${escapeHtml(table.table_number)}" class="table-card__qr" />` : '';
     const hasActiveSession = Boolean(table.active_session_id) || String(table.active_session_status || '').toLowerCase() === 'active';
     const runningBill = hasRunningBill(table);
     const hasOrder = table.active_order_id ? '1' : '0';
@@ -1588,10 +1615,10 @@ async function loadOrders() {
   const kitchenContainer = document.getElementById('kitchenOrders');
   kitchenContainer.innerHTML = kitchenOrders.length ? kitchenOrders.map((order) => `
     <div class="card">
-      <strong>Order #${order.id} | Table ${order.table_number}</strong>
+      <strong>Order #${escapeHtml(order.id)} | Table ${escapeHtml(order.table_number)}</strong>
       <p>${buildItemsList(order.items)}</p>
       <div class="toolbar">
-        <button class="btn btn-light" data-kot="${order.id}" type="button">Print KOT</button>
+        <button class="btn btn-light" data-kot="${escapeHtml(order.id)}" type="button">Print KOT</button>
         <button class="btn btn-light" data-thermal="${order.id}" type="button">Thermal Bill</button>
         <button class="btn btn-light" data-status="preparing" data-order="${order.id}" type="button">Mark Preparing</button>
         <button class="btn btn-primary" data-status="ready" data-order="${order.id}" type="button">Mark Ready</button>
@@ -1602,9 +1629,9 @@ async function loadOrders() {
   const readyContainer = document.getElementById('readyOrders');
   readyContainer.innerHTML = readyOrders.length ? readyOrders.map((order) => `
     <div class="card">
-      <strong>Order #${order.id} | Table ${order.table_number}</strong>
+      <strong>Order #${escapeHtml(order.id)} | Table ${escapeHtml(order.table_number)}</strong>
       <p>${buildItemsList(order.items)}</p>
-      <button class="btn btn-dark" data-status="delivered" data-order="${order.id}" type="button">Mark Delivered</button>
+      <button class="btn btn-dark" data-status="delivered" data-order="${escapeHtml(order.id)}" type="button">Mark Delivered</button>
     </div>
   `).join('') : '<p>No ready orders.</p>';
 
@@ -1974,6 +2001,10 @@ document.getElementById('passwordForm').addEventListener('submit', async (event)
       body: JSON.stringify({ currentPassword, newPassword }),
     }, true);
 
+    if (data.token) {
+      const auth = getAuth() || {};
+      setAuth({ ...auth, token: data.token });
+    }
     event.target.reset();
     setMessage('ownerMessage', data.message || 'Password updated successfully.');
   } catch (error) {

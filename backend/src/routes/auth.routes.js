@@ -301,9 +301,18 @@ router.post('/change-password', requireAuth(), asyncHandler(async (req, res) => 
   }
 
   const hash = await bcrypt.hash(data.newPassword, 10);
-  await pool.query('UPDATE users SET password_hash = $1 WHERE id = $2', [hash, req.user.userId]);
+  const { rows: updated } = await pool.query(
+    `UPDATE users
+     SET password_hash = $1, token_version = COALESCE(token_version, 0) + 1
+     WHERE id = $2
+     RETURNING id, email, role, COALESCE(token_version, 0) AS token_version`,
+    [hash, req.user.userId]
+  );
 
-  return res.json({ message: 'Password updated successfully' });
+  return res.json({
+    message: 'Password updated successfully',
+    token: signToken(updated[0]),
+  });
 }));
 
 module.exports = router;

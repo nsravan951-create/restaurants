@@ -69,6 +69,10 @@
             </div>
             <div class="section-body">
               <div class="category-nav-wrap">
+                <label class="menu-search">
+                  <span class="visually-hidden">Search dishes</span>
+                  <input id="menuSearch" type="search" placeholder="Search dishes" autocomplete="off" enterkeyhint="search" />
+                </label>
                 <div id="categoryNav" class="category-nav" role="tablist" aria-label="Food categories"></div>
               </div>
               <div id="menuContainer" class="menu-grid"></div>
@@ -194,6 +198,7 @@
         orderFoodBtn: document.getElementById('orderFoodBtn'),
         menuState: document.getElementById('menuState'),
         categoryNav: document.getElementById('categoryNav'),
+        menuSearch: document.getElementById('menuSearch'),
         menuContainer: document.getElementById('menuContainer'),
         menuToast: document.getElementById('menuToast'),
         cartContainer: document.getElementById('cartContainer'),
@@ -245,6 +250,7 @@
         foodCategories: [],
         allMenuItems: [],
         selectedCategory: 'all',
+        menuQuery: '',
         inlineAds: [],
       };
 
@@ -297,6 +303,15 @@
 
       function storageKey(prefix, restaurantId, tableId) {
         return `${prefix}${restaurantId}_${tableId}`;
+      }
+
+      function escapeHtml(value) {
+        return String(value ?? '')
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;')
+          .replace(/'/g, '&#39;');
       }
 
       function money(value) {
@@ -624,8 +639,8 @@
           <div class="cart-item">
             <div class="cart-item-top">
               <div>
-                <p class="cart-item-name">${item.name}</p>
-                <div class="food-meta"><span>${item.category || 'Food'}</span></div>
+                <p class="cart-item-name">${escapeHtml(item.name)}</p>
+                <div class="food-meta"><span>${escapeHtml(item.category || 'Food')}</span></div>
               </div>
               <div class="price-chip">INR ${money((item.lockedPrice || item.price) * item.quantity)}</div>
             </div>
@@ -653,7 +668,7 @@
         vibrate(50);
         const existing = state.cart.get(item.id);
         if (existing) {
-          existing.quantity += 1;
+          existing.quantity = Math.min(50, existing.quantity + 1);
           state.cart.set(item.id, existing);
         } else {
           state.cart.set(item.id, {
@@ -668,13 +683,29 @@
         }
         saveCart();
         renderCart();
+        syncFoodCardQuantity(item.id);
         setToast('menuToast', 'Added to cart', 'success');
+      }
+
+      function syncFoodCardQuantity(itemId) {
+        const qty = state.cart.get(Number(itemId))?.quantity || 0;
+        const card = els.menuContainer?.querySelector(`[data-food-id="${Number(itemId)}"]`);
+        if (!card) return;
+        card.classList.toggle('is-in-cart', qty > 0);
+        const button = card.querySelector('.food-card-h__add');
+        if (button) button.textContent = qty ? `Add · ${qty}` : '+ Add';
+      }
+
+      function syncAllFoodCards() {
+        els.menuContainer?.querySelectorAll('[data-food-id]').forEach((card) => {
+          syncFoodCardQuantity(Number(card.dataset.foodId));
+        });
       }
 
       function updateQuantity(itemId, delta) {
         const item = state.cart.get(itemId);
         if (!item) return;
-        item.quantity += delta;
+        item.quantity = Math.min(50, item.quantity + delta);
         if (item.quantity <= 0) {
           state.cart.delete(itemId);
         } else {
@@ -682,12 +713,14 @@
         }
         saveCart();
         renderCart();
+        syncFoodCardQuantity(itemId);
       }
 
       function clearCart() {
         state.cart.clear();
         saveCart();
         renderCart();
+        syncAllFoodCards();
       }
 
       function setToast(elementId, message, type = 'success') {
@@ -726,10 +759,10 @@
           <button
             type="button"
             class="category-pill${state.selectedCategory === name ? ' active' : ''}"
-            data-category="${name === 'all' ? 'all' : name}"
+            data-category="${name === 'all' ? 'all' : escapeHtml(name)}"
             role="tab"
             aria-selected="${state.selectedCategory === name ? 'true' : 'false'}"
-          >${name === 'all' ? 'All' : name}</button>
+          >${name === 'all' ? 'All' : escapeHtml(name)}</button>
         `).join('');
 
         els.categoryNav.querySelectorAll('[data-category]').forEach((button) => {
@@ -772,13 +805,20 @@
         return ordered;
       }
 
-      function renderMenu(menuItems) {
-        state.allMenuItems = menuItems || [];
-        renderCategoryBar();
+      function renderMenu(menuItems, options = {}) {
+        if (menuItems) state.allMenuItems = menuItems;
+        if (!options.keepCategories) renderCategoryBar();
 
+        const query = String(state.menuQuery || '').trim().toLowerCase();
         let visibleItems = state.allMenuItems;
         if (state.selectedCategory && state.selectedCategory !== 'all') {
-          visibleItems = state.allMenuItems.filter((item) => (item.category || 'Other') === state.selectedCategory);
+          visibleItems = visibleItems.filter((item) => (item.category || 'Other') === state.selectedCategory);
+        }
+        if (query) {
+          visibleItems = visibleItems.filter((item) => {
+            const haystack = `${item.name || ''} ${item.description || ''} ${item.category || ''}`.toLowerCase();
+            return haystack.includes(query);
+          });
         }
 
         const groups = groupMenu(visibleItems);
@@ -788,7 +828,7 @@
 
         if (!categories.length) {
           window.InlineMenu?.destroyAll();
-          els.menuContainer.innerHTML = '<div class="empty">No menu items available for this category.</div>';
+          els.menuContainer.innerHTML = `<div class="empty">${query ? 'No dishes match your search.' : 'No menu items available for this category.'}</div>`;
           return;
         }
 
@@ -805,6 +845,7 @@
             money,
             normalizeUrl,
             slugifyCategory,
+            getQuantity: (id) => state.cart.get(Number(id))?.quantity || 0,
           },
         });
       }
@@ -824,8 +865,8 @@
           <div class="invoice-box" style="padding:14px;">
             <div class="invoice-row"><span>Items</span><strong>${count}</strong></div>
             <div class="invoice-row"><span>Total Amount</span><strong>INR ${money(subtotal)}</strong></div>
-            <div class="invoice-row"><span>Table</span><strong>${state.context.table.table_number}</strong></div>
-            <div class="invoice-row"><span>Restaurant</span><strong>${state.context.restaurant.name}</strong></div>
+            <div class="invoice-row"><span>Table</span><strong>${escapeHtml(state.context.table.table_number)}</strong></div>
+            <div class="invoice-row"><span>Restaurant</span><strong>${escapeHtml(state.context.restaurant.name)}</strong></div>
           </div>
         `;
         els.checkoutModal.classList.remove('hidden');
@@ -1517,6 +1558,10 @@
             console.warn('Menu expansion failed:', error.message);
             finalizeMenuEnter();
           });
+        });
+        els.menuSearch?.addEventListener('input', () => {
+          state.menuQuery = els.menuSearch.value;
+          renderMenu(null, { keepCategories: true });
         });
         els.clearCartBtn.addEventListener('click', () => clearCart());
         els.proceedBtn.addEventListener('click', openCheckoutModal);

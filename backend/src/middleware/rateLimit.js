@@ -6,10 +6,18 @@ function getClientIp(req) {
   return req.ip || req.socket?.remoteAddress || 'unknown';
 }
 
+function pruneHits(hits, now) {
+  if (hits.size < 500) return;
+  for (const [id, bucket] of hits) {
+    if (!bucket || bucket.resetAt <= now) hits.delete(id);
+  }
+}
+
 function createRateLimiter({ windowMs, max, key = (req) => getClientIp(req) } = {}) {
   const hits = new Map();
   return (req, res, next) => {
     const now = Date.now();
+    pruneHits(hits, now);
     const id = String(key(req) || 'unknown');
     const prior = hits.get(id);
     const bucket = !prior || prior.resetAt <= now ? { count: 0, resetAt: now + windowMs } : prior;
@@ -35,6 +43,7 @@ function createFailureRateLimiter({
   const hits = new Map();
   return (req, res, next) => {
     const now = Date.now();
+    pruneHits(hits, now);
     const id = String(key(req) || 'unknown');
     const prior = hits.get(id);
 
@@ -64,7 +73,8 @@ const loginFailureLimiter = createFailureRateLimiter({
   key: (req) => `${getClientIp(req)}:${String(req.body?.email || '').trim().toLowerCase()}`,
   message: 'Too many failed login attempts. Please wait and try again.',
 });
-const publicOrderLimiter = createRateLimiter({ windowMs: 10 * 60 * 1000, max: 60 });
+const publicOrderLimiter = createRateLimiter({ windowMs: 10 * 60 * 1000, max: 400 });
+const publicTrackLimiter = createRateLimiter({ windowMs: 60 * 1000, max: 120 });
 const paymentLimiter = createRateLimiter({ windowMs: 10 * 60 * 1000, max: 20 });
 const webhookLimiter = createRateLimiter({ windowMs: 60 * 1000, max: 300 });
 
@@ -75,6 +85,7 @@ module.exports = {
   authLimiter,
   loginFailureLimiter,
   publicOrderLimiter,
+  publicTrackLimiter,
   paymentLimiter,
   webhookLimiter,
 };

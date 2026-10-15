@@ -69,19 +69,34 @@
     return rows;
   }
 
+  function safeHttpUrl(value) {
+    const text = String(value || '').trim();
+    return /^https?:\/\//i.test(text) ? text : '';
+  }
+
+  function safeMediaUrl(value, helpers) {
+    const raw = String(value || '').trim();
+    const normalized = helpers?.normalizeUrl ? String(helpers.normalizeUrl(raw) || '').trim() : raw;
+    if (/^https?:\/\//i.test(normalized)) return normalized;
+    if (normalized.startsWith('/') && !normalized.startsWith('//') && !normalized.startsWith('/\\')) return normalized;
+    return '';
+  }
+
   function renderFoodCard(item, helpers) {
-    const image = item.image_url
-      ? `<img class="food-card-h__image" src="${escapeHtml(helpers.normalizeUrl(item.image_url))}" alt="${escapeHtml(item.name)}" loading="lazy" referrerpolicy="no-referrer" />`
+    const imageUrl = safeMediaUrl(item.image_url, helpers);
+    const image = imageUrl
+      ? `<img class="food-card-h__image" src="${escapeHtml(imageUrl)}" alt="${escapeHtml(item.name)}" loading="lazy" referrerpolicy="no-referrer" />`
       : '<div class="food-card-h__placeholder" aria-hidden="true">🍽</div>';
+    const qty = Number(helpers.getQuantity?.(item.id) || 0);
 
     return `
-      <article class="food-card-h" data-food-id="${item.id}">
+      <article class="food-card-h${qty ? ' is-in-cart' : ''}" data-food-id="${Number(item.id)}">
         <div class="food-card-h__image-wrap">${image}</div>
         <h4 class="food-card-h__name">${escapeHtml(item.name)}</h4>
         ${item.description ? `<p class="food-card-h__desc">${escapeHtml(item.description)}</p>` : ''}
         <div class="food-card-h__footer">
           <span class="food-card-h__price">₹${escapeHtml(helpers.money(item.price))}</span>
-          <button class="food-card-h__add" type="button" data-add-item="${item.id}" aria-label="Add ${escapeHtml(item.name)} to cart">+ ADD</button>
+          <button class="food-card-h__add" type="button" data-add-item="${Number(item.id)}" aria-label="Add ${escapeHtml(item.name)} to cart">${qty ? `Add · ${qty}` : '+ Add'}</button>
         </div>
       </article>
     `;
@@ -90,12 +105,9 @@
   function renderFoodRow(items, helpers, rowId) {
     return `
       <div class="food-row-wrap" data-food-row="${rowId}">
-        <p class="food-row-hint">Swipe for more items</p>
-        <button class="row-nav row-nav--prev" type="button" aria-label="Scroll food left" data-row-prev="${rowId}">‹</button>
         <div class="food-row" data-row-scroll="${rowId}">
           ${items.map((item) => renderFoodCard(item, helpers)).join('')}
         </div>
-        <button class="row-nav row-nav--next" type="button" aria-label="Scroll food right" data-row-next="${rowId}">›</button>
       </div>
     `;
   }
@@ -106,13 +118,14 @@
       ? (ad.mobileImageUrl || ad.mobile_image_url)
       : (ad.imageUrl || ad.image_url);
     const mediaType = ad.mediaType || ad.media_type || 'image';
-    const videoUrl = ad.videoUrl || ad.video_url;
+    const videoUrl = safeMediaUrl(ad.videoUrl || ad.video_url, helpers);
+    const safeImage = safeMediaUrl(imageUrl, helpers);
     const media = mediaType === 'video' && videoUrl
       ? `<video src="${escapeHtml(videoUrl)}" muted loop playsinline autoplay></video>`
-      : `<img src="${escapeHtml(helpers.normalizeUrl(imageUrl))}" alt="${escapeHtml(ad.title)}" loading="lazy" referrerpolicy="no-referrer" />`;
+      : (safeImage ? `<img src="${escapeHtml(safeImage)}" alt="${escapeHtml(ad.title)}" loading="lazy" referrerpolicy="no-referrer" />` : '');
 
     const ctaText = ad.ctaText || ad.cta_text || 'Order Now';
-    const targetLink = ad.targetLink || ad.target_link || '#';
+    const targetLink = safeHttpUrl(ad.targetLink || ad.target_link);
 
     return `
       <article class="inline-ad-slide" data-ad-id="${ad.id}">
@@ -120,7 +133,7 @@
         <div class="inline-ad-copy">
           <h4>${escapeHtml(ad.title)}</h4>
           ${ad.description ? `<p>${escapeHtml(ad.description)}</p>` : ''}
-          <a class="inline-ad-cta" href="${escapeHtml(targetLink)}" target="_blank" rel="noopener noreferrer" data-ad-cta="${ad.id}">${escapeHtml(ctaText)}</a>
+          ${targetLink ? `<a class="inline-ad-cta" href="${escapeHtml(targetLink)}" target="_blank" rel="noopener noreferrer" data-ad-cta="${Number(ad.id)}">${escapeHtml(ctaText)}</a>` : ''}
         </div>
       </article>
     `;

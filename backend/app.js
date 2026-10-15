@@ -28,6 +28,7 @@ const errorHandler = require('./src/middleware/errorHandler');
 const { buildAllowedOrigins, createOriginValidator } = require('./src/config/cors');
 
 const app = express();
+app.disable('x-powered-by');
 
 if (process.env.NODE_ENV === 'production') {
   app.set('trust proxy', 1);
@@ -49,7 +50,19 @@ const corsOptions = {
 
 app.use(cors(corsOptions));
 app.options('*', cors(corsOptions));
+app.use((req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
+  res.setHeader('X-DNS-Prefetch-Control', 'off');
+  if (process.env.NODE_ENV === 'production') {
+    res.setHeader('Strict-Transport-Security', 'max-age=15552000; includeSubDomains');
+  }
+  next();
+});
 app.use(express.json({
+  limit: '256kb',
   verify(req, res, buffer) {
     if (req.originalUrl.split('?')[0].endsWith('/cashfree/webhook')) {
       req.rawBody = Buffer.from(buffer);

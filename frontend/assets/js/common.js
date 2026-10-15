@@ -19,6 +19,23 @@ function clearAuth() {
   localStorage.removeItem(STORAGE_KEY);
 }
 
+function escapeHtml(value) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function safeResourceUrl(value) {
+  const text = String(value || '').trim();
+  if (/^https?:\/\//i.test(text)) return text;
+  if (text.startsWith('/') && !text.startsWith('//') && !text.startsWith('/\\')) return text;
+  if (/^data:image\/(png|jpeg|jpg|webp|gif);base64,[a-z0-9+/=\s]+$/i.test(text)) return text;
+  return '';
+}
+
 async function apiRequest(path, options = {}, requiresAuth = false) {
   const headers = {
     'Content-Type': 'application/json',

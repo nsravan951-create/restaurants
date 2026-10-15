@@ -105,11 +105,41 @@
   position: sticky;
   top: 0;
   z-index: 20;
+  display: grid;
+  gap: 10px;
   margin: 0 0 var(--ar-space-4);
   padding: var(--ar-space-3) 0;
   background-color: rgba(248, 250, 252, 0.95);
   backdrop-filter: blur(10px);
   border-bottom: 1px solid var(--ar-border-subtle);
+}
+
+.menu-search input {
+  width: 100%;
+  min-height: 44px;
+  padding: 0.7rem 0.9rem;
+  border-radius: 14px;
+  border: 1px solid var(--ar-border-subtle);
+  background: #fff;
+  font: inherit;
+  font-size: 1rem;
+}
+
+.menu-search input:focus {
+  outline: 2px solid rgba(191, 78, 34, 0.35);
+  border-color: rgba(191, 78, 34, 0.45);
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 
 .category-nav {

@@ -27,14 +27,14 @@ const createOrderSchema = z.object({
   tableId: z.number(),
   tableSessionId: z.number().int().positive(),
   sessionToken: z.string().min(10),
-  customerName: z.string().optional().default(''),
+  customerName: z.string().max(80).optional().default(''),
   paymentMethod: z.enum(['cash', 'cashfree']),
   items: z.array(z.object({
-    menuItemId: z.number(),
+    menuItemId: z.number().int().positive(),
     itemPrice: z.number().positive(),
-    quantity: z.number().int().positive(),
-  })).min(1),
-  notes: z.string().optional().default(''),
+    quantity: z.number().int().positive().max(50),
+  })).min(1).max(40),
+  notes: z.string().max(500).optional().default(''),
   couponCode: z.string().optional().default(''),
 });
 
@@ -56,6 +56,11 @@ router.post('/', publicOrderLimiter, asyncHandler(async (req, res) => {
     }
     if (sessionRows[0].status !== 'active') {
       return res.status(409).json({ message: 'Session is no longer active' });
+    }
+
+    const providedToken = String(req.body.sessionToken || '').trim();
+    if (!providedToken || providedToken !== sessionRows[0].session_token) {
+      return res.status(403).json({ message: 'A valid table session is required' });
     }
 
     const rawItems = Array.isArray(req.body.items) ? req.body.items : [];
@@ -250,11 +255,18 @@ router.post('/', publicOrderLimiter, asyncHandler(async (req, res) => {
       });
     }
 
-    for (const item of orderItems) {
+    if (orderItems.length) {
+      const values = [];
+      const params = [];
+      orderItems.forEach((item, index) => {
+        const base = index * 7;
+        values.push(`($${base + 1}, $${base + 2}, $${base + 3}, $${base + 4}, $${base + 5}, $${base + 6}, $${base + 7})`);
+        params.push(orderId, item.menuItemId, item.itemName, item.itemPrice, item.quantity, item.unitPrice, item.lineTotal);
+      });
       await conn.query(
         `INSERT INTO order_items (order_id, menu_item_id, item_name, item_price, quantity, unit_price, line_total)
-         VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-        [orderId, item.menuItemId, item.itemName, item.itemPrice, item.quantity, item.unitPrice, item.lineTotal]
+         VALUES ${values.join(', ')}`,
+        params
       );
     }
 

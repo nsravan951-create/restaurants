@@ -179,7 +179,7 @@ function renderCart() {
     total += lineTotal;
     return `
       <div class="card">
-        <strong>${item.name}</strong>
+        <strong>${escapeHtml(item.name)}</strong>
         <p>Qty: ${item.quantity}</p>
         <p>INR ${formatCurrency(lineTotal)}</p>
       </div>
@@ -212,7 +212,7 @@ function renderMenu(menu, ads = []) {
     // Add menu item
     menuHTML.push(`
       <article class="card menu-item-card">
-        ${item.image_url ? `<img src="${escapeHtml(item.image_url)}" alt="${escapeHtml(item.name)}" />` : ''}
+        ${safeResourceUrl(item.image_url) ? `<img src="${escapeHtml(safeResourceUrl(item.image_url))}" alt="${escapeHtml(item.name)}" />` : ''}
         <div class="card-content">
           <h3>${escapeHtml(item.name)}</h3>
           <p class="category">${escapeHtml(item.category)}</p>
@@ -227,16 +227,18 @@ function renderMenu(menu, ads = []) {
       const adIndex = Math.floor((index + 1) / 3) - 1;
       if (adIndex < ads.length) {
         const ad = ads[adIndex];
-        const mediaHTML = ad.media_type === 'video' && ad.video_url
-          ? `<video src="${escapeHtml(ad.video_url)}" muted loop playsinline autoplay></video>`
-          : `<img src="${escapeHtml(ad.image_url)}" alt="${escapeHtml(ad.title)}" />`;
+        const mediaUrl = safeResourceUrl(ad.media_type === 'video' ? ad.video_url : ad.image_url);
+        const offerUrl = safeResourceUrl(ad.target_link);
+        const mediaHTML = ad.media_type === 'video' && mediaUrl
+          ? `<video src="${escapeHtml(mediaUrl)}" muted loop playsinline autoplay></video>`
+          : (mediaUrl ? `<img src="${escapeHtml(mediaUrl)}" alt="${escapeHtml(ad.title)}" />` : '');
         menuHTML.push(`
           <article class="card ad-card" data-ad-id="${ad.id}">
             ${mediaHTML}
             <div class="card-content">
               <h3>${escapeHtml(ad.title)}</h3>
               <p>${escapeHtml(ad.description || 'Exclusive offer from our partners')}</p>
-              <a href="${escapeHtml(ad.target_link)}" target="_blank" rel="noreferrer" class="btn btn-primary">View Offer</a>
+              ${offerUrl ? `<a href="${escapeHtml(offerUrl)}" target="_blank" rel="noopener noreferrer" class="btn btn-primary">View Offer</a>` : ''}
             </div>
           </article>
         `);

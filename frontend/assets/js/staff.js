@@ -1,7 +1,7 @@
 function parseOrderItems(items) {
   try {
     const parsed = typeof items === 'string' ? JSON.parse(items) : items;
-    return parsed.map((item) => `${item.item_name} x${item.quantity}`).join(', ');
+    return parsed.map((item) => `${escapeHtml(item.item_name)} x${escapeHtml(item.quantity)}`).join(', ');
   } catch (error) {
     return 'Unable to parse items';
   }
@@ -32,7 +32,7 @@ async function loadStaffBoard() {
 
   board.innerHTML = data.orders.map((order) => `
     <div class="card">
-      <strong>Order #${order.id} | Table ${order.table_number}</strong>
+      <strong>Order #${escapeHtml(order.id)} | Table ${escapeHtml(order.table_number)}</strong>
       <p>${parseOrderItems(order.items)}</p>
       <div class="toolbar">
         <button class="btn btn-light" data-print="${order.id}">Print Bill</button>

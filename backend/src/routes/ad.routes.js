@@ -4,6 +4,7 @@ const { z } = require('zod');
 const pool = require('../config/db');
 const asyncHandler = require('../utils/asyncHandler');
 const { requireAuth } = require('../middleware/auth');
+const { publicTrackLimiter } = require('../middleware/rateLimit');
 const {
   fetchActiveInlineAds,
   replaceAdRestaurantTargets,
@@ -110,13 +111,13 @@ router.get('/active', asyncHandler(async (req, res) => {
   return res.json({ ads });
 }));
 
-router.post('/click/:adId', asyncHandler(async (req, res) => {
+router.post('/click/:adId', publicTrackLimiter, asyncHandler(async (req, res) => {
   const { adId } = req.params;
   await pool.query('UPDATE ads SET clicks = clicks + 1 WHERE id = $1', [adId]);
   return res.json({ message: 'Click tracked' });
 }));
 
-router.post('/impression/:adId', asyncHandler(async (req, res) => {
+router.post('/impression/:adId', publicTrackLimiter, asyncHandler(async (req, res) => {
   const { adId } = req.params;
   await pool.query('UPDATE ads SET impressions = impressions + 1 WHERE id = $1', [adId]);
   return res.json({ message: 'Impression tracked' });
