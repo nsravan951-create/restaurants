@@ -17,7 +17,11 @@ const router = express.Router();
 const ownerRegisterSchema = z.object({
   name: z.string().min(2),
   email: z.string().email(),
-  password: z.string().min(6),
+  password: z.string()
+    .min(8, 'Password must be at least 8 characters.')
+    .refine((value) => /[A-Z]/.test(value), 'Password must contain at least 1 capital letter.')
+    .refine((value) => (value.match(/\d/g) || []).length >= 2, 'Password must contain at least 2 numbers.')
+    .refine((value) => (value.match(/[^A-Za-z0-9]/g) || []).length >= 2, 'Password must contain at least 2 symbols.'),
   restaurantName: z.string().min(2),
   totalTables: z.number().int().positive().max(500),
   phone: z.string().optional().default(''),

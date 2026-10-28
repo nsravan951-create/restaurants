@@ -64,7 +64,15 @@
             <h2>Register new restaurant</h2>
             <input name="name" placeholder="Owner name" required />
             <input name="email" type="email" placeholder="Email" required />
-            <input name="password" type="password" placeholder="Password" required />
+            <label class="auth-field">
+              <span>Password</span>
+              <input id="registerPassword" name="password" type="password" placeholder="Password" required minlength="8"
+                pattern="(?=.*[A-Z])(?=(?:.*\d){2})(?=(?:.*[^A-Za-z0-9]){2}).{8,}"
+                title="Use at least 8 characters, 1 capital letter, 2 numbers, and 2 symbols." autocomplete="new-password" />
+              <small id="registerPasswordHint" class="muted" aria-live="polite">
+                Use at least 8 characters, 1 capital letter, 2 numbers, and 2 symbols.
+              </small>
+            </label>
             <input name="restaurantName" placeholder="Restaurant name" required />
             <input name="totalTables" type="number" min="1" max="500" placeholder="Total tables" required />
             <input name="phone" placeholder="Phone" />

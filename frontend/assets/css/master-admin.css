@@ -382,6 +382,10 @@ body.admin-page .admin-topbar {
   display: block;
 }
 
+.password-hint--valid {
+  color: #16794c;
+}
+
 .ma-feature-toggle small {
   color: #9eb5cc;
 }

@@ -2,6 +2,8 @@ const registerForm = document.getElementById('registerForm');
 const ownerLoginForm = document.getElementById('ownerLoginForm');
 const teamLoginForm = document.getElementById('teamLoginForm');
 const legacyLoginForm = document.getElementById('loginForm');
+const registerPassword = document.getElementById('registerPassword');
+const registerPasswordHint = document.getElementById('registerPasswordHint');
 
 const PLATFORM_TEAM_ROLES = new Set([
   'finance_manager', 'payment_manager', 'settlement_manager', 'subscription_manager',
@@ -175,10 +177,36 @@ if (legacyLoginForm) {
 }
 
 if (registerForm) {
+  function getPasswordRequirements(password) {
+    return [
+      { label: '8 characters', valid: password.length >= 8 },
+      { label: '1 capital letter', valid: /[A-Z]/.test(password) },
+      { label: '2 numbers', valid: (password.match(/\d/g) || []).length >= 2 },
+      { label: '2 symbols', valid: (password.match(/[^A-Za-z0-9]/g) || []).length >= 2 },
+    ];
+  }
+
+  function updateRegisterPasswordHint() {
+    if (!registerPassword || !registerPasswordHint) return;
+    const requirements = getPasswordRequirements(registerPassword.value);
+    registerPasswordHint.textContent = requirements
+      .map((requirement) => `${requirement.valid ? '✓' : '○'} ${requirement.label}`)
+      .join('  ');
+    registerPasswordHint.classList.toggle('password-hint--valid', requirements.every((requirement) => requirement.valid));
+  }
+
+  registerPassword?.addEventListener('input', updateRegisterPasswordHint);
+
   registerForm.addEventListener('submit', (event) => {
     event.preventDefault();
     const formData = new FormData(registerForm);
     const payload = Object.fromEntries(formData.entries());
+
+    if (registerPassword && !registerPassword.checkValidity()) {
+      updateRegisterPasswordHint();
+      registerPassword.reportValidity();
+      return;
+    }
 
     fetch(`${window.API_URL}/api/auth/register-owner`, {
       method: 'POST',
