@@ -734,8 +734,14 @@ function hasRunningBill(table) {
 
 function tableStatusLabel(table) {
   const status = String(table.availability_status || 'available');
-  if (status === 'paid') return 'Paid — tap for receipt';
-  if (hasRunningBill(table)) return 'Running bill — tap to add items';
+  if (status === 'paid') return 'Paid — guests finishing up, tap for receipt';
+  if (hasRunningBill(table)) {
+    const orderStatus = String(table.order_status || '').toLowerCase();
+    if (orderStatus === 'delivered') return 'Dining — having food';
+    if (orderStatus === 'ready') return 'Food ready — waiting to be served';
+    if (orderStatus === 'preparing') return 'Kitchen is preparing the food';
+    if (orderStatus === 'pending') return 'Waiting for food';
+  }
   if (status === 'active') return 'QR scanned — waiting for order';
   return 'Available';
 }
@@ -759,14 +765,38 @@ function tablePaymentPill(table) {
 
 function tableStatusClass(status) {
   if (status === 'active') return 'table-card--active';
+  if (status === 'preparing') return 'table-card--preparing';
+  if (status === 'dining') return 'table-card--dining';
   if (status === 'paid') return 'table-card--paid';
   return 'table-card--available';
 }
 
 function tableBadgeClass(status) {
   if (status === 'active') return 'table-card__badge table-card__badge--active';
+  if (status === 'preparing') return 'table-card__badge table-card__badge--preparing';
+  if (status === 'dining') return 'table-card__badge table-card__badge--dining';
   if (status === 'paid') return 'table-card__badge table-card__badge--paid';
   return 'table-card__badge table-card__badge--available';
+}
+
+// Occupied table colors follow the kitchen:
+//   white = unoccupied · orange = occupied, kitchen not started yet
+//   yellow = food preparing · green = dining (food delivered OR paid — guests
+//   still at the table). Payment shows via the CASH/PAID pill, not a color.
+//   Terminal Reset clears a paid table back to white.
+function resolveTableVisualStatus(table) {
+  const availability = String(table.availability_status || 'available').toLowerCase();
+  const orderStatus = String(table.order_status || '').toLowerCase();
+  if (availability === 'paid') {
+    return orderStatus === 'preparing' ? 'preparing' : 'dining';
+  }
+  const occupied = availability === 'active'
+    || Boolean(table.active_session_id)
+    || hasRunningBill(table);
+  if (occupied && orderStatus === 'delivered') return 'dining';
+  if (occupied && orderStatus === 'preparing') return 'preparing';
+  if (occupied) return 'active';
+  return 'available';
 }
 
 function applyTableCardStatus(tableId, status) {
@@ -785,7 +815,7 @@ function applyTableCardStatus(tableId, status) {
 
   const statusMeta = card.querySelector('.table-card__meta');
   if (statusMeta) {
-    statusMeta.textContent = `Status: ${tableStatusLabel({ availability_status: normalized, active_order_id: card.dataset.hasOrder === '1' ? 1 : null, order_payment_status: normalized === 'paid' ? 'paid' : (card.dataset.runningBill === '1' ? 'pending' : '') })}`;
+    statusMeta.textContent = `Status: ${tableStatusLabel({ availability_status: normalized, active_order_id: card.dataset.hasOrder === '1' ? 1 : null, order_payment_status: normalized === 'paid' ? 'paid' : (card.dataset.runningBill === '1' ? 'pending' : ''), order_status: card.dataset.orderStatus || '' })}`;
   }
 }
 
@@ -1411,20 +1441,19 @@ async function loadTables() {
     const hasActiveSession = Boolean(table.active_session_id) || String(table.active_session_status || '').toLowerCase() === 'active';
     const runningBill = hasRunningBill(table);
     const hasOrder = table.active_order_id ? '1' : '0';
-    const status = String(table.availability_status || 'available') === 'paid'
-      ? 'paid'
-      : (runningBill || hasActiveSession ? 'active' : 'available');
-    const clickable = runningBill || status === 'active' || status === 'paid';
+    const status = resolveTableVisualStatus(table);
+    const clickable = runningBill || status === 'active' || status === 'dining' || status === 'paid';
     const showTerminate = status !== 'available';
-    const showBillAction = runningBill || status === 'active' || status === 'paid';
+    const showBillAction = runningBill || status === 'active' || status === 'dining' || status === 'paid';
     return `
-      <div class="table-card ${tableStatusClass(status)}${clickable ? ' table-card--clickable' : ''}" data-table-id="${table.id}" data-table-status="${escapeHtml(status)}" data-table-number="${escapeHtml(table.table_number)}" data-has-order="${hasOrder}" data-running-bill="${runningBill ? '1' : '0'}">
+      <div class="table-card ${tableStatusClass(status)}${clickable ? ' table-card--clickable' : ''}" data-table-id="${table.id}" data-table-status="${escapeHtml(status)}" data-table-number="${escapeHtml(table.table_number)}" data-has-order="${hasOrder}" data-running-bill="${runningBill ? '1' : '0'}" data-order-status="${escapeHtml(String(table.order_status || ''))}">
         <div class="${tableBadgeClass(status)}">${escapeHtml(table.table_number)}</div>
         <p class="table-card__meta">Status: ${escapeHtml(tableStatusLabel(table))}</p>
         ${tablePaymentPill(table)}
         ${qrImage}
         <div class="toolbar">
           <button class="btn btn-light" data-print-qr="${table.id}" type="button">Print QR</button>
+          ${qrSrc ? `<button class="btn btn-light" data-download-qr="${table.id}" type="button">Download QR</button>` : ''}
           ${showBillAction ? `<button class="btn btn-primary" data-open-bill="${table.id}" type="button">Open Bill</button>` : ''}
           ${showTerminate ? `<button class="btn btn-primary" data-reset-terminal="${table.id}" type="button">Terminate Box</button>` : ''}
           <button class="btn btn-dark" data-delete-table="${table.id}" type="button">Delete</button>
@@ -1463,6 +1492,23 @@ async function loadTables() {
       } catch (error) {
         setMessage('ownerMessage', error.message, true);
       }
+    });
+  });
+
+  tableList.querySelectorAll('button[data-download-qr]').forEach((button) => {
+    button.addEventListener('click', () => {
+      const table = latestTablesCache.find((row) => String(row.id) === String(button.dataset.downloadQr));
+      const qrSrc = table ? safeResourceUrl(table.qr_data_url) : null;
+      if (!qrSrc) {
+        setMessage('ownerMessage', 'No QR image available for this table.', true);
+        return;
+      }
+      const link = document.createElement('a');
+      link.href = qrSrc;
+      link.download = `${String(table.table_number).replace(/\s+/g, '-')}-QR.png`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
     });
   });
 
@@ -1772,7 +1818,7 @@ async function initSocket() {
     }
 
     try {
-      if (payload && (payload.type === 'created' || payload.type === 'paid')) {
+      if (payload && ['created', 'paid', 'status_changed', 'items_added'].includes(payload.type)) {
         loadTables().catch(() => {});
         if (payload.type === 'paid') {
           showFloatingPromo('transaction');
@@ -1980,6 +2026,50 @@ document.getElementById('autoTableForm').addEventListener('submit', async (event
   } catch (error) {
     setMessage('ownerMessage', error.message, true);
   }
+});
+
+document.getElementById('printAllQrsBtn').addEventListener('click', () => {
+  if (!ensureRestaurantId()) return;
+  const tables = (latestTablesCache || []).filter((table) => safeResourceUrl(table.qr_data_url));
+  if (!tables.length) {
+    setMessage('ownerMessage', 'No QR codes to print yet. Generate tables first.', true);
+    return;
+  }
+  const cards = tables.map((table) => {
+    const qrSrc = escapeHtml(safeResourceUrl(table.qr_data_url));
+    const qrLink = escapeHtml(String(table.qr_url || ''));
+    return `
+      <div class="qr-sheet-card">
+        <img src="${qrSrc}" alt="QR for ${escapeHtml(table.table_number)}" />
+        <h3>${escapeHtml(table.table_number)}</h3>
+        <p>${qrLink}</p>
+      </div>
+    `;
+  }).join('');
+  const html = `
+    <html>
+      <head>
+        <title>Table QR Codes</title>
+        <style>
+          body { font-family: sans-serif; padding: 24px; }
+          .qr-sheet { display: grid; grid-template-columns: repeat(2, 1fr); gap: 24px; }
+          .qr-sheet-card { border: 1px solid #ddd; border-radius: 12px; padding: 16px; text-align: center; page-break-inside: avoid; }
+          .qr-sheet-card img { width: 220px; height: 220px; }
+          .qr-sheet-card h3 { margin: 8px 0 4px; }
+          .qr-sheet-card p { margin: 0; font-size: 11px; color: #555; word-break: break-all; }
+        </style>
+      </head>
+      <body>
+        <h1>Table QR Codes</h1>
+        <div class="qr-sheet">${cards}</div>
+      </body>
+    </html>
+  `;
+  const printWindow = window.open('', '_blank');
+  printWindow.document.write(html);
+  printWindow.document.close();
+  printWindow.focus();
+  printWindow.print();
 });
 
 document.getElementById('passwordForm').addEventListener('submit', async (event) => {

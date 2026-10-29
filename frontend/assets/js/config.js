@@ -8,7 +8,8 @@
     window.BACKEND_PUBLIC_URL || 'https://restaurant-backend-rxqz.onrender.com'
   ).replace(/\/$/, '');
 
-  const apiUrl = (isLocalHost || isFileProtocol) ? 'http://localhost:5000' : productionApi;
+  const apiUrl = String(window.BACKEND_PUBLIC_URL || '').replace(/\/$/, '')
+    || ((isLocalHost || isFileProtocol) ? 'http://localhost:5000' : productionApi);
 
   const path = window.location.pathname || '/';
   const pagesMarker = '/pages/';

@@ -282,10 +282,22 @@ main {
   box-shadow: 0 10px 30px rgba(255,140,20,0.06), 0 0 24px rgba(255,140,20,0.04) inset;
 }
 
+.table-card--preparing {
+  background: linear-gradient(90deg, rgba(255,214,10,0.12), rgba(250,190,0,0.05));
+  border-color: rgba(230,180,0,0.28);
+  box-shadow: 0 10px 30px rgba(240,190,0,0.08), 0 0 24px rgba(240,190,0,0.06) inset;
+}
+
+.table-card--dining {
+  background: linear-gradient(90deg, rgba(60,210,120,0.10), rgba(34,170,90,0.06));
+  border-color: rgba(50,190,110,0.30);
+  box-shadow: 0 10px 30px rgba(50,200,110,0.10), 0 0 24px rgba(50,200,110,0.08) inset;
+}
+
 .table-card--paid {
-  background: linear-gradient(90deg, rgba(120,240,160,0.04), rgba(80,200,120,0.04));
-  border-color: rgba(100,200,140,0.12);
-  box-shadow: 0 10px 30px rgba(60,210,120,0.06), 0 0 18px rgba(60,210,120,0.04) inset;
+  background: linear-gradient(90deg, rgba(110,120,240,0.07), rgba(70,90,220,0.04));
+  border-color: rgba(100,115,230,0.20);
+  box-shadow: 0 10px 30px rgba(100,115,230,0.07), 0 0 18px rgba(100,115,230,0.05) inset;
 }
 
 .table-card__badge {
@@ -310,9 +322,19 @@ main {
   color: #b55100;
 }
 
+.table-card__badge--preparing {
+  background: rgba(240, 185, 0, 0.18);
+  color: #8a6a00;
+}
+
+.table-card__badge--dining {
+  background: rgba(50, 190, 110, 0.16);
+  color: #157a41;
+}
+
 .table-card__badge--paid {
-  background: rgba(50, 185, 110, 0.14);
-  color: #1f7a46;
+  background: rgba(100, 115, 230, 0.14);
+  color: #3a47b8;
 }
 
 .table-card__qr {
@@ -539,6 +561,8 @@ select:focus {
 }
 
 .table-card--active::after,
+.table-card--preparing::after,
+.table-card--dining::after,
 .table-card--paid::after {
   content: '';
   position: absolute;

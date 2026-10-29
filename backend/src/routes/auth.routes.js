@@ -14,14 +14,12 @@ const { authLimiter, loginFailureLimiter } = require('../middleware/rateLimit');
 
 const router = express.Router();
 
+const EMAIL_REGEX = /^[A-Za-z0-9._%+-]+@[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?)*\.[A-Za-z]{2,}$/;
+
 const ownerRegisterSchema = z.object({
   name: z.string().min(2),
-  email: z.string().email(),
-  password: z.string()
-    .min(8, 'Password must be at least 8 characters.')
-    .refine((value) => /[A-Z]/.test(value), 'Password must contain at least 1 capital letter.')
-    .refine((value) => (value.match(/\d/g) || []).length >= 2, 'Password must contain at least 2 numbers.')
-    .refine((value) => (value.match(/[^A-Za-z0-9]/g) || []).length >= 2, 'Password must contain at least 2 symbols.'),
+  email: z.string().email().regex(EMAIL_REGEX, 'Invalid email address'),
+  password: z.string().min(6),
   restaurantName: z.string().min(2),
   totalTables: z.number().int().positive().max(500),
   phone: z.string().optional().default(''),
@@ -29,7 +27,7 @@ const ownerRegisterSchema = z.object({
 });
 
 const loginSchema = z.object({
-  email: z.string().email(),
+  email: z.string().email().regex(EMAIL_REGEX, 'Invalid email address'),
   password: z.string().min(6),
 });
 

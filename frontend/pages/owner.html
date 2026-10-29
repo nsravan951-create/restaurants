@@ -80,11 +80,12 @@
             <div class="section-head">
               <div>
                 <h2>Tables & QR Codes</h2>
-                <p class="hero-copy">White = available. Orange = running bill (tap the box to view bill and add extra items). Green = paid.</p>
+                <p class="hero-copy">White = unoccupied. Orange = order placed. Yellow = food preparing. Green = guests at the table (dining or already paid — the pill shows payment). Reset the terminal once guests leave.</p>
             <div class="card-row" style="margin-top:0.75rem;">
-              <div class="card"><strong>White</strong><p>Available</p></div>
-              <div class="card"><strong>Orange</strong><p>Running bill — tap box</p></div>
-              <div class="card"><strong>Green</strong><p>Paid — reset terminal</p></div>
+              <div class="card"><strong>White</strong><p>Unoccupied</p></div>
+              <div class="card"><strong>Orange</strong><p>Order placed — waiting</p></div>
+              <div class="card"><strong>Yellow</strong><p>Food preparing</p></div>
+              <div class="card"><strong>Green</strong><p>Guests at table — dining or paid</p></div>
             </div>
               </div>
             </div>
@@ -112,6 +113,7 @@
               <input name="tableNumber" placeholder="Table number (e.g., A1)" required />
               <button class="btn btn-primary" type="submit">Create Single Table</button>
             </form>
+            <button id="printAllQrsBtn" class="btn btn-dark" type="button">Print All Table QRs</button>
             <div id="tableList" class="table-grid"></div>
           </section>
 

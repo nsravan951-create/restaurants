@@ -1814,7 +1814,7 @@
     { role_key: 'finance_manager', name: 'Finance Manager', department_name: 'Finance', description: 'Full finance access — commissions, settlements, refunds.' },
     { role_key: 'payment_manager', name: 'Payment Manager', department_name: 'Finance', description: 'Cashfree reconciliation and restaurant payout details.' },
     { role_key: 'settlement_manager', name: 'Settlement Manager', department_name: 'Finance', description: 'Restaurant settlement batches and payout status.' },
-    { role_key: 'subscription_manager', name: 'Subscription Manager', department_name: 'Finance', description: 'SaaS plans and billing for restaurants.' },
+    { role_key: 'subscription_manager', name: 'Subscription Manager', department_name: 'Finance', description: 'Platform plans and billing for restaurants.' },
     { role_key: 'restaurant_manager', name: 'Restaurant Manager', department_name: 'Operations', description: 'Day-to-day restaurant operations and status.' },
     { role_key: 'registration_manager', name: 'Registration Manager', department_name: 'Operations', description: 'Onboard new restaurants and owners.' },
     { role_key: 'operations_manager', name: 'Operations Manager', department_name: 'Operations', description: 'Live platform operations and orders.' },

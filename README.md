@@ -11,11 +11,14 @@ Contactless table ordering with QR codes, owner dashboard, kitchen/staff flows, 
 
 ## Table color states (Owner dashboard)
 
-| Status | Color | When |
-|--------|-------|------|
-| `available` | White | Table idle, ready for next guest |
-| `active` | Orange | Customer scanned QR and started ordering |
-| `paid` | Green | Payment completed; use **Terminal Reset** to clear |
+| Color | When |
+|-------|------|
+| White | Unoccupied — ready for next guest |
+| Orange | Occupied — QR scanned or order placed, kitchen not started (`pending`) |
+| Yellow | Food preparing (`preparing`) |
+| Green | Guests at the table — food delivered (`delivered`) **or** paid but not yet reset (payment shows as a CASH/PAID pill on the card) |
+
+Use **Terminal Reset** on a paid table once guests leave; it returns to white.
 
 ## Quick start (local)
 

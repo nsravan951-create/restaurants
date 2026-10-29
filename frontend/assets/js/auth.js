@@ -1,9 +1,9 @@
+const EMAIL_REGEX = /^[A-Za-z0-9._%+-]+@[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?)*\.[A-Za-z]{2,}$/;
+
 const registerForm = document.getElementById('registerForm');
 const ownerLoginForm = document.getElementById('ownerLoginForm');
 const teamLoginForm = document.getElementById('teamLoginForm');
 const legacyLoginForm = document.getElementById('loginForm');
-const registerPassword = document.getElementById('registerPassword');
-const registerPasswordHint = document.getElementById('registerPasswordHint');
 
 const PLATFORM_TEAM_ROLES = new Set([
   'finance_manager', 'payment_manager', 'settlement_manager', 'subscription_manager',
@@ -56,10 +56,14 @@ try {
 } catch (_) {}
 
 async function performLogin(formData) {
+  const email = String(formData.get('email') || '').trim();
+  if (!EMAIL_REGEX.test(email)) {
+    throw new Error('Please enter a valid email address (e.g. name@example.com).');
+  }
   return apiRequest('/api/auth/login', {
     method: 'POST',
     body: JSON.stringify({
-      email: formData.get('email'),
+      email,
       password: formData.get('password'),
     }),
   });
@@ -177,34 +181,14 @@ if (legacyLoginForm) {
 }
 
 if (registerForm) {
-  function getPasswordRequirements(password) {
-    return [
-      { label: '8 characters', valid: password.length >= 8 },
-      { label: '1 capital letter', valid: /[A-Z]/.test(password) },
-      { label: '2 numbers', valid: (password.match(/\d/g) || []).length >= 2 },
-      { label: '2 symbols', valid: (password.match(/[^A-Za-z0-9]/g) || []).length >= 2 },
-    ];
-  }
-
-  function updateRegisterPasswordHint() {
-    if (!registerPassword || !registerPasswordHint) return;
-    const requirements = getPasswordRequirements(registerPassword.value);
-    registerPasswordHint.textContent = requirements
-      .map((requirement) => `${requirement.valid ? '✓' : '○'} ${requirement.label}`)
-      .join('  ');
-    registerPasswordHint.classList.toggle('password-hint--valid', requirements.every((requirement) => requirement.valid));
-  }
-
-  registerPassword?.addEventListener('input', updateRegisterPasswordHint);
-
   registerForm.addEventListener('submit', (event) => {
     event.preventDefault();
     const formData = new FormData(registerForm);
     const payload = Object.fromEntries(formData.entries());
+    payload.email = String(payload.email || '').trim();
 
-    if (registerPassword && !registerPassword.checkValidity()) {
-      updateRegisterPasswordHint();
-      registerPassword.reportValidity();
+    if (!EMAIL_REGEX.test(payload.email)) {
+      setMessage('authMessage', 'Please enter a valid email address (e.g. name@example.com).', true);
       return;
     }
 
@@ -215,7 +199,12 @@ if (registerForm) {
     })
       .then(async (res) => {
         const data = await res.json().catch(() => ({}));
-        if (!res.ok) throw new Error(data.error || data.message || 'Request failed');
+        if (!res.ok) {
+          const detail = Array.isArray(data.details) && data.details.length
+            ? data.details.map((d) => `${(d.path || []).join('.') || 'field'}: ${d.message}`).join(' | ')
+            : null;
+          throw new Error(detail || data.error || data.message || 'Request failed');
+        }
         return data;
       })
       .then(() => {

@@ -22,9 +22,43 @@
   --od-surface-2: var(--ar-slate-950, #14111a);
   --od-border: rgba(255, 255, 255, 0.08);
   --od-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
-  --od-ink: var(--ar-text-inverse, #f5f0ea);
+  --od-ink: var(--ar-text-primary, #f5f0ea);
   --od-muted: var(--ar-slate-400, #a8a0b0);
   background: linear-gradient(180deg, #121018 0%, #0d0b12 100%);
+}
+
+/* Dark-theme surfaces for components with hard-coded light backgrounds.
+   Scoped to the owner shell so light mode is untouched. */
+.theme-dark .owner-app .soft-panel {
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--od-ink);
+  box-shadow: none;
+}
+
+.theme-dark .owner-app .analytics-item {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: var(--od-border);
+  color: var(--od-ink);
+}
+
+.theme-dark .owner-app .table-card {
+  background-color: var(--od-surface-2);
+  border-color: var(--od-border);
+  color: var(--od-ink);
+}
+
+.theme-dark .owner-app .btn-light {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  color: var(--od-ink);
+}
+
+.theme-dark .owner-app input,
+.theme-dark .owner-app textarea,
+.theme-dark .owner-app select {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.14);
+  color: var(--od-ink);
 }
 
 .owner-app__layout {
