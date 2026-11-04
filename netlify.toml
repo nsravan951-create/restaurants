@@ -1,0 +1,7 @@
+[build]
+  publish = "frontend"
+
+[[redirects]]
+  from = "/"
+  to = "/showcase.html"
+  status = 200

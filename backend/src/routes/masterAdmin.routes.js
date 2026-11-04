@@ -379,8 +379,26 @@ router.post('/settlements', requirePlatformPermission('settlements.manage'), asy
     refundAmount, adjustmentAmount, notes,
   } = req.body || {};
 
-  const net = Number(grossAmount || 0) - Number(commissionAmount || 0)
-    - Number(refundAmount || 0) + Number(adjustmentAmount || 0);
+  const start = new Date(periodStart);
+  const end = new Date(periodEnd);
+  const gross = Number(grossAmount || 0);
+  const commission = Number(commissionAmount || 0);
+  const refunds = Number(refundAmount || 0);
+  const adjustment = Number(adjustmentAmount || 0);
+  const targetRestaurantId = Number(restaurantId);
+  if (!Number.isInteger(targetRestaurantId) || targetRestaurantId <= 0
+    || Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || end <= start
+    || ![gross, commission, refunds, adjustment].every((value) => Number.isFinite(value) && value >= 0)
+    || gross - commission - refunds + adjustment < 0) {
+    return res.status(400).json({ message: 'Settlement period and non-negative amounts are required.' });
+  }
+
+  const accessible = await getAccessibleRestaurantIds(req.user.userId, req.user.role);
+  if (accessible && !accessible.includes(targetRestaurantId)) {
+    return res.status(403).json({ message: 'You cannot manage settlements for this restaurant.' });
+  }
+
+  const net = gross - commission - refunds + adjustment;
 
   const { rows } = await pool.query(
     `INSERT INTO settlements (
@@ -389,9 +407,9 @@ router.post('/settlements', requirePlatformPermission('settlements.manage'), asy
      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'pending', $9, $10)
      RETURNING *`,
     [
-      Number(restaurantId), periodStart, periodEnd,
-      Number(grossAmount || 0), Number(commissionAmount || 0),
-      Number(refundAmount || 0), Number(adjustmentAmount || 0),
+      targetRestaurantId, periodStart, periodEnd,
+      gross, commission,
+      refunds, adjustment,
       net, notes || null, req.user.userId,
     ]
   );
@@ -413,6 +431,34 @@ router.post('/settlements', requirePlatformPermission('settlements.manage'), asy
 router.patch('/settlements/:id', requirePlatformPermission('settlements.manage'), asyncHandler(async (req, res) => {
   const id = Number(req.params.id);
   const { status, settlementReference, notes } = req.body || {};
+  const allowedStatuses = new Set(['pending', 'scheduled', 'processing', 'sent', 'verified', 'paid', 'failed', 'on_hold', 'cancelled']);
+  if (status && !allowedStatuses.has(status)) {
+    return res.status(400).json({ message: 'Invalid settlement status.' });
+  }
+  const { rows: existingRows } = await pool.query(
+    'SELECT restaurant_id, status FROM settlements WHERE id = $1 LIMIT 1',
+    [id]
+  );
+  if (!existingRows.length) return res.status(404).json({ message: 'Settlement not found' });
+  const accessible = await getAccessibleRestaurantIds(req.user.userId, req.user.role);
+  if (accessible && !accessible.includes(Number(existingRows[0].restaurant_id))) {
+    return res.status(403).json({ message: 'You cannot manage this settlement.' });
+  }
+  const currentStatus = existingRows[0].status;
+  const transitions = {
+    pending: new Set(['pending', 'scheduled', 'processing', 'on_hold', 'cancelled']),
+    scheduled: new Set(['scheduled', 'processing', 'on_hold', 'cancelled']),
+    processing: new Set(['processing', 'sent', 'failed', 'on_hold']),
+    sent: new Set(['sent', 'verified', 'failed']),
+    verified: new Set(['verified', 'paid', 'on_hold']),
+    paid: new Set(['paid']),
+    failed: new Set(['failed', 'processing']),
+    on_hold: new Set(['on_hold', 'processing', 'cancelled']),
+    cancelled: new Set(['cancelled']),
+  };
+  if (status && !transitions[currentStatus]?.has(status)) {
+    return res.status(409).json({ message: `Cannot move settlement from ${currentStatus} to ${status}.` });
+  }
   const { rows } = await pool.query(
     `UPDATE settlements SET
        status = COALESCE($1, status),

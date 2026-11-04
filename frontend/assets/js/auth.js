@@ -43,6 +43,10 @@ document.querySelectorAll('[data-auth-tab]').forEach((btn) => {
   btn.addEventListener('click', () => switchAuthTab(btn.dataset.authTab));
 });
 
+if (window.location.hash === '#register') {
+  switchAuthTab('register');
+}
+
 try {
   const authMessage = sessionStorage.getItem('owner_auth_message');
   if (authMessage) {

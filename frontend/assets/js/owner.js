@@ -23,6 +23,7 @@ const OWNER_NAV = [
   { group: 'Growth', section: 'analytics', label: 'Analytics', icon: 'chart', featureKey: null },
   { group: 'Growth', section: 'reviews', label: 'Reviews', icon: 'star', featureKey: null },
   { group: 'Growth', section: 'inventory', label: 'Inventory', icon: 'box', featureKey: 'inventory', premium: true },
+  { group: 'Growth', section: 'recipes', label: 'Recipes', icon: 'menu', featureKey: 'inventory', premium: true },
   { group: 'Growth', section: 'offers', label: 'Offers', icon: 'tag', featureKey: 'offers', premium: true },
   { group: 'Growth', section: 'coupons', label: 'Coupons', icon: 'ticket', featureKey: 'coupons', premium: true },
   { group: 'Growth', section: 'customers', label: 'Customers', icon: 'users', featureKey: 'customer_management', premium: true },
@@ -47,6 +48,7 @@ const SECTION_META = {
   password: { title: 'Password', description: 'Update your owner dashboard password.', action: null },
   features: { title: 'Plans & Upgrade', description: 'See enabled features and upgrade options.', action: { label: 'View Upgrade', id: 'openUpgradeFromFeatures' } },
   inventory: { title: 'Inventory', description: 'Track stock levels and low-stock alerts.', premium: true },
+  recipes: { title: 'Recipes', description: 'Map menu items to ingredients and automate consumption.', premium: true },
   offers: { title: 'Offers', description: 'Create promotional offers for guests.', premium: true },
   coupons: { title: 'Coupons', description: 'Discount codes and campaign management.', premium: true },
   customers: { title: 'Customers', description: 'Guest profiles and order history.', premium: true },
@@ -987,12 +989,189 @@ async function activateSection(sectionName) {
     kitchen: loadOrders,
     ready: loadOrders,
     finance: loadFinance,
+    inventory: loadInventory,
+    recipes: loadRecipes,
   };
 
   if (loaders[sectionName]) {
     await loaders[sectionName]();
   }
 }
+
+async function loadInventory() {
+  if (!ensureRestaurantId()) return;
+  const summaryRoot = document.getElementById('inventorySummary');
+  const ingredientsRoot = document.getElementById('inventoryIngredients');
+  const transactionsRoot = document.getElementById('inventoryTransactions');
+  const ingredientSelect = document.getElementById('inventoryIngredientSelect');
+  if (summaryRoot) summaryRoot.innerHTML = '<p class="hero-copy">Loading inventory...</p>';
+
+  try {
+    const [ingredientsData, transactionsData, lowStockData] = await Promise.all([
+      apiRequest(`/api/inventory/restaurant/${restaurantId}/ingredients`, {}, true),
+      apiRequest(`/api/inventory/restaurant/${restaurantId}/transactions`, {}, true),
+      apiRequest(`/api/inventory/restaurant/${restaurantId}/low-stock`, {}, true),
+    ]);
+    const ingredients = ingredientsData.ingredients || [];
+    const lowStock = lowStockData.ingredients || [];
+    if (summaryRoot) {
+      summaryRoot.innerHTML = `
+        <div class="od-widget"><strong>${ingredients.length}</strong><span>Ingredients tracked</span></div>
+        <div class="od-widget"><strong>${lowStock.length}</strong><span>Low-stock alerts</span></div>
+        <div class="od-widget"><strong>${ingredients.filter((item) => Number(item.current_stock) === 0).length}</strong><span>Out of stock</span></div>
+        <div class="od-widget"><strong>${(transactionsData.transactions || []).length}</strong><span>Recent movements</span></div>
+      `;
+    }
+    if (ingredientSelect) {
+      ingredientSelect.innerHTML = '<option value="">Ingredient</option>' + ingredients.map((item) =>
+        `<option value="${item.id}">${escapeHtml(item.name)} (${escapeHtml(item.unit)})</option>`
+      ).join('');
+    }
+    if (ingredientsRoot) {
+      ingredientsRoot.innerHTML = ingredients.map((item) => `
+        <tr>
+          <td>${escapeHtml(item.name)}</td>
+          <td>${formatCurrency(item.current_stock)}</td>
+          <td>${escapeHtml(item.unit)}</td>
+          <td>${formatCurrency(item.low_stock_threshold)}</td>
+          <td><span class="owner-status-chip owner-status-chip--${item.is_low_stock ? 'pending' : 'paid'}">${item.is_low_stock ? 'Low stock' : 'Healthy'}</span></td>
+        </tr>
+      `).join('') || '<tr><td colspan="5">No ingredients yet.</td></tr>';
+    }
+    if (transactionsRoot) {
+      transactionsRoot.innerHTML = (transactionsData.transactions || []).slice(0, 20).map((item) => `
+        <div class="analytics-item">
+          <strong>${escapeHtml(item.ingredient_name)} · ${escapeHtml(item.transaction_type)} · ${formatCurrency(item.quantity)} ${escapeHtml(item.unit || '')}</strong>
+          <p>${escapeHtml(item.notes || 'No notes')} · ${escapeHtml(new Date(item.created_at).toLocaleString())}</p>
+        </div>
+      `).join('') || '<p class="hero-copy">No stock movements yet.</p>';
+    }
+  } catch (error) {
+    if (summaryRoot) summaryRoot.innerHTML = `<p class="hero-copy" style="color:var(--danger,#b42318);">${escapeHtml(error.message)}</p>`;
+  }
+}
+
+document.getElementById('inventoryIngredientForm')?.addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const payload = Object.fromEntries(new FormData(event.target).entries());
+  try {
+    await apiRequest('/api/inventory/ingredients', {
+      method: 'POST',
+      body: JSON.stringify({
+        ...payload,
+        restaurantId,
+        currentStock: Number(payload.currentStock),
+        lowStockThreshold: Number(payload.lowStockThreshold),
+      }),
+    }, true);
+    event.target.reset();
+    setMessage('ownerMessage', 'Ingredient added.');
+    await loadInventory();
+  } catch (error) {
+    setMessage('ownerMessage', error.message || 'Could not add ingredient.', true);
+  }
+});
+
+document.getElementById('inventoryTransactionForm')?.addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const payload = Object.fromEntries(new FormData(event.target).entries());
+  try {
+    await apiRequest('/api/inventory/transactions', {
+      method: 'POST',
+      body: JSON.stringify({ ...payload, restaurantId, ingredientId: Number(payload.ingredientId), quantity: Number(payload.quantity) }),
+    }, true);
+    event.target.reset();
+    setMessage('ownerMessage', 'Inventory movement recorded.');
+    await loadInventory();
+  } catch (error) {
+    setMessage('ownerMessage', error.message || 'Could not record inventory movement.', true);
+  }
+});
+
+let selectedRecipeItems = [];
+
+async function loadRecipes() {
+  if (!ensureRestaurantId()) return;
+  if (!menuItemsCache.length) await loadMenu();
+  const menuSelect = document.getElementById('recipeMenuItem');
+  const ingredientSelect = document.getElementById('recipeIngredient');
+  const listRoot = document.getElementById('recipeList');
+  const ingredientsData = await apiRequest(`/api/inventory/restaurant/${restaurantId}/ingredients`, {}, true);
+  const recipesData = await apiRequest(`/api/inventory/restaurant/${restaurantId}/recipes`, {}, true);
+  const ingredients = ingredientsData.ingredients || [];
+  if (menuSelect) {
+    menuSelect.innerHTML = '<option value="">Menu item</option>' + menuItemsCache.map((item) =>
+      `<option value="${item.id}">${escapeHtml(item.name)}</option>`
+    ).join('');
+  }
+  if (ingredientSelect) {
+    ingredientSelect.innerHTML = '<option value="">Ingredient</option>' + ingredients.map((item) =>
+      `<option value="${item.id}">${escapeHtml(item.name)} (${escapeHtml(item.unit)})</option>`
+    ).join('');
+  }
+  if (listRoot) {
+    listRoot.innerHTML = (recipesData.recipes || []).map((recipe) => `
+      <div class="analytics-item">
+        <strong>${escapeHtml(recipe.menu_item_name)}</strong>
+        <p>${(recipe.items || []).map((item) => `${escapeHtml(item.ingredientName)}: ${formatCurrency(item.quantity)} ${escapeHtml(item.unit)}`).join(' · ')}</p>
+      </div>
+    `).join('') || '<p class="hero-copy">No recipes configured yet.</p>';
+  }
+  renderSelectedRecipeItems();
+}
+
+function renderSelectedRecipeItems() {
+  const root = document.getElementById('selectedRecipeItems');
+  if (!root) return;
+  root.innerHTML = selectedRecipeItems.map((item, index) => `
+    <span class="owner-recipe-chip">${escapeHtml(item.name)}: ${escapeHtml(String(item.quantity))} ${escapeHtml(item.unit)}
+      <button type="button" data-remove-recipe-item="${index}" aria-label="Remove ingredient">×</button>
+    </span>
+  `).join('') || '<span class="muted">Add ingredients to this recipe.</span>';
+}
+
+document.getElementById('addRecipeIngredientBtn')?.addEventListener('click', () => {
+  const select = document.getElementById('recipeIngredient');
+  const quantityInput = document.getElementById('recipeQuantity');
+  const option = select?.selectedOptions?.[0];
+  const quantity = Number(quantityInput?.value);
+  if (!option?.value || !Number.isFinite(quantity) || quantity <= 0) {
+    setMessage('ownerMessage', 'Choose an ingredient and enter a positive quantity.', true);
+    return;
+  }
+  selectedRecipeItems = selectedRecipeItems.filter((item) => item.ingredientId !== Number(option.value));
+  selectedRecipeItems.push({ ingredientId: Number(option.value), name: option.textContent.split(' (')[0], unit: option.textContent.match(/\(([^)]+)\)/)?.[1] || '', quantity });
+  quantityInput.value = '';
+  renderSelectedRecipeItems();
+});
+
+document.getElementById('selectedRecipeItems')?.addEventListener('click', (event) => {
+  const button = event.target.closest('[data-remove-recipe-item]');
+  if (!button) return;
+  selectedRecipeItems.splice(Number(button.dataset.removeRecipeItem), 1);
+  renderSelectedRecipeItems();
+});
+
+document.getElementById('recipeForm')?.addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const menuItemId = Number(document.getElementById('recipeMenuItem')?.value);
+  if (!menuItemId || !selectedRecipeItems.length) {
+    setMessage('ownerMessage', 'Choose a menu item and add at least one ingredient.', true);
+    return;
+  }
+  try {
+    await apiRequest('/api/inventory/recipes', {
+      method: 'PUT',
+      body: JSON.stringify({ restaurantId, menuItemId, items: selectedRecipeItems }),
+    }, true);
+    selectedRecipeItems = [];
+    event.target.reset();
+    setMessage('ownerMessage', 'Recipe saved.');
+    await loadRecipes();
+  } catch (error) {
+    setMessage('ownerMessage', error.message || 'Could not save recipe.', true);
+  }
+});
 
 function formatSettlementStatus(status) {
   const value = String(status || 'pending').toUpperCase();
@@ -1012,22 +1191,26 @@ function formatSettlementStatus(status) {
 async function loadFinance() {
   if (!ensureRestaurantId()) return;
 
+  const dashboardRoot = document.getElementById('financeDashboard');
   const summaryRoot = document.getElementById('financeSummary');
   const settlementsRoot = document.getElementById('financeSettlements');
   const ledgerRoot = document.getElementById('financeLedger');
   const statusRoot = document.getElementById('financeLedgerStatus');
 
   if (summaryRoot) summaryRoot.innerHTML = '<p class="hero-copy">Loading finance overview...</p>';
+  if (dashboardRoot) dashboardRoot.innerHTML = '<p class="hero-copy">Loading selected period...</p>';
   if (settlementsRoot) settlementsRoot.innerHTML = '';
   if (ledgerRoot) ledgerRoot.innerHTML = '';
 
   try {
-    const [overview, settlementsData, ledgerData] = await Promise.all([
+    const [dashboardData, overview, settlementsData, ledgerData] = await Promise.all([
+      apiRequest(`/api/owner/financial-dashboard?range=${encodeURIComponent(activeFinanceRange)}`, {}, true),
       apiRequest('/api/owner/financial-overview', {}, true),
       apiRequest('/api/owner/settlements', {}, true).catch(() => ({ settlements: [] })),
-      apiRequest('/api/owner/ledger', {}, true).catch(() => ({ entries: [] })),
+      apiRequest(`/api/owner/ledger${getLedgerQueryString()}`, {}, true).catch(() => ({ entries: [], summary: {} })),
     ]);
 
+    renderFinanceDashboard(dashboardData);
     const latest = overview.latestSettlement || null;
     if (summaryRoot) {
       summaryRoot.innerHTML = `
@@ -1078,14 +1261,24 @@ async function loadFinance() {
     }
 
     const entries = ledgerData.entries || [];
+    const ledgerSummaryRoot = document.getElementById('financeLedgerSummary');
+    if (ledgerSummaryRoot) {
+      const summary = ledgerData.summary || {};
+      ledgerSummaryRoot.innerHTML = `
+        <span>Credits: INR ${formatCurrency(summary.totalCredits || 0)}</span>
+        <span>Debits: INR ${formatCurrency(summary.totalDebits || 0)}</span>
+        <strong>Balance: INR ${formatCurrency(summary.closingBalance || 0)}</strong>
+      `;
+    }
     if (ledgerRoot) {
       ledgerRoot.innerHTML = entries.length ? `
         <div class="stack">
           ${entries.slice(0, 20).map((entry) => `
             <div class="analytics-item">
-              <strong>${escapeHtml(entry.entry_type || 'entry')} · INR ${formatCurrency(entry.amount)}</strong>
+              <strong>${escapeHtml(entry.entry_type || 'entry')} · ${escapeHtml(entry.direction || 'debit')} · INR ${formatCurrency(entry.amount)}</strong>
               <p>${escapeHtml(entry.description || 'Ledger entry')}${entry.order_id ? ` · Order #${entry.order_id}` : ''}</p>
-              <p class="hero-copy">${escapeHtml(new Date(entry.created_at).toLocaleString())}</p>
+              <p class="hero-copy">${escapeHtml(entry.category || 'uncategorized')} · ${escapeHtml(new Date(entry.created_at).toLocaleString())}</p>
+              ${entry.reversed_entry_id ? '<small class="muted">Reversed</small>' : `<button type="button" class="btn btn-light btn-sm" data-reverse-ledger="${entry.id}">Reverse</button>`}
             </div>
           `).join('')}
         </div>
@@ -1095,6 +1288,96 @@ async function loadFinance() {
     if (summaryRoot) summaryRoot.innerHTML = `<p class="hero-copy" style="color:var(--danger,#b42318);">Unable to load finance data: ${escapeHtml(error.message)}</p>`;
   }
 }
+
+let activeFinanceRange = 'today';
+let activeLedgerFilters = {};
+
+function getLedgerQueryString() {
+  const params = new URLSearchParams(activeLedgerFilters);
+  const query = params.toString();
+  return query ? `?${query}` : '';
+}
+
+function renderFinanceDashboard(data) {
+  const root = document.getElementById('financeDashboard');
+  if (!root) return;
+  const metrics = data.metrics || {};
+  const money = (value) => `INR ${formatCurrency(value || 0)}`;
+  root.innerHTML = `
+    <div class="od-widget-grid">
+      <div class="od-widget"><strong>${money(metrics.grossSales)}</strong><span>Gross sales (paid)</span></div>
+      <div class="od-widget"><strong>${money(metrics.restaurantPayable)}</strong><span>Restaurant payable</span></div>
+      <div class="od-widget"><strong>${metrics.paidOrders || 0}</strong><span>Paid orders</span></div>
+      <div class="od-widget"><strong>${metrics.cancelledOrders || 0}</strong><span>Cancelled orders</span></div>
+      <div class="od-widget"><strong>${money(metrics.cashSales)}</strong><span>Cash sales</span></div>
+      <div class="od-widget"><strong>${money(metrics.onlineSales)}</strong><span>Online sales</span></div>
+      <div class="od-widget"><strong>${money(metrics.platformFees)}</strong><span>AutoResto platform fees</span></div>
+      <div class="od-widget"><strong>${money(metrics.averageOrderValue)}</strong><span>Average paid order</span></div>
+    </div>
+    <p class="hero-copy owner-finance-note">
+      Unpaid orders: ${metrics.unpaidOrders || 0}. Discounts, refunds, tax, gateway fees, and expenses are not included because they are not stored in the current order schema.
+    </p>
+  `;
+}
+
+async function reloadFinanceForRange(range) {
+  activeFinanceRange = range;
+  document.querySelectorAll('[data-finance-range]').forEach((button) => {
+    button.classList.toggle('is-active', button.dataset.financeRange === range);
+  });
+  await loadFinance();
+}
+
+document.querySelectorAll('[data-finance-range]').forEach((button) => {
+  button.addEventListener('click', () => reloadFinanceForRange(button.dataset.financeRange));
+});
+
+const ledgerEntryForm = document.getElementById('ledgerEntryForm');
+if (ledgerEntryForm) {
+  ledgerEntryForm.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const form = event.target;
+    const payload = Object.fromEntries(new FormData(form).entries());
+    try {
+      await apiRequest('/api/owner/ledger', {
+        method: 'POST',
+        body: JSON.stringify({ ...payload, amount: Number(payload.amount) }),
+      }, true);
+      form.reset();
+      setMessage('ownerMessage', 'Ledger entry added.');
+      await loadFinance();
+    } catch (error) {
+      setMessage('ownerMessage', error.message || 'Could not add ledger entry.', true);
+    }
+  });
+}
+
+document.getElementById('ledgerFilterBtn')?.addEventListener('click', () => {
+  activeLedgerFilters = {
+    category: document.getElementById('ledgerCategoryFilter')?.value || '',
+    direction: document.getElementById('ledgerDirectionFilter')?.value || '',
+    startDate: document.getElementById('ledgerStartDate')?.value || '',
+    endDate: document.getElementById('ledgerEndDate')?.value || '',
+  };
+  loadFinance();
+});
+
+document.getElementById('financeLedger')?.addEventListener('click', async (event) => {
+  const button = event.target.closest('[data-reverse-ledger]');
+  if (!button || !window.confirm('Reverse this posted ledger entry? A linked reversal entry will be created.')) return;
+  button.disabled = true;
+  try {
+    await apiRequest(`/api/owner/ledger/${button.dataset.reverseLedger}/reverse`, {
+      method: 'POST',
+      body: '{}',
+    }, true);
+    setMessage('ownerMessage', 'Ledger entry reversed.');
+    await loadFinance();
+  } catch (error) {
+    button.disabled = false;
+    setMessage('ownerMessage', error.message || 'Could not reverse ledger entry.', true);
+  }
+});
 
 async function previewLedgerEmail() {
   if (!ensureRestaurantId()) return;

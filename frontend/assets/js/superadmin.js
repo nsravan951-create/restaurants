@@ -1780,6 +1780,7 @@
         ['Gross paid', formatMoney(summary.gross_paid)],
         ['Total commission', formatMoney(summary.total_commission)],
         ['Net to restaurants', formatMoney(summary.net_to_restaurants)],
+        ['Reconciliation issues', rowsWithIssues(data.transactions || [])],
         ['Records', summary.total_count || 0],
       ].map(([label, value]) => `<article class="summary-card"><p>${label}</p><strong>${value}</strong></article>`).join('');
     }
@@ -1791,7 +1792,7 @@
       <table class="admin-table">
         <thead><tr>
           <th>Order</th><th>Restaurant</th><th>Gross</th><th>Commission</th><th>Restaurant amt</th>
-          <th>Cashfree order</th><th>Payment</th><th>Date</th>
+          <th>Cashfree order</th><th>Payment</th><th>Issue</th><th>Date</th>
         </tr></thead>
         <tbody>
           ${rows.map((r) => `
@@ -1803,11 +1804,18 @@
               <td>${formatMoney(r.restaurant_amount)}</td>
               <td><small>${escapeHtml(r.cashfree_order_id || '—')}</small></td>
               <td>${escapeHtml(r.payment_status)} / ${escapeHtml(r.payment_provider || '')}</td>
+              <td>${r.reconciliation_issue
+                ? `<span class="ma-badge ma-badge--danger">${escapeHtml(r.reconciliation_issue.replace(/_/g, ' '))}</span>`
+                : '<span class="ma-badge ma-badge--success">Matched</span>'}</td>
               <td>${formatDate(r.created_at)}</td>
             </tr>
-          `).join('') || '<tr><td colspan="8">No transactions found.</td></tr>'}
+          `).join('') || '<tr><td colspan="9">No transactions found.</td></tr>'}
         </tbody>
       </table>`;
+  }
+
+  function rowsWithIssues(rows) {
+    return rows.filter((row) => row.reconciliation_issue).length;
   }
 
   const PLATFORM_ROLE_FALLBACK = [

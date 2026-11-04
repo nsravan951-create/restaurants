@@ -56,6 +56,13 @@ router.get('/transactions', asyncHandler(async (req, res) => {
        pt.provider_order_id AS cashfree_order_id,
        pt.provider_payment_id AS cashfree_payment_id,
        pt.status AS provider_status,
+       CASE
+         WHEN pt.id IS NULL AND o.payment_status = 'paid' THEN 'missing_payment_transaction'
+         WHEN pt.amount IS NOT NULL AND pt.amount <> o.total_amount THEN 'amount_mismatch'
+         WHEN o.payment_status = 'paid' AND COALESCE(pt.status, '') <> 'paid' THEN 'provider_status_mismatch'
+         WHEN o.payment_status <> 'paid' AND pt.status = 'paid' THEN 'order_status_mismatch'
+         ELSE NULL
+       END AS reconciliation_issue,
        pt.amount AS provider_amount,
        col.charge_amount AS commission_amount,
        (o.total_amount - COALESCE(col.charge_amount, 0))::numeric AS restaurant_amount,

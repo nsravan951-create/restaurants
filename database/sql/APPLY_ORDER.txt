@@ -26,6 +26,10 @@ Apply order (psql examples):
   psql "$DATABASE_URL" -f database/sql/015_platform_roles_catalog.sql
   psql "$DATABASE_URL" -f database/sql/016_platform_settings.sql
   psql "$DATABASE_URL" -f database/sql/017_inline_ads_enhancements.sql
+  psql "$DATABASE_URL" -f database/sql/018_financial_ledger_enhancements.sql
+  psql "$DATABASE_URL" -f database/sql/019_settlement_reconciliation_enhancements.sql
+  psql "$DATABASE_URL" -f database/sql/020_inventory_enhancements.sql
+  psql "$DATABASE_URL" -f database/sql/021_recipe_consumption_enhancements.sql
 
 Or apply all at once (after reviewing each file):
 

@@ -168,6 +168,13 @@
                 <p class="hero-copy">Track sales, commission, settlements, and daily ledger statements. Payment status and settlement status are separate.</p>
               </div>
             </div>
+            <div class="owner-finance-filters" role="group" aria-label="Finance date range">
+              <button type="button" class="btn btn-light owner-finance-filter is-active" data-finance-range="today">Today</button>
+              <button type="button" class="btn btn-light owner-finance-filter" data-finance-range="7d">7 Days</button>
+              <button type="button" class="btn btn-light owner-finance-filter" data-finance-range="30d">30 Days</button>
+              <button type="button" class="btn btn-light owner-finance-filter" data-finance-range="month">This Month</button>
+            </div>
+            <div id="financeDashboard" class="owner-finance-dashboard" aria-live="polite"></div>
             <div id="financeSummary"></div>
             <div class="analytics-grid" style="margin-top:1rem;">
               <div class="panel soft-panel">
@@ -180,6 +187,53 @@
                 <div class="section-head" style="padding:0 0 0.75rem;">
                   <h3>Ledger entries</h3>
                 </div>
+                <div class="owner-ledger-filters">
+                  <select id="ledgerCategoryFilter" aria-label="Filter ledger category">
+                    <option value="">All categories</option>
+                    <option value="inventory_purchase">Inventory purchase</option>
+                    <option value="supplier_payment">Supplier payment</option>
+                    <option value="staff_expense">Staff expense</option>
+                    <option value="rent">Rent</option>
+                    <option value="utilities">Utilities</option>
+                    <option value="packaging_cost">Packaging cost</option>
+                    <option value="other_income">Other income</option>
+                    <option value="other_expense">Other expense</option>
+                    <option value="adjustment">Adjustment</option>
+                  </select>
+                  <select id="ledgerDirectionFilter" aria-label="Filter ledger direction">
+                    <option value="">All directions</option>
+                    <option value="credit">Credits</option>
+                    <option value="debit">Debits</option>
+                  </select>
+                  <input id="ledgerStartDate" type="date" aria-label="Ledger start date" />
+                  <input id="ledgerEndDate" type="date" aria-label="Ledger end date" />
+                  <button id="ledgerFilterBtn" class="btn btn-light" type="button">Apply filters</button>
+                </div>
+                <form id="ledgerEntryForm" class="owner-ledger-form">
+                  <select name="entryType" required>
+                    <option value="">Entry type</option>
+                    <option value="inventory_purchase">Inventory purchase</option>
+                    <option value="supplier_payment">Supplier payment</option>
+                    <option value="staff_expense">Staff expense</option>
+                    <option value="rent">Rent</option>
+                    <option value="utilities">Utilities</option>
+                    <option value="packaging_cost">Packaging cost</option>
+                    <option value="other_income">Other income</option>
+                    <option value="other_expense">Other expense</option>
+                    <option value="adjustment">Adjustment</option>
+                  </select>
+                  <select name="direction" required>
+                    <option value="">Direction</option>
+                    <option value="credit">Credit / income</option>
+                    <option value="debit">Debit / expense</option>
+                  </select>
+                  <input name="category" placeholder="Category" required />
+                  <input name="amount" type="number" min="0.01" step="0.01" placeholder="Amount (INR)" required />
+                  <input name="referenceId" placeholder="Reference (optional)" />
+                  <input name="description" placeholder="Description" required />
+                  <button class="btn btn-primary" type="submit">Add entry</button>
+                </form>
+                <div id="financeLedgerSummary" class="owner-ledger-summary"></div>
                 <div id="financeLedger"></div>
               </div>
             </div>
@@ -211,6 +265,74 @@
                 <h3>Order Overview</h3>
                 <div id="analyticsOrderList" class="stack"></div>
               </div>
+            </div>
+          </section>
+
+          <section class="panel dashboard-section hidden" data-owner-section-panel="inventory">
+            <div class="section-head">
+              <div>
+                <h2>Inventory &amp; Stock</h2>
+                <p class="hero-copy">Track ingredient quantities, stock movements, and low-stock alerts. Recipe consumption is managed separately.</p>
+              </div>
+            </div>
+            <div id="inventorySummary" class="od-widget-grid"></div>
+            <div class="analytics-grid">
+              <div class="panel soft-panel">
+                <h3>Add ingredient</h3>
+                <form id="inventoryIngredientForm" class="owner-inventory-form">
+                  <input name="name" placeholder="Ingredient name" required />
+                  <input name="unit" placeholder="Unit (kg, litre, piece)" required />
+                  <input name="currentStock" type="number" min="0" step="0.001" placeholder="Opening stock" value="0" required />
+                  <input name="lowStockThreshold" type="number" min="0" step="0.001" placeholder="Low-stock threshold" value="0" required />
+                  <button class="btn btn-primary" type="submit">Add ingredient</button>
+                </form>
+              </div>
+              <div class="panel soft-panel">
+                <h3>Record stock movement</h3>
+                <form id="inventoryTransactionForm" class="owner-inventory-form">
+                  <select name="ingredientId" id="inventoryIngredientSelect" required><option value="">Ingredient</option></select>
+                  <select name="transactionType" required>
+                    <option value="stock_in">Stock in</option>
+                    <option value="stock_out">Stock out</option>
+                    <option value="adjustment">Adjustment / add</option>
+                    <option value="consumption">Consumption</option>
+                  </select>
+                  <input name="quantity" type="number" min="0.001" step="0.001" placeholder="Quantity" required />
+                  <input name="notes" placeholder="Notes" />
+                  <button class="btn btn-primary" type="submit">Record movement</button>
+                </form>
+              </div>
+            </div>
+            <div class="admin-table-wrap panel" style="margin-top:1rem;">
+              <table class="owner-finance-table">
+                <thead><tr><th>Ingredient</th><th>Stock</th><th>Unit</th><th>Threshold</th><th>Status</th></tr></thead>
+                <tbody id="inventoryIngredients"></tbody>
+              </table>
+            </div>
+            <div class="panel soft-panel" style="margin-top:1rem;">
+              <h3>Recent stock movements</h3>
+              <div id="inventoryTransactions" class="stack"></div>
+            </div>
+          </section>
+
+          <section class="panel dashboard-section hidden" data-owner-section-panel="recipes">
+            <div class="section-head">
+              <div>
+                <h2>Food Recipes</h2>
+                <p class="hero-copy">Map each menu item to ingredient quantities. Paid orders consume mapped ingredients in one transaction.</p>
+              </div>
+            </div>
+            <form id="recipeForm" class="owner-recipe-form">
+              <select id="recipeMenuItem" required><option value="">Menu item</option></select>
+              <select id="recipeIngredient"><option value="">Ingredient</option></select>
+              <input id="recipeQuantity" type="number" min="0.001" step="0.001" placeholder="Quantity per item" />
+              <button id="addRecipeIngredientBtn" class="btn btn-light" type="button">Add ingredient</button>
+              <button class="btn btn-primary" type="submit">Save recipe</button>
+            </form>
+            <div id="selectedRecipeItems" class="owner-recipe-chips"></div>
+            <div class="panel soft-panel" style="margin-top:1rem;">
+              <h3>Configured recipes</h3>
+              <div id="recipeList" class="stack"></div>
             </div>
           </section>
 

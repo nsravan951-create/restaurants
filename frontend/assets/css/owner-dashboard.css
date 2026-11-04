@@ -493,6 +493,18 @@
 }
 
 @media (max-width: 560px) {
+  .owner-ledger-filters {
+    grid-template-columns: 1fr;
+  }
+
+  .owner-ledger-form {
+    grid-template-columns: 1fr;
+  }
+
+  .owner-recipe-form {
+    grid-template-columns: 1fr;
+  }
+
   .owner-header { padding: 0.55rem 0.85rem; }
   .owner-page-head,
   .owner-content { padding-left: 0.85rem; padding-right: 0.85rem; }
@@ -651,6 +663,110 @@
 
 .owner-finance-table-wrap {
   overflow-x: auto;
+}
+
+.owner-finance-filters {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin: 0 0 1rem;
+}
+
+.owner-finance-filter.is-active {
+  border-color: var(--accent, #e66a3d);
+  color: var(--accent-dark, #c44f25);
+}
+
+.owner-finance-dashboard {
+  margin-bottom: 1rem;
+}
+
+.owner-finance-note {
+  margin: 0 0 1rem;
+  font-size: 0.85rem;
+}
+
+.owner-ledger-filters {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.55rem;
+  margin-bottom: 0.8rem;
+}
+
+.owner-ledger-filters button {
+  width: 100%;
+}
+
+.owner-ledger-form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.55rem;
+  margin-bottom: 0.8rem;
+}
+
+.owner-ledger-form input,
+.owner-ledger-form select {
+  min-width: 0;
+}
+
+.owner-ledger-form button {
+  width: 100%;
+}
+
+.owner-ledger-summary {
+  display: flex;
+  gap: 0.8rem;
+  flex-wrap: wrap;
+  margin: 0 0 0.8rem;
+  color: var(--od-muted);
+  font-size: 0.82rem;
+}
+
+.owner-ledger-summary strong {
+  color: var(--od-ink, inherit);
+}
+
+.owner-inventory-form {
+  display: grid;
+  gap: 0.6rem;
+}
+
+.owner-inventory-form button {
+  width: 100%;
+}
+
+.owner-recipe-form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.6rem;
+}
+
+.owner-recipe-form button {
+  width: 100%;
+}
+
+.owner-recipe-chips {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-top: 0.75rem;
+}
+
+.owner-recipe-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.35rem 0.55rem;
+  border: 1px solid var(--od-border);
+  border-radius: 999px;
+  font-size: 0.8rem;
+}
+
+.owner-recipe-chip button {
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  color: inherit;
 }
 
 .owner-finance-table {

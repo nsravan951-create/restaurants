@@ -5,6 +5,7 @@ const { endSessionByOrderId } = require('./tableSession');
 const { emitOrderUpdate, emitTableUpdate } = require('../services/socket');
 const { writeAuditLog } = require('./auditLog');
 const { assignInvoiceNumber } = require('./gst');
+const { consumeRecipesForOrder } = require('./recipeConsumption');
 
 async function finalizePaidOrder(orderId, {
   method = 'cash',
@@ -16,6 +17,7 @@ async function finalizePaidOrder(orderId, {
   await endSessionByOrderId(orderId, 'payment_completed');
   await syncInvoiceForOrder(orderId);
   await recordChargeableOrder(orderId);
+  const consumption = await consumeRecipesForOrder(orderId, actorUserId);
 
   const { rows } = await pool.query(
     'SELECT restaurant_id, table_id, total_amount FROM orders WHERE id = $1 LIMIT 1',
@@ -34,6 +36,7 @@ async function finalizePaidOrder(orderId, {
       amount: Number(order.total_amount),
       providerPaymentId,
       providerPayload: providerPayload ? 'present' : null,
+      recipeConsumption: consumption.reason || (consumption.consumed ? 'recorded' : 'not_applicable'),
     },
   });
 
