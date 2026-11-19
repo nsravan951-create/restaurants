@@ -172,6 +172,18 @@
             <button class="btn btn-ghost" id="closeCheckoutBtn" type="button">Back to cart</button>
           </div>
         </div>
+
+        <div id="orderBookedModal" class="order-booked-modal hidden" aria-hidden="true">
+          <div class="order-booked-modal__sheet" role="dialog" aria-labelledby="orderBookedTitle">
+            <div class="order-booked-modal__icon" aria-hidden="true">✓</div>
+            <p class="eyebrow">Order sent to restaurant</p>
+            <h3 id="orderBookedTitle">Food booked successfully</h3>
+            <div id="orderBookedItems" class="order-booked-modal__items"></div>
+            <div class="modal-actions">
+              <button class="btn btn-primary" id="viewOrderedStatusBtn" type="button">View Order Status</button>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -218,6 +230,9 @@
         cashfreeCheckoutBtn: document.getElementById('cashfreeCheckoutBtn'),
         checkoutPayMessage: document.getElementById('checkoutPayMessage'),
         closeCheckoutBtn: document.getElementById('closeCheckoutBtn'),
+        orderBookedModal: document.getElementById('orderBookedModal'),
+        orderBookedItems: document.getElementById('orderBookedItems'),
+        viewOrderedStatusBtn: document.getElementById('viewOrderedStatusBtn'),
         trackingState: document.getElementById('trackingState'),
         trackingBadge: document.getElementById('trackingBadge'),
         trackingTitle: document.getElementById('trackingTitle'),
@@ -1028,6 +1043,26 @@
         `).join('');
       }
 
+      function showOrderBookedModal(order) {
+        if (!els.orderBookedModal) return;
+        els.orderBookedItems.innerHTML = (order.items || []).map((item) => `
+          <div class="order-booked-modal__row">
+            <span>${escapeHtml(item.name)} × ${Number(item.quantity)}</span>
+            <strong>INR ${money(item.lineTotal)}</strong>
+          </div>
+        `).join('');
+        els.orderBookedModal.classList.remove('hidden');
+        els.orderBookedModal.setAttribute('aria-hidden', 'false');
+        document.body.classList.add('order-booked-modal-open');
+      }
+
+      function closeOrderBookedModal() {
+        if (!els.orderBookedModal) return;
+        els.orderBookedModal.classList.add('hidden');
+        els.orderBookedModal.setAttribute('aria-hidden', 'true');
+        document.body.classList.remove('order-booked-modal-open');
+      }
+
       async function viewBill() {
         const credentials = getBillCredentials();
         if (!credentials) throw new Error('Bill is not available for this order.');
@@ -1431,14 +1466,10 @@
           const paidOnReturn = await verifyCashfreeReturn();
           const restoredPostPayment = paidOnReturn ? true : await tryRestorePostPaymentState();
           if (!paidOnReturn && !restoredPostPayment) {
-            if (shouldSkipWelcome()) {
-              history.replaceState({ autorestoView: 'menu' }, '', window.location.href);
-              setView('menu');
-              els.menuState.classList.add('menu-reveal');
-            } else {
-              history.replaceState({ autorestoView: 'welcome' }, '', window.location.href);
-              setView('welcome');
-            }
+            markMenuEntered();
+            history.replaceState({ autorestoView: 'menu' }, '', window.location.href);
+            setView('menu');
+            els.menuState.classList.add('menu-reveal');
           }
         } catch (error) {
           setError(error.message || 'Unable to load table menu.');
@@ -1501,6 +1532,7 @@
           closeCheckoutModal();
           saveWaitingCashOrder(order, sessionToken);
           showCashWaitingView(order, sessionToken);
+          showOrderBookedModal(order);
           startPaymentPolling(order.orderId, sessionToken);
           lockTableAfterBooking('Order placed. Pay cash at the counter.');
           clearCartStorage();
@@ -1522,6 +1554,7 @@
             ...orderSnapshot,
             sessionToken: state.session.sessionToken,
           }));
+          showOrderBookedModal(orderSnapshot);
 
           const paymentData = await apiRequest('/api/payments/cashfree/create-order', {
             method: 'POST',
@@ -1571,6 +1604,12 @@
         });
         els.cashCheckoutBtn?.addEventListener('click', handleCashCheckout);
         els.cashfreeCheckoutBtn?.addEventListener('click', handleCashfreeCheckout);
+        els.viewOrderedStatusBtn?.addEventListener('click', () => {
+          closeOrderBookedModal();
+        });
+        els.orderBookedModal?.addEventListener('click', (event) => {
+          if (event.target === els.orderBookedModal) closeOrderBookedModal();
+        });
 
       }
 
