@@ -391,10 +391,17 @@ async function handleOnline() {
       method: 'POST',
       body: JSON.stringify({ orderId: orderData.orderId, sessionToken: activeSession.sessionToken }),
     });
-    if (!paymentData.checkoutUrl && !paymentData.paymentSessionId) {
+    if (!paymentData.checkoutUrl) {
       throw new Error('Cashfree checkout is not ready. No payment was marked as successful.');
     }
-    setMessage('orderMessage', 'Cashfree Checkout is ready for the official SDK integration.');
+    sessionStorage.setItem('autoresto_payment_success_context', JSON.stringify({
+      orderId: paymentData.orderId,
+      sessionToken: activeSession.sessionToken,
+      status: 'pending',
+      tableId: context.table.id,
+      qrToken: routeState.qrToken || '',
+    }));
+    window.location.assign(paymentData.checkoutUrl);
   } catch (error) {
     setMessage('orderMessage', error.message, true);
   }
