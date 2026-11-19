@@ -40,36 +40,12 @@
         <textarea id="orderNotes" placeholder="Notes (optional)"></textarea>
 
         <div class="payment-actions">
-          <button id="orderFoodBtn" class="btn btn-primary">Order Food</button>
-          <button id="codBtn" class="btn btn-dark hidden">Pay with Cash</button>
-          <button id="onlineBtn" class="btn btn-primary hidden">Pay Online with Cashfree</button>
+          <button id="codBtn" class="btn btn-dark">Pay with Cash</button>
+          <button id="onlineBtn" class="btn btn-primary">Pay Online with Cashfree</button>
         </div>
         <div id="orderMessage" class="message"></div>
       </aside>
 
-      <div id="postOrderModal" class="bill-modal hidden" aria-hidden="true">
-        <div class="bill-modal__sheet" role="dialog" aria-labelledby="postOrderTitle">
-          <header class="bill-modal__head">
-            <div>
-              <p class="eyebrow">Food ordered</p>
-              <h2 id="postOrderTitle">Pay after enjoying your food</h2>
-              <p id="postOrderTotal" class="hero-copy"></p>
-            </div>
-          </header>
-          <div class="bill-modal__body">
-            <p class="hero-copy">Your food is added to this table bill. Order more anytime, and it will be added to the same bill.</p>
-            <div id="postOrderActions" class="payment-actions">
-              <button id="orderMoreBtn" class="btn btn-light" type="button">Order More</button>
-              <button id="completeBookingBtn" class="btn btn-primary" type="button">Complete Booking &amp; Proceed to Payment</button>
-            </div>
-            <div id="checkoutActions" class="payment-actions hidden">
-              <button id="modalCodBtn" class="btn btn-dark" type="button">Cash / COD</button>
-              <button id="modalOnlineBtn" class="btn btn-primary" type="button">Pay Online with Cashfree</button>
-            </div>
-            <div id="postOrderMessage" class="message"></div>
-          </div>
-        </div>
-      </div>
 
     <footer class="brand-footer">Powered by Online Solutionzzz</footer>
     <script src="../assets/js/config.js"></script>

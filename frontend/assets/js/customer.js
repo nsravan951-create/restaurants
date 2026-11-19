@@ -8,15 +8,6 @@ const sessionTimerEl = document.getElementById('sessionTimer');
 const joinSessionBtn = document.getElementById('joinSessionBtn');
 const offersSection = document.getElementById('offersSection');
 const offersContainer = document.getElementById('offersContainer');
-const orderFoodBtn = document.getElementById('orderFoodBtn');
-const postOrderModal = document.getElementById('postOrderModal');
-const postOrderTotal = document.getElementById('postOrderTotal');
-const postOrderActions = document.getElementById('postOrderActions');
-const checkoutActions = document.getElementById('checkoutActions');
-const orderMoreBtn = document.getElementById('orderMoreBtn');
-const completeBookingBtn = document.getElementById('completeBookingBtn');
-const modalCodBtn = document.getElementById('modalCodBtn');
-const modalOnlineBtn = document.getElementById('modalOnlineBtn');
 
 const cart = new Map();
 let activeOfferId = null;
@@ -25,8 +16,6 @@ let routeState = null;
 let activeSession = null;
 let countdownInterval = null;
 let pingInterval = null;
-let currentBillOrderId = null;
-let currentBillTotal = 0;
 
 const CLIENT_ID_KEY = 'qr_customer_client_id';
 const SESSION_KEY_PREFIX = 'qr_table_session_';
@@ -168,7 +157,6 @@ function parseRoute() {
       restaurantId: Number(parts[restaurantIdx + 1]),
       tableId: Number(parts[tableIdx + 1]),
       tableNumber: null,
-      qrToken: new URLSearchParams(window.location.search).get('token') || '',
     };
   }
 
@@ -177,7 +165,6 @@ function parseRoute() {
     restaurantId: Number(params.get('restaurantId')),
     tableId: Number(params.get('tableId')),
     tableNumber: params.get('table') || params.get('tableNumber') || null,
-    qrToken: params.get('token') || '',
   };
 }
 
@@ -386,29 +373,23 @@ async function placeOrder(paymentMethod) {
 
 async function handleCod() {
   try {
-    if (!currentBillOrderId) throw new Error('No active table bill found.');
-    const data = await apiRequest(`/api/orders/${currentBillOrderId}/pay-cash`, {
-      method: 'POST',
-      body: JSON.stringify({ sessionToken: activeSession.sessionToken }),
-    });
-    const successUrl = new URL('../payment-success.html', window.location.href);
-    successUrl.searchParams.set('orderId', String(data.orderId));
-    successUrl.searchParams.set('sessionToken', activeSession.sessionToken);
-    successUrl.searchParams.set('status', 'paid');
-    successUrl.searchParams.set('tableId', String(context.table.id));
-    if (routeState.qrToken) successUrl.searchParams.set('token', routeState.qrToken);
-    window.location.assign(successUrl.toString());
+    const orderData = await placeOrder('cash');
+    setMessage('orderMessage', `Order #${orderData.orderId} placed successfully. Wait for staff delivery.`);
+    setOrderingLocked(true, 'Order already placed for this active table session.');
+    cart.clear();
+    activeOfferId = null;
+    renderCart();
   } catch (error) {
-    setMessage('postOrderMessage', error.message, true);
+    setMessage('orderMessage', error.message, true);
   }
 }
 
 async function handleOnline() {
   try {
-    if (!currentBillOrderId) throw new Error('No active table bill found.');
+    const orderData = await placeOrder('cashfree');
     const paymentData = await apiRequest('/api/payments/cashfree/create-order', {
       method: 'POST',
-      body: JSON.stringify({ orderId: currentBillOrderId, sessionToken: activeSession.sessionToken }),
+      body: JSON.stringify({ orderId: orderData.orderId, sessionToken: activeSession.sessionToken }),
     });
     if (!paymentData.checkoutUrl) {
       throw new Error('Cashfree checkout is not ready. No payment was marked as successful.');
@@ -421,38 +402,6 @@ async function handleOnline() {
       qrToken: routeState.qrToken || '',
     }));
     window.location.assign(paymentData.checkoutUrl);
-  } catch (error) {
-    setMessage('postOrderMessage', error.message, true);
-  }
-}
-
-function showPostOrderModal(orderId, totalAmount) {
-  currentBillOrderId = Number(orderId);
-  currentBillTotal = Number(totalAmount || 0);
-  postOrderTotal.textContent = `Current bill total: INR ${formatCurrency(currentBillTotal)}`;
-  postOrderActions.classList.remove('hidden');
-  checkoutActions.classList.add('hidden');
-  postOrderModal.classList.remove('hidden');
-  postOrderModal.classList.add('is-open');
-  postOrderModal.setAttribute('aria-hidden', 'false');
-  document.body.classList.add('bill-modal-open');
-}
-
-function closePostOrderModal() {
-  postOrderModal.classList.add('hidden');
-  postOrderModal.classList.remove('is-open');
-  postOrderModal.setAttribute('aria-hidden', 'true');
-  document.body.classList.remove('bill-modal-open');
-}
-
-async function handleOrderFood() {
-  try {
-    const orderData = await placeOrder('cash');
-    if (!orderData) return;
-    cart.clear();
-    activeOfferId = null;
-    renderCart();
-    showPostOrderModal(orderData.orderId, orderData.totalAmount);
   } catch (error) {
     setMessage('orderMessage', error.message, true);
   }
@@ -506,17 +455,5 @@ if (codBtn) {
 if (onlineBtn) {
   onlineBtn.addEventListener('click', handleOnline);
 }
-
-orderFoodBtn?.addEventListener('click', handleOrderFood);
-orderMoreBtn?.addEventListener('click', () => {
-  closePostOrderModal();
-  setOrderingLocked(false, 'Table session active. You can add more food to the same bill.');
-});
-completeBookingBtn?.addEventListener('click', () => {
-  postOrderActions.classList.add('hidden');
-  checkoutActions.classList.remove('hidden');
-});
-modalCodBtn?.addEventListener('click', handleCod);
-modalOnlineBtn?.addEventListener('click', handleOnline);
 
 initCustomerPage();

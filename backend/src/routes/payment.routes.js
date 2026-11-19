@@ -159,16 +159,9 @@ router.post('/cashfree/create-order', paymentLimiter, asyncHandler(async (req, r
   if (!rows.length) return res.status(404).json({ message: 'Order not found' });
 
   const order = rows[0];
-  if (order.payment_status !== 'pending') {
+  if (order.payment_provider !== 'cashfree' || order.payment_status !== 'pending') {
     return res.status(409).json({ message: 'Order is not eligible for Cashfree payment' });
   }
-
-  await pool.query(
-    `UPDATE orders
-     SET payment_method = 'cashfree', payment_provider = 'cashfree', updated_at = CURRENT_TIMESTAMP
-     WHERE id = $1`,
-    [orderId]
-  );
 
   const existing = await pool.query(
     `SELECT provider_order_id, status, amount, currency
