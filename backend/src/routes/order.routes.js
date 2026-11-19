@@ -157,17 +157,10 @@ router.post('/', publicOrderLimiter, asyncHandler(async (req, res) => {
     }
 
     const { rows: existingOrderRows } = await conn.query(
-      'SELECT id FROM orders WHERE table_session_id = $1 LIMIT 1 FOR UPDATE',
+      `SELECT id, payment_status, total_amount, subtotal_amount, discount_amount, coupon_code
+       FROM orders WHERE table_session_id = $1 LIMIT 1 FOR UPDATE`,
       [data.tableSessionId]
     );
-
-    if (existingOrderRows.length) {
-      await conn.query('ROLLBACK');
-      return res.status(409).json({
-        message: 'An order is already placed for this active table session',
-        orderId: existingOrderRows[0].id,
-      });
-    }
 
     const idempotencyKey = (req.headers['idempotency-key'] || req.body.idempotencyKey || '').toString().trim() || null;
 
@@ -217,6 +210,94 @@ router.post('/', publicOrderLimiter, asyncHandler(async (req, res) => {
         lineTotal,
       };
     });
+
+    if (existingOrderRows.length) {
+      const existing = existingOrderRows[0];
+      if (existing.payment_status === 'paid') {
+        await conn.query('ROLLBACK');
+        return res.status(409).json({
+          message: 'This table bill is already paid',
+          orderId: existing.id,
+        });
+      }
+
+      const addedSubtotal = orderItems.reduce((sum, item) => sum + item.lineTotal, 0);
+      const existingSubtotal = Number(
+        existing.subtotal_amount != null
+          ? existing.subtotal_amount
+          : Math.max(0, Number(existing.total_amount) - Number(existing.discount_amount || 0))
+      );
+      const combinedSubtotal = Number((existingSubtotal + addedSubtotal).toFixed(2));
+      const existingDiscount = Number(existing.discount_amount || 0);
+      const gstRate = await resolveRestaurantGstRate(conn, data.restaurantId);
+      const tax = calculateGstBreakdown({
+        subtotal: combinedSubtotal,
+        discountAmount: existingDiscount,
+        gstRate,
+        isInterState: false,
+      });
+
+      for (const item of orderItems) {
+        await conn.query(
+          `INSERT INTO order_items (order_id, menu_item_id, item_name, item_price, quantity, unit_price, line_total)
+           VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+          [existing.id, item.menuItemId, item.itemName, item.itemPrice, item.quantity, item.unitPrice, item.lineTotal]
+        );
+      }
+
+      await conn.query(
+        `UPDATE orders
+         SET total_amount = $1,
+             subtotal_amount = $2,
+             discount_amount = $3,
+             taxable_amount = $4,
+             cgst_amount = $5,
+             sgst_amount = $6,
+             igst_amount = $7,
+             gst_rate = $8,
+             payment_method = $9,
+             payment_provider = $9,
+             notes = CASE
+               WHEN $10 = '' THEN notes
+               ELSE CONCAT_WS(E'\\n', NULLIF(notes, ''), $10)
+             END,
+             updated_at = CURRENT_TIMESTAMP
+         WHERE id = $11`,
+        [
+          tax.grandTotal,
+          tax.subtotal,
+          tax.discountAmount,
+          tax.taxableAmount,
+          tax.cgstAmount,
+          tax.sgstAmount,
+          tax.igstAmount,
+          tax.gstRate,
+          data.paymentMethod,
+          data.notes,
+          existing.id,
+        ]
+      );
+
+      const nextExpiry = getSessionExpiryDate();
+      await conn.query(
+        'UPDATE table_sessions SET last_activity_at = NOW(), expires_at = $1 WHERE id = $2',
+        [nextExpiry, data.tableSessionId]
+      );
+      await conn.query('COMMIT');
+      emitOrderUpdate(data.restaurantId, {
+        type: 'items_added',
+        orderId: existing.id,
+        tableId: data.tableId,
+        status: 'pending',
+        totalAmount: tax.grandTotal,
+      });
+      return res.status(200).json({
+        message: 'Items added to the existing table bill',
+        orderId: existing.id,
+        totalAmount: tax.grandTotal,
+        existingBill: true,
+      });
+    }
 
     let discountAmount = 0;
     let couponMeta = null;
@@ -353,6 +434,33 @@ router.post('/', publicOrderLimiter, asyncHandler(async (req, res) => {
   } finally {
     conn.release();
   }
+}));
+
+router.post('/:orderId/pay-cash', publicOrderLimiter, asyncHandler(async (req, res) => {
+  const orderId = Number(req.params.orderId);
+  const sessionToken = String(req.body?.sessionToken || '').trim();
+  if (!Number.isInteger(orderId) || orderId <= 0 || sessionToken.length < 10) {
+    return res.status(400).json({ message: 'orderId and a valid table session are required' });
+  }
+
+  const { rows } = await pool.query(
+    `SELECT o.id
+     FROM orders o
+     INNER JOIN table_sessions s ON s.id = o.table_session_id
+     WHERE o.id = $1 AND s.session_token = $2 AND o.payment_status = 'pending'
+     LIMIT 1`,
+    [orderId, sessionToken]
+  );
+  if (!rows.length) {
+    return res.status(404).json({ message: 'Pending bill not found for this table session' });
+  }
+
+  const result = await completeCashPayment(orderId, null);
+  return res.status(result.status).json({
+    message: result.message,
+    orderId: result.orderId,
+    paymentMethod: 'cash',
+  });
 }));
 
 router.get('/active', requireAuth(['owner', 'super_admin', 'kitchen', 'staff']), asyncHandler(async (req, res) => {
