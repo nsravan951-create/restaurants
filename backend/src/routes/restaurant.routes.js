@@ -82,6 +82,30 @@ async function buildPublicTableContext({ restaurantId, tableId }) {
   const orderPlaced = activeOrderRows.length > 0;
   const session = activeSessionRows[0] || null;
   const inlineAds = await fetchActiveInlineAds(pool, restaurantId);
+  let offers = [];
+  try {
+    const { rows: offerRows } = await pool.query(
+      `SELECT o.id, o.title, o.description, o.image_url, o.offer_type,
+              o.original_price, o.offer_price, o.discount_value, o.discount_type,
+              o.start_at, o.expires_at,
+              COALESCE(json_agg(json_build_object(
+                'menu_item_id', oi.menu_item_id, 'name', oi.item_name_snapshot,
+                'quantity', oi.quantity, 'price', oi.price_snapshot
+              ) ORDER BY oi.id) FILTER (WHERE oi.id IS NOT NULL), '[]'::json) AS items
+       FROM offers o
+       LEFT JOIN offer_items oi ON oi.offer_id = o.id
+       WHERE o.restaurant_id = $1 AND o.status = 'active'
+         AND o.start_at <= CURRENT_TIMESTAMP
+         AND (o.expires_at IS NULL OR o.expires_at > CURRENT_TIMESTAMP)
+         AND (o.usage_limit IS NULL OR o.usage_count < o.usage_limit)
+       GROUP BY o.id
+       ORDER BY o.start_at DESC, o.id DESC`,
+      [restaurantId]
+    );
+    offers = offerRows;
+  } catch (error) {
+    if (error.code !== '42P01') throw error;
+  }
 
   return {
     table: {
@@ -105,6 +129,7 @@ async function buildPublicTableContext({ restaurantId, tableId }) {
     menu: orderedMenu,
     foodCategories,
     inlineAds,
+    offers,
   };
 }
 

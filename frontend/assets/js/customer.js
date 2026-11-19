@@ -6,8 +6,11 @@ const onlineBtn = document.getElementById('onlineBtn');
 const tableLockNotice = document.getElementById('tableLockNotice');
 const sessionTimerEl = document.getElementById('sessionTimer');
 const joinSessionBtn = document.getElementById('joinSessionBtn');
+const offersSection = document.getElementById('offersSection');
+const offersContainer = document.getElementById('offersContainer');
 
 const cart = new Map();
+let activeOfferId = null;
 let context = null;
 let routeState = null;
 let activeSession = null;
@@ -271,6 +274,68 @@ function renderMenu(menu, ads = []) {
   });
 }
 
+function renderOffers(offers = []) {
+  if (!offersSection || !offersContainer) return;
+  if (!offers.length) {
+    offersSection.classList.add('hidden');
+    offersContainer.innerHTML = '';
+    return;
+  }
+  offersSection.classList.remove('hidden');
+  offersContainer.innerHTML = offers.map((offer) => {
+    const items = (offer.items || []).map((item) => `${item.quantity} ${escapeHtml(item.name)}`).join(' + ');
+    const saving = Math.max(0, Number(offer.original_price) - Number(offer.offer_price));
+    const image = safeResourceUrl(offer.image_url);
+    return `
+      <article class="offer-card">
+        ${image ? `<img src="${escapeHtml(image)}" alt="${escapeHtml(offer.title)}" />` : '<div class="offer-card__placeholder" aria-hidden="true">%</div>'}
+        <div class="offer-card__body">
+          <span class="offer-card__badge">${saving > 0 ? `Save INR ${formatCurrency(saving)}` : 'Special price'}</span>
+          <h3>${escapeHtml(offer.title)}</h3>
+          <p>${items || escapeHtml(offer.description || 'Limited-time restaurant offer')}</p>
+          <p class="offer-card__price">
+            ${Number(offer.original_price) > Number(offer.offer_price) ? `<del>INR ${formatCurrency(offer.original_price)}</del>` : ''}
+            <strong>INR ${formatCurrency(offer.offer_price)}</strong>
+          </p>
+          <button class="btn btn-primary" type="button" data-offer-id="${offer.id}">Add Combo</button>
+        </div>
+      </article>
+    `;
+  }).join('');
+  offersContainer.querySelectorAll('[data-offer-id]').forEach((button) => {
+    button.addEventListener('click', () => {
+      const offer = offers.find((item) => Number(item.id) === Number(button.dataset.offerId));
+      if (offer) addOfferToCart(offer);
+    });
+  });
+}
+
+function addOfferToCart(offer) {
+  const items = offer.items || [];
+  if (!items.length) {
+    setMessage('orderMessage', 'This offer has no available items.', true);
+    return;
+  }
+  activeOfferId = Number(offer.id);
+  items.forEach((item) => {
+    const key = Number(item.menu_item_id);
+    const existing = cart.get(key);
+    if (existing) {
+      existing.quantity = Math.max(existing.quantity, Number(item.quantity));
+    } else {
+      cart.set(key, {
+        id: key,
+        name: item.name,
+        price: Number(item.price),
+        lockedPrice: Number(item.price),
+        quantity: Number(item.quantity),
+      });
+    }
+  });
+  renderCart();
+  setMessage('orderMessage', `${offer.title} added to your cart.`);
+}
+
 async function placeOrder(paymentMethod) {
   if (!activeSession) {
     throw new Error('Table session is not active. Please start or join the session first.');
@@ -290,6 +355,7 @@ async function placeOrder(paymentMethod) {
     customerName: document.getElementById('customerName').value.trim(),
     notes: document.getElementById('orderNotes').value.trim(),
     paymentMethod,
+    offerId: activeOfferId,
     items: entries.map((item) => ({
       menuItemId: item.id,
       itemPrice: item.lockedPrice,
@@ -311,6 +377,7 @@ async function handleCod() {
     setMessage('orderMessage', `Order #${orderData.orderId} placed successfully. Wait for staff delivery.`);
     setOrderingLocked(true, 'Order already placed for this active table session.');
     cart.clear();
+    activeOfferId = null;
     renderCart();
   } catch (error) {
     setMessage('orderMessage', error.message, true);
@@ -358,6 +425,7 @@ async function initCustomerPage() {
     document.getElementById('restaurantTitle').textContent = data.restaurant.name;
     document.getElementById('tableInfo').textContent = `Table ${data.table.table_number}`;
 
+    renderOffers(data.offers);
     renderMenu(data.menu, data.ads);
     renderCart();
 

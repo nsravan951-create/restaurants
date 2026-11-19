@@ -36,6 +36,7 @@ const createOrderSchema = z.object({
   })).min(1).max(40),
   notes: z.string().max(500).optional().default(''),
   couponCode: z.string().optional().default(''),
+  offerId: z.number().int().positive().nullable().optional(),
 });
 
 router.post('/', publicOrderLimiter, asyncHandler(async (req, res) => {
@@ -113,6 +114,7 @@ router.post('/', publicOrderLimiter, asyncHandler(async (req, res) => {
     tableId: Number(req.body.tableId),
     tableSessionId: Number(req.body.tableSessionId),
     couponCode: String(req.body.couponCode || '').trim(),
+    offerId: req.body.offerId ? Number(req.body.offerId) : null,
     items: (req.body.items || []).map((item) => ({
       menuItemId: Number(item.menuItemId),
       itemPrice: Number(item.itemPrice),
@@ -218,6 +220,53 @@ router.post('/', publicOrderLimiter, asyncHandler(async (req, res) => {
 
     let discountAmount = 0;
     let couponMeta = null;
+    let offerMeta = null;
+    if (data.offerId) {
+      if (data.couponCode) {
+        const err = new Error('Offers cannot be combined with a coupon');
+        err.status = 400;
+        throw err;
+      }
+      const { rows: offerRows } = await conn.query(
+        `SELECT id, offer_price, usage_limit, usage_count
+         FROM offers
+         WHERE id = $1 AND restaurant_id = $2 AND status = 'active'
+           AND start_at <= CURRENT_TIMESTAMP
+           AND (expires_at IS NULL OR expires_at > CURRENT_TIMESTAMP)
+         FOR UPDATE`,
+        [data.offerId, data.restaurantId]
+      );
+      if (!offerRows.length) {
+        const err = new Error('This offer is no longer active');
+        err.status = 400;
+        throw err;
+      }
+      const offer = offerRows[0];
+      if (offer.usage_limit !== null && Number(offer.usage_count) >= Number(offer.usage_limit)) {
+        const err = new Error('This offer has reached its redemption limit');
+        err.status = 400;
+        throw err;
+      }
+      const { rows: offerItems } = await conn.query(
+        'SELECT menu_item_id, quantity FROM offer_items WHERE offer_id = $1',
+        [data.offerId]
+      );
+      const requested = new Map(data.items.map((item) => [item.menuItemId, item.quantity]));
+      for (const item of offerItems) {
+        if (Number(requested.get(Number(item.menu_item_id)) || 0) < Number(item.quantity)) {
+          const err = new Error('The selected offer items are incomplete');
+          err.status = 400;
+          throw err;
+        }
+      }
+      discountAmount = Number((subtotal - Number(offer.offer_price)).toFixed(2));
+      if (discountAmount < 0) {
+        const err = new Error('The offer price is invalid for the current menu prices');
+        err.status = 409;
+        throw err;
+      }
+      offerMeta = offer;
+    }
     if (data.couponCode) {
       const couponResult = await validateCoupon({
         restaurantId: data.restaurantId,
@@ -253,6 +302,14 @@ router.post('/', publicOrderLimiter, asyncHandler(async (req, res) => {
         restaurantId: data.restaurantId,
         discountAmount,
       });
+    }
+    if (offerMeta) {
+      await conn.query(
+        `INSERT INTO offer_redemptions (offer_id, restaurant_id, order_id, discount_amount)
+         VALUES ($1, $2, $3, $4)`,
+        [offerMeta.id, data.restaurantId, orderId, discountAmount]
+      );
+      await conn.query('UPDATE offers SET usage_count = usage_count + 1 WHERE id = $1', [offerMeta.id]);
     }
 
     if (orderItems.length) {

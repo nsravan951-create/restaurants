@@ -991,10 +991,70 @@ async function activateSection(sectionName) {
     finance: loadFinance,
     inventory: loadInventory,
     recipes: loadRecipes,
+    offers: loadOffers,
   };
 
   if (loaders[sectionName]) {
     await loaders[sectionName]();
+  }
+
+  async function loadOffers() {
+    if (!ensureRestaurantId()) return;
+    const summaryRoot = document.getElementById('offersSummary');
+    const listRoot = document.getElementById('offersList');
+    const menuSelect = document.getElementById('offerMenuItemSelect');
+    const [offerData, menuData] = await Promise.all([
+      apiRequest(`/api/offers/restaurant/${restaurantId}`, {}, true),
+      apiRequest(`/menu/${restaurantId}`, {}, true),
+    ]);
+    const stats = offerData.stats || {};
+    if (summaryRoot) {
+      summaryRoot.innerHTML = [
+        ['total', 'Total offers'],
+        ['active', 'Active offers'],
+        ['scheduled', 'Scheduled offers'],
+        ['expired', 'Expired offers'],
+        ['redemptions', 'Redemptions'],
+      ].map(([key, label]) => `<div class="od-widget"><strong>${Number(stats[key] || 0)}</strong><span>${label}</span></div>`).join('');
+    }
+    const menu = (menuData.menu || []).filter((item) => item.is_available !== false);
+    if (menuSelect) {
+      menuSelect.innerHTML = menu.map((item) => `<option value="${item.id}">${escapeHtml(item.name)} (INR ${formatCurrency(item.price)})</option>`).join('');
+    }
+    if (listRoot) {
+      listRoot.innerHTML = (offerData.offers || []).map((offer) => `
+        <article class="card">
+          <strong>${escapeHtml(offer.title)}</strong>
+          <p>${escapeHtml(offer.description || '')}</p>
+          <p>${escapeHtml(offer.computed_status)} · INR ${formatCurrency(offer.offer_price)} · ${Number(offer.usage_count || 0)} redemptions</p>
+          <button class="btn btn-light" type="button" data-offer-toggle="${offer.id}" data-next-status="${offer.status === 'paused' ? 'active' : 'paused'}">${offer.status === 'paused' ? 'Activate' : 'Pause'}</button>
+          <button class="btn btn-light" type="button" data-offer-duplicate="${offer.id}">Duplicate</button>
+          <button class="btn btn-light" type="button" data-offer-delete="${offer.id}">Delete</button>
+        </article>
+      `).join('') || '<p class="hero-copy">No offers yet.</p>';
+      listRoot.querySelectorAll('[data-offer-toggle]').forEach((button) => {
+        button.addEventListener('click', async () => {
+          await apiRequest(`/api/offers/${button.dataset.offerToggle}/status`, {
+            method: 'PATCH',
+            body: JSON.stringify({ status: button.dataset.nextStatus }),
+          }, true);
+          await loadOffers();
+        });
+      });
+      listRoot.querySelectorAll('[data-offer-delete]').forEach((button) => {
+        button.addEventListener('click', async () => {
+          if (!window.confirm('Delete this offer?')) return;
+          await apiRequest(`/api/offers/${button.dataset.offerDelete}`, { method: 'DELETE' }, true);
+          await loadOffers();
+        });
+      });
+      listRoot.querySelectorAll('[data-offer-duplicate]').forEach((button) => {
+        button.addEventListener('click', async () => {
+          await apiRequest(`/api/offers/${button.dataset.offerDuplicate}/duplicate`, { method: 'POST' }, true);
+          await loadOffers();
+        });
+      });
+    }
   }
 }
 
@@ -2486,6 +2546,40 @@ document.getElementById('saveLayoutBtn')?.addEventListener('click', async () => 
     await saveDashboardLayout();
   } catch (error) {
     setMessage('ownerMessage', error.message, true);
+  }
+});
+
+document.getElementById('offerForm')?.addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const formData = new FormData(event.target);
+  const selectedItems = Array.from(document.getElementById('offerMenuItemSelect')?.selectedOptions || []);
+  if (!selectedItems.length) {
+    setMessage('ownerMessage', 'Select at least one menu item for the offer.', true);
+    return;
+  }
+  try {
+    await apiRequest('/api/offers', {
+      method: 'POST',
+      body: JSON.stringify({
+        restaurantId,
+        title: formData.get('title'),
+        description: formData.get('description'),
+        imageUrl: formData.get('imageUrl'),
+        offerType: formData.get('offerType'),
+        offerPrice: Number(formData.get('offerPrice')),
+        startAt: formData.get('startAt') ? new Date(formData.get('startAt')).toISOString() : undefined,
+        expiresAt: formData.get('expiresAt') ? new Date(formData.get('expiresAt')).toISOString() : null,
+        items: selectedItems.map((option) => ({
+          menuItemId: Number(option.value),
+          quantity: Number(formData.get('quantity') || 1),
+        })),
+      }),
+    }, true);
+    event.target.reset();
+    setMessage('ownerMessage', 'Offer created.');
+    await loadOffers();
+  } catch (error) {
+    setMessage('ownerMessage', error.message || 'Could not create offer.', true);
   }
 });
 

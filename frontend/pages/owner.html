@@ -161,6 +161,37 @@
             <div id="menuList" class="stack"></div>
           </section>
 
+          <section class="panel dashboard-section hidden" data-owner-section-panel="offers">
+            <div class="section-head">
+              <div>
+                <h2>Offers &amp; Combos</h2>
+                <p class="hero-copy">Create restaurant-scoped combos from currently available menu items.</p>
+              </div>
+            </div>
+            <div id="offersSummary" class="od-widget-grid"></div>
+            <form id="offerForm" class="grid-3" style="margin-top:1rem;">
+              <input name="title" placeholder="Offer title" required />
+              <select name="offerType" required>
+                <option value="combo">Combo offer</option>
+                <option value="special_price">Special price</option>
+                <option value="percentage">Percentage discount</option>
+                <option value="flat">Flat discount</option>
+                <option value="bogo">Buy one get one</option>
+                <option value="free_item">Free item</option>
+              </select>
+              <input name="offerPrice" type="number" min="0" step="0.01" placeholder="Offer price (INR)" required />
+              <input name="description" placeholder="Short description" />
+              <input name="imageUrl" type="url" placeholder="Banner image URL (optional)" />
+              <input name="startAt" type="datetime-local" />
+              <input name="expiresAt" type="datetime-local" />
+              <select name="menuItemId" id="offerMenuItemSelect" multiple required aria-label="Included menu items"></select>
+              <input name="quantity" type="number" min="1" value="1" placeholder="Quantity per item" required />
+              <button class="btn btn-primary" type="submit">Create Offer</button>
+            </form>
+            <p class="hero-copy">Hold Ctrl/Cmd to select multiple active menu items. Each selected item uses the quantity above.</p>
+            <div id="offersList" class="stack" style="margin-top:1rem;"></div>
+          </section>
+
           <section class="panel dashboard-section hidden" data-owner-section-panel="finance">
             <div class="section-head">
               <div>

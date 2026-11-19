@@ -30,6 +30,7 @@ Apply order (psql examples):
   psql "$DATABASE_URL" -f database/sql/019_settlement_reconciliation_enhancements.sql
   psql "$DATABASE_URL" -f database/sql/020_inventory_enhancements.sql
   psql "$DATABASE_URL" -f database/sql/021_recipe_consumption_enhancements.sql
+  psql "$DATABASE_URL" -f database/sql/022_offers.sql
 
 Or apply all at once (after reviewing each file):
 
